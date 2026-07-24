@@ -1,58 +1,65 @@
 # Issue tracker: Local Markdown
 
-Issues and Wayfinder maps for this repository live as Markdown files under
-`.scratch/`.
+Issues and PRDs for this project live as Markdown files in `.scratch/`.
 
 ## Conventions
 
-- One effort per directory: `.scratch/<effort-slug>/`
-- The canonical Wayfinder map is `.scratch/<effort-slug>/PRD.md`
-- Decision tickets are `.scratch/<effort-slug>/issues/<NN>-<slug>.md`
-- Research assets are `.scratch/<effort-slug>/research/<slug>.md`
-- `State:` records whether a ticket is `open` or `closed`
-- `Status:` uses the vocabulary in
-  [triage-labels.md](triage-labels.md)
-- `Assignee: unassigned` means the ticket is unclaimed
-- Resolution history is appended under `## Comments`
+- One feature per directory: `.scratch/<feature-slug>/`
+- The PRD is `.scratch/<feature-slug>/PRD.md`
+- Issues are `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from
+  `01`
+- `State:` records whether an issue is `open` or `closed`
+- `Status:` records its triage state; see `triage-labels.md`
+- `Assignee:` records the actor that has claimed the issue
+- Comments and conversation history append under `## Comments`
+- A resolved issue records its answer under `## Resolution`
+
+## When a skill says "publish to the issue tracker"
+
+Create a file under `.scratch/<feature-slug>/`, creating its `issues/`
+directory when needed.
+
+## When a skill says "fetch the relevant ticket"
+
+Read the referenced file. The user will normally provide its path, title, or
+issue number.
 
 ## Wayfinding operations
 
-### Create a map
+### Maps and child tickets
 
-Create `PRD.md` with the `wayfinder:map` label and the sections Destination,
-Notes, Decisions so far, Not yet specified, and Out of scope.
+- A Wayfinder map is an issue file with `Type: wayfinder:map`
+- Use `.scratch/<feature-slug>/issues/00-<map-slug>.md` for the map so its
+  index is visually first
+- A child ticket records `Parent:` with the map's relative path
+- A child ticket records one of `Type: wayfinder:research`,
+  `wayfinder:prototype`, `wayfinder:grilling`, or `wayfinder:task`
+- Refer to maps and tickets by their Markdown-linked titles in human-facing
+  text, not by bare issue numbers
 
-### Create a child ticket
+### Blocking and frontier
 
-Create a numbered file in `issues/` with:
+- A ticket records dependencies as a comma-separated `Blocked by:` list of
+  relative issue paths; use `none` when it has no blockers
+- A ticket is unblocked when every listed blocker has `State: closed`
+- The frontier is the ordered set of child tickets whose `State:` is `open`,
+  whose blockers are all closed, and whose `Assignee:` is `unassigned`
 
-- a `wayfinder:research`, `wayfinder:prototype`, `wayfinder:grilling`, or
-  `wayfinder:task` label;
-- a relative link to the parent map;
-- `Assignee: unassigned`;
-- `Blocked by:` and `Blocks:` links;
-- a single decision under `## Question`.
+### Claiming
 
-### Claim a ticket
+Before working a ticket, replace `Assignee: unassigned` with the actor name.
+The assignee is the claim; other sessions must skip claimed tickets.
 
-Replace `Assignee: unassigned` before doing any work. The assignee line is the
-claim and prevents another session from taking the same ticket.
+### Resolution
 
-### Express blocking
+To resolve a ticket:
 
-This tracker has no native dependency graph, so each ticket records dependency
-links under `Blocked by:`. A ticket is unblocked only when every linked blocker
-has `State: closed`.
+1. Append the answer under `## Resolution`
+2. Set `State: closed`
+3. Update the parent map's `## Decisions so far` with a linked one-line gist
+4. Create newly visible tickets before adding their blocking relationships
+5. Remove graduated material from `## Not yet specified`
 
-The frontier is the ordered set of child tickets that are:
-
-1. `State: open`;
-2. unblocked; and
-3. `Assignee: unassigned`.
-
-### Resolve a ticket
-
-Append a dated resolution comment, link any research or prototype asset, set
-`State: closed`, and add a one-line context pointer to the map's
-`Decisions so far` section. The detailed answer lives in the ticket or linked
-asset; the map contains only the gist.
+If a ticket is found to be beyond the map's destination, close it as
+out-of-scope and link it under the map's `## Out of scope` instead of
+`## Decisions so far`.

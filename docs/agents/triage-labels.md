@@ -1,12 +1,15 @@
-# Triage labels
+# Triage Labels
 
-| Canonical role | Local label | Meaning |
+The skills speak in terms of five canonical triage roles. This file maps those
+roles to the status strings used in this project's local Markdown tracker.
+
+| Label in mattpocock/skills | Label in our tracker | Meaning |
 | --- | --- | --- |
-| `needs-triage` | `needs-triage` | Maintainer evaluation is required |
-| `needs-info` | `needs-info` | Waiting for human input |
-| `ready-for-agent` | `ready-for-agent` | Fully specified and AFK-ready |
-| `ready-for-human` | `ready-for-human` | Requires live human participation |
+| `needs-triage` | `needs-triage` | Maintainer needs to evaluate this issue |
+| `needs-info` | `needs-info` | Waiting on reporter for more information |
+| `ready-for-agent` | `ready-for-agent` | Fully specified and ready for an AFK agent |
+| `ready-for-human` | `ready-for-human` | Requires human implementation |
 | `wontfix` | `wontfix` | Will not be actioned |
 
-Ticket dependencies, rather than the status label, determine whether a ticket
-is currently on the Wayfinder frontier.
+When a skill mentions a canonical role, use the corresponding status string
+from this table.
