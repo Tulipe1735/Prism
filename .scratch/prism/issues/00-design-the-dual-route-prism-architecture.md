@@ -56,8 +56,8 @@ a safe, dynamically expanded Run DAG.
 
 - Implementing or publishing executable product tickets during this map.
 - GitHub, Vercel, Supabase, and other third-party dashboard repair scenarios
-  are deferred beyond this first React frontend-repair architecture slice; see
-  the [superseded console-operations scenario catalog](../scenarios.md).
+  are deferred beyond R1–R13; their reusable constraints and candidate fixtures
+  are retained in [Prism future dashboard adapters](../scenarios.md).
 - Open-ended aesthetic design prompts without a confirmable repair plan are
   outside the MVP evaluation boundary.
 - Treating Prism as a plugin for a customer's existing coding agent, or adding

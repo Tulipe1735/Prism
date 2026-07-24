@@ -1,140 +1,94 @@
-# Superseded Prism console-operations scenario catalog
+# Prism future dashboard adapters
 
-Decision date: 2026-07-23  
-Status: `superseded`
+Status: `deferred`
+Origin: valuable constraints absorbed from the superseded ConsoleOps plan
+Implementation status: `not authorized`
 
-Superseded on 2026-07-24 when the first Prism vertical slice moved to
-objectively verifiable React frontend repairs with source edits from the Coding Runtime
-and rendered-result verification from the Browser Runtime. This catalog is
-retained as historical input for later dashboard-operation expansion. The
-replacement scenario decision lives in
-[Choose the React frontend-repair MVP scenarios](issues/17-choose-the-react-frontend-repair-mvp-scenarios.md).
+GitHub, Vercel, and Supabase dashboard repair may become a later Prism adapter family after the local React repair system and R1–R13 release evidence are complete. This is not an active scenario catalog, implementation graph, or extension of M1/M2.
 
-## Shared contract
+The future adapters reuse Prism Orchestrator, Browser Runtime, ActionBroker, event journal, artifact store, approval records, deterministic oracles, and recovery semantics. They do not restore the former Diagnoser, Browser Operator, and Auditor product model, add another autonomous runtime, or allow the browser worker to edit source.
 
-Every scenario uses a disposable fixture, synthetic values, a visible Chrome
-repair, scoped read-only MCP evidence, an intercepted typed mutation, an
-approval record, a replayable trajectory, a machine-checkable oracle, and a
-deterministic reset. Balanced mode may run low-risk observations automatically
-but requests approval for medium- and high-risk mutations. Strict mode requests
-approval for every mutation. High-risk approval cannot be disabled.
+## Promotion gate
 
-The scenario runner is the primary end-to-end seam:
+Before any dashboard scenario becomes an implementation ticket:
 
-`prompt -> role handoffs -> MCP evidence -> visible Chrome repair -> approval -> audit/replay -> oracle -> reset`
+1. open a new scoped design decision after the React release baseline exists;
+2. revalidate vendor MCP and dashboard capabilities against current primary documentation;
+3. provision a disposable repository, preview project, or development database;
+4. freeze a synthetic known-bad baseline, deterministic reset, and machine-checkable oracle;
+5. register exact semantic operations, targets, parameters, preconditions, redactions, risks, and approvals;
+6. demonstrate cleanup without production accounts, secrets, billing, or irreversible state.
 
-## S1 — Repair a GitHub Actions repository variable
+## Reusable adapter contract
 
-- **Initial state:** A disposable repository has a failing fixture workflow
-  because one non-secret Actions repository variable contains a deliberately
-  incorrect synthetic value.
-- **User prompt:** "Diagnose the failing fixture workflow and repair its
-  non-secret configuration."
-- **Evidence:** The GitHub MCP reads the failed run, job, and log output and
-  identifies the referenced variable without reading or exposing secrets.
-- **Chrome action:** Open the repository's Actions variable settings and replace
-  the fixture value through the visible GitHub UI.
-- **Approval:** Intercept the typed repository-setting mutation before the final
-  save and record the approver, risk class, proposed value, and decision.
-- **Oracle:** Re-run or dispatch the fixture workflow; the GitHub MCP confirms
-  the expected run and job complete successfully.
-- **Reset:** Restore the known-bad synthetic variable and produce a fresh
-  failing run.
-- **Non-goals:** Secrets, production environments, workflow-file edits, branch
-  protection, repository administration, and arbitrary repositories.
+### Evidence and authority
 
-## S2 — Enable a disabled GitHub fixture workflow
+- Vendor MCP connections are project-scoped, minimally enabled, and read-only by default.
+- MCP supplies structured diagnosis and independent before and after verification. It is not an authorization boundary, and a discovered tool is not automatically allowed.
+- Browser input remains a typed ActionBroker proposal. Neither UI-TARS nor an MCP tool receives unrestricted browser, shell, repository, or filesystem authority.
+- Page content, screenshots, DOM, accessibility data, console output, network bodies, and MCP responses are untrusted observations and cannot widen tools or policy.
 
-- **Initial state:** A known fixture workflow exists but is disabled in a
-  disposable repository.
-- **User prompt:** "Find why the fixture automation does not run and restore it."
-- **Evidence:** The GitHub MCP confirms the workflow identity and its disabled
-  state, with no unrelated repository mutation.
-- **Chrome action:** Open the workflow in GitHub Actions, enable it visibly, and
-  dispatch the fixture when required by the oracle.
-- **Approval:** Intercept workflow enablement before the final confirmation.
-- **Oracle:** The GitHub MCP confirms the workflow is enabled and a deterministic
-  fixture run succeeds.
-- **Reset:** Disable the same workflow and clear or ignore the prior fixture run.
-- **Non-goals:** Editing workflow YAML, enabling arbitrary workflows, changing
-  permissions, production deployment, or repository administration.
+### Semantic operation registry
 
-## S3 — Repair a Vercel preview environment value
+Every persistent effect must match a versioned, adapter-owned registry entry containing:
 
-- **Initial state:** A disposable preview project has a missing or incorrect
-  non-secret synthetic environment value, causing its fixture health check to
-  fail.
-- **User prompt:** "Diagnose the broken preview and repair its preview-only
-  configuration."
-- **Evidence:** The Vercel MCP reads project, deployment, and build/runtime log
-  evidence that points to the fixture key; secret values remain redacted.
-- **Chrome action:** Update only the preview-scoped value in Vercel project
-  settings and visibly trigger the required preview redeploy.
-- **Approval:** Intercept both the setting update and redeploy as typed
-  operations, grouping them in one explicit repair plan when policy permits.
-- **Oracle:** Vercel reports a ready preview and the fixture endpoint returns its
-  expected machine-checkable response.
-- **Reset:** Restore the known-bad preview value and create a fresh failing
-  preview.
-- **Non-goals:** Production values, real credentials, production promotion,
-  aliases, domains, DNS, billing, or arbitrary Vercel projects.
+- operation name and parameter schema;
+- allowlisted account, repository or project, environment, and target;
+- expected precondition and intended postcondition;
+- redaction and artifact policy;
+- risk class and approval requirement;
+- deterministic oracle and reversal or reset primitive.
 
-## S4 — Repair a Vercel preview build configuration
+Unknown operations fail closed and emit a registry miss. Forbidden operations terminate without an override path. Generic `click`, `type`, `save`, `deploy`, SQL, settings, policy, extension, or arbitrary JavaScript operations are never registered as persistent effects.
 
-- **Initial state:** A disposable monorepo preview project has an incorrect Root
-  Directory or equivalent build setting and therefore cannot build the fixture.
-- **User prompt:** "Use the failed preview evidence to fix the project's build
-  configuration."
-- **Evidence:** The Vercel MCP reads the failed deployment and build logs and
-  identifies the expected fixture directory.
-- **Chrome action:** Correct the selected build setting in the visible Vercel
-  dashboard and trigger a preview redeploy.
-- **Approval:** Intercept the project-setting mutation and redeploy before
-  execution.
-- **Oracle:** The replacement preview reaches ready state and its fixture
-  endpoint returns the expected response.
-- **Reset:** Restore the known-bad build setting and create a fresh failed
-  deployment.
-- **Non-goals:** Source-code repair, production deployment, framework migration,
-  domain changes, billing, or unrelated project settings.
+### Approval and recovery
 
-## S5 — Repair a Supabase fixture RLS policy
+- An approval is single-use and binds the registry version, operation digest, normalized parameters, active DAG node, target, risk, observation, and precondition.
+- State drift, changed parameters, navigation to another target, interruption, or process restart invalidates the approval.
+- The journal must durably record the redacted proposal and approval decision before execution. Persistence failure denies the action.
+- Denial and cancellation perform no new mutation and terminate the current transaction.
+- An unknown or possibly partial effect is never blindly retried. Prism first observes actual state, then appends a reconciliation, compensation, or human-review node.
+- Reset is a separately audited workflow and completes only when its fixed baseline oracle passes. A failed reset marks the fixture dirty.
 
-- **Initial state:** A development-only fixture table has RLS enabled but lacks
-  its intended narrow read policy, so the fixture role cannot read the expected
-  row.
-- **User prompt:** "Diagnose the fixture's authorization failure and restore the
-  intended least-privilege read access."
-- **Evidence:** A project-scoped, read-only Supabase MCP connection reproduces
-  the denied or empty query and reads relevant advisors or logs.
-- **Chrome action:** Use the visible Supabase policy editor to create the exact
-  fixture-only SELECT policy for the named role and condition.
-- **Approval:** Treat the security-policy change as high risk. Approval is
-  mandatory in every mode and records the full proposed policy.
-- **Oracle:** The intended fixture role can read the expected row while the
-  unauthorized fixture role remains denied.
-- **Reset:** Remove the named fixture policy and confirm the original denial.
-- **Non-goals:** Production data, broad public access, write policies, bypassing
-  RLS, MCP SQL mutation, schema redesign, or account administration.
+### Browser evidence
 
-## S6 — Enable a required Supabase PostgreSQL extension
+- Prefer a unique semantic target; use hybrid visual grounding when it adds confidence.
+- Coordinate actions are a fallback and bind to the exact screenshot, viewport, device-pixel ratio, tab, URL, and page-state hash.
+- Navigation, resize, scrolling, a newer observation, or target ambiguity makes a visual action stale.
+- Capture localized before and after evidence for every persistent effect.
+- Playwright and UI-TARS traces are supplementary forensic artifacts. Exact executable replay of a changing external dashboard is not promised.
 
-- **Initial state:** A development-only fixture requires a preselected harmless
-  extension such as `pg_trgm`, which is disabled; the deterministic fixture
-  query therefore fails.
-- **User prompt:** "Find the missing database capability and enable only what
-  this development fixture requires."
-- **Evidence:** The read-only Supabase MCP confirms the extension is absent and
-  captures the fixture query failure.
-- **Chrome action:** Enable the allow-listed extension through the visible
-  Supabase dashboard.
-- **Approval:** Intercept the database-capability mutation before enablement and
-  show its project, schema, extension, risk class, and reversal plan.
-- **Oracle:** The MCP confirms the extension is installed and the deterministic
-  fixture query succeeds.
-- **Reset:** Remove fixture dependencies, disable the extension, and confirm the
-  original failure state.
-- **Non-goals:** Production databases, arbitrary or privileged extensions,
-  destructive SQL, MCP mutation, account administration, or unrelated schema
-  changes.
+## Candidate adapter scenarios
 
+These six scenarios are retained as future inputs, not approved work.
+
+| Adapter | Synthetic failure | Evidence channel | Visible browser repair | Oracle and reset | Risk |
+| --- | --- | --- | --- | --- | --- |
+| GitHub | A non-secret Actions repository variable has the wrong fixture value | Project-scoped GitHub MCP reads the failed workflow, job, and logs | Change only the named synthetic variable | A fixture workflow succeeds; reset restores the wrong value and fresh failure | Medium |
+| GitHub | A named disposable workflow is disabled | GitHub MCP confirms workflow identity and state | Enable only that workflow and optionally dispatch it | MCP confirms enabled state and successful fixture run; reset disables it | Medium |
+| Vercel | A preview-only synthetic environment value is missing or wrong | Project-scoped Vercel MCP reads deployment, build, and runtime evidence | Update only the preview value and trigger one preview redeploy | Preview becomes ready and fixture endpoint passes; reset restores the bad value | Medium |
+| Vercel | A disposable preview has the wrong Root Directory or build setting | Vercel MCP reads failed build evidence | Correct the named build field and redeploy preview | Replacement preview and fixture endpoint pass; reset restores the bad setting | Medium |
+| Supabase | A development fixture table lacks one narrow read policy | Read-only, project-scoped Supabase MCP reproduces denial and reads advisors or logs | Create the exact fixture-only SELECT policy | Intended role reads the row while unauthorized role remains denied; reset removes the policy | High |
+| Supabase | A harmless allowlisted development extension required by a fixture is disabled | Read-only Supabase MCP confirms extension state and fixture-query failure | Enable only the named extension | Extension and fixture query pass; reset removes dependencies and disables it | High |
+
+## Permanently forbidden initial surfaces
+
+- production accounts, deployments, databases, or customer data;
+- secrets, service-role keys, tokens, credential screenshots, or secret-value editing;
+- billing, purchases, domains, DNS, ownership transfer, or organization and account administration;
+- repository deletion, visibility changes, branch or ruleset weakening, or arbitrary source pushes;
+- production promotion, aliases, real environment secrets, or arbitrary deployments;
+- destructive SQL, broad RLS access, database-password rotation, project pause or deletion, arbitrary extensions, or security weakening;
+- uploads, downloads, cross-origin data movement, or arbitrary script evaluation without a separately approved capability design.
+
+## Historical decisions intentionally not carried forward
+
+- Chrome interaction is not mandatory for every Prism task.
+- Vendor MCP is not part of the React MVP.
+- The former three-agent role split is replaced by one Orchestrator with sibling Coding and Browser runtimes.
+- The former Next.js operator and replay interface is not an approved Prism milestone.
+- The former I1–I8 ConsoleOps graph must not be published or implemented.
+
+## Historical source note
+
+This document is the durable Prism summary of the removed ConsoleOps planning directory. The detailed external capability research was dated 2026-07-23 and must be refreshed before implementation because vendor MCP and dashboard surfaces change.

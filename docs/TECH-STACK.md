@@ -1,74 +1,72 @@
-# Technical baseline
+# Prism technical baseline
 
-Status: **selected for planning; not yet implemented**
+Status: `selected for the approved roadmap; not yet implemented`
 
-These packages are the current implementation baseline. Open Wayfinder research
-tickets validate their integration boundaries and current APIs; they do not
-reopen the stack without concrete evidence.
+This document describes the current Prism technology boundary. Exact dependency versions and any package name not fixed by the approved architecture are pinned during R1 or the owning implementation ticket.
 
-## Application layer
+## Product runtime
 
 | Technology | Responsibility |
 | --- | --- |
-| TypeScript | Shared language for the harness, adapters, schemas, and UI |
-| Next.js | Operator console, approval UI, run status, and replay viewer |
+| TypeScript on Node.js | Orchestrator, contracts, runtimes, controlled executors, CLI, and evaluation tooling |
+| pnpm workspace | Package boundaries and distribution |
+| Pi Agent SDK | Embedded Coding Runtime session and coding trajectory events |
+| UI-TARS SDK | Embedded Browser Runtime visual grounding and typed action proposals |
 
-Exact framework and runtime versions will be pinned when the implementation
-architecture ticket resolves.
+The Orchestrator and both SDK runtimes run in one Node.js process for the MVP. This is a deployment choice, not an authority shortcut: source, shell, test, and browser effects still cross controlled executors.
 
-## Agent and integration runtime
+Do not inherit the former ConsoleOps package name or version pins by default. R1 must pin the actual Pi and UI-TARS packages against the interfaces approved in the roadmap.
 
-| Package | Responsibility |
-| --- | --- |
-| `@earendil-works/pi-agent-core` | Agent loop, event streaming, tool preflight, and context transformation |
-| `playwright-core` | Chrome/CDP connection, browser sessions, screenshots, and UI actions |
-| `@modelcontextprotocol/sdk@1` | MCP client transport, discovery, and tool invocation |
-
-Pi has migrated to the `@earendil-works/pi-agent-core` package name. The MCP
-TypeScript SDK stays on major version 1 for the MVP because version 2 remains a
-future migration rather than an implementation prerequisite.
-
-References:
-
-- [Pi Agent Core package](https://www.npmjs.com/package/@earendil-works/pi-agent-core)
-- [Official MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-
-## Contracts, testing, and observability
-
-| Package | Responsibility |
-| --- | --- |
-| `zod` | Runtime schemas for operations, trajectories, approvals, fixtures, and adapter boundaries |
-| `vitest` | Unit tests for policy, schemas, routing, and trace behavior |
-| `@playwright/test` | End-to-end scenario fixtures, verifiers, retries, and evidence capture |
-| `pino` | Structured operational logs with run and trace correlation identifiers |
-
-## Intended layering
+## Prism-owned packages
 
 ```text
-Next.js operator and replay UI
-                |
-@earendil-works/pi-agent-core
-                |
-typed operation registry (zod)
-        /                       \
-playwright-core             MCP SDK v1
-Chrome observations         structured evidence
-and approved actions        and verification
-        \                       /
- pino trace events + Vitest/Playwright verification
+apps/
+  cli/
+packages/
+  contracts/
+  orchestrator/
+  runtime-pi/
+  runtime-ui-tars/
+  workspace-executor/
+  action-broker/
+  trajectory-store/
+  eval/
+fixtures/
+  react-repair/
 ```
 
-## Guardrails
+- `contracts` owns versioned DAG, task-envelope, outcome, evidence, event, and artifact schemas.
+- `orchestrator` owns routing, DAG revisions, scheduling, budgets, cancellation, and the fenced exclusive effect lease.
+- `runtime-pi` and `runtime-ui-tars` translate SDK events into Prism contracts; neither may execute unrestricted effects or mutate the DAG.
+- `workspace-executor` confines repository reads, patches, commands, and tests.
+- `action-broker` validates browser proposals and owns BrowserExecutor access.
+- `trajectory-store` owns the append-only journal, hashed artifacts, and rebuildable snapshots.
+- `eval` owns deterministic fault tests, React scenarios, and the frozen SWE-bench non-regression manifest.
 
-- `playwright-core` is the browser substrate; `@playwright/test` is the
-  scenario-verification layer. Do not collapse their responsibilities.
-- MCP tools support diagnosis and verification but do not remove the required
-  Chrome interaction from an MVP scenario.
-- Every MCP result, browser action, approval, and verifier result must cross a
-  Zod-validated boundary before being recorded.
-- Pino logs are operational diagnostics. The replayable trajectory schema
-  remains the durable source of truth.
-- Package selection does not imply that approval pause/resume, three-agent
-  handoffs, or replay are provided automatically. The Pi research ticket must
-  identify the thin harness required around confirmed APIs.
-- No dependency installation is authorized by this planning document.
+## Browser and verification boundary
+
+The UI-TARS SDK is a planner and grounder, not the security boundary. A custom Prism operator maps each prediction to a typed browser proposal. The ActionBroker checks target freshness, origin, effect class, authority, approval, and lease before BrowserExecutor input.
+
+Use semantic or hybrid targets where possible. A coordinate target must be bound to the screenshot hash, viewport, device-pixel ratio, tab, and page state that produced it. Stale targets fail closed.
+
+Deterministic browser predicates and fixture oracles are authoritative. Screenshots, UI-TARS judgment, Playwright traces, console data, and network data are evidence artifacts, not substitutes for the oracle.
+
+## Testing and observability requirements
+
+Implementation packages must select libraries that provide:
+
+- runtime schema validation for every cross-package contract;
+- deterministic unit and fault testing;
+- browser fixture control, screenshots, traces, console, and network evidence;
+- structured events with run, DAG, node, attempt, correlation, and causation identity;
+- Windows-safe artifact paths and deterministic process cleanup.
+
+The exact schema, test, logging, and browser-executor packages remain R1/R4/R8 implementation pins unless the approved roadmap names them explicitly.
+
+## Deferred dashboard adapters
+
+Future GitHub, Vercel, and Supabase adapters may add project-scoped, normally read-only vendor MCP evidence beside visible browser repair. They reuse Prism ActionBroker, approval, journal, artifact, oracle, reset, and recovery contracts; they do not revive the former ConsoleOps product or become a third runtime.
+
+See [Prism future dashboard adapters](../.scratch/prism/scenarios.md).
+
+No dependency installation is authorized by this planning document.

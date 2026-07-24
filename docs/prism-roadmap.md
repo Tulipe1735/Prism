@@ -206,6 +206,18 @@ are hard. Report median and p95 tokens, cost, and wall time. Run deterministic
 tests on every change, an optional representative pre-merge model smoke, and
 the full 42-attempt evaluation only for release candidates or scheduled runs.
 
+## Deferred dashboard-adapter expansion
+
+The useful approval, semantic-operation, MCP evidence, browser-safety, replay,
+oracle, and reset constraints from the former ConsoleOps direction are retained
+in [Prism future dashboard adapters](../.scratch/prism/scenarios.md).
+
+GitHub, Vercel, and Supabase repair remains outside R1–R13. A later adapter
+effort may reuse Prism Orchestrator, Browser Runtime, ActionBroker, journal,
+artifacts, and recovery contracts only after the React release baseline exists
+and current vendor capabilities, disposable fixtures, risk entries, approvals,
+oracles, and reset behavior are revalidated.
+
 ## Replacement implementation DAG
 
 This graph replaces the superseded I1–I8 console-operations graph. It is not
