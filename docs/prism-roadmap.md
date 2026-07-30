@@ -1,7 +1,7 @@
 # Prism developer-ready roadmap
 
 Status: `approved`  
-Implementation status: `not started`  
+Implementation status: `active — Field Desk and initial request contracts built`
 Supersedes: the console-operations scenario catalog and I1–I8 graph  
 
 Approving this document approves an architecture and implementation sequence.
@@ -53,8 +53,10 @@ source mutations and browser input share one exclusive effect lease.
 
 ```text
 apps/
-  cli/
+  web/                 # implemented Field Desk
+  cli/                 # planned release surface
 packages/
+  tooling-config/      # implemented shared tooling
   contracts/
   orchestrator/
   runtime-pi/
@@ -67,10 +69,12 @@ fixtures/
   react-repair/
 ```
 
-These pnpm packages modularize Prism; they do not extend a customer's existing
-coding agent. Package interfaces remain process-neutral so later isolation
-does not require changing DAG or artifact schemas, although the MVP runs in
-one Node.js process.
+The initial slice implements `apps/web`, `packages/tooling-config`, and the
+first request boundary in `packages/contracts`; every other entry above remains
+planned work owned by its implementation ticket. These pnpm packages modularize
+Prism; they do not extend a customer's existing coding agent. Package
+interfaces remain process-neutral so later isolation does not require changing
+DAG or artifact schemas, although the MVP runs in one Node.js process.
 
 ## Canonical contracts
 

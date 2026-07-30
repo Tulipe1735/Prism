@@ -1,0 +1,11 @@
+node_modules/
+.playwright-cli/
+.pnpm-store/
+.next/
+.turbo/
+coverage/
+dist/
+out/
+*.tsbuildinfo
+.DS_Store
+*.log

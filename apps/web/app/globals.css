@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --color-prism-blue: #246bfe;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+:root {
+  color-scheme: light;
+  background: #f3efe4;
+  font-family:
+    "Aptos",
+    "Segoe UI Variable",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: #f3efe4;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background-color: #f3efe4;
+  background-image: radial-gradient(rgba(49, 43, 29, 0.1) 0.55px, transparent 0.7px);
+  background-size: 5px 5px;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea {
+  color: inherit;
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  color: white;
+  background: #246bfe;
+}

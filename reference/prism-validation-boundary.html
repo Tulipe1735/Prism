@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prism Validation Boundary — Reference</title>
+    <link rel="icon" href="../assets/lesson-icon.svg" />
+    <link rel="stylesheet" href="../assets/learning.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="kicker">Prism / Reference / v1</span>
+        <h1>Repair request 信任边界</h1>
+        <p class="lede">改 contract 或排查 validation 时，按此顺序定位。</p>
+      </header>
+
+      <section>
+        <div class="two-column">
+          <article class="reference-card">
+            <span class="eyebrow">Browser boundary</span>
+            <h2>即时反馈</h2>
+            <ol>
+              <li>构造 draft。</li>
+              <li><code>repairRequestSchema.safeParse(draft)</code>。</li>
+              <li>失败：显示字段错误，不 fetch。</li>
+              <li>成功：POST JSON。</li>
+              <li>再校验服务器响应 schema。</li>
+            </ol>
+            <span class="path">apps/web/components/field-desk/repair-composer.tsx</span>
+          </article>
+
+          <article class="reference-card">
+            <span class="eyebrow">Server boundary</span>
+            <h2>独立信任</h2>
+            <ol>
+              <li>Content-Type 必须是 JSON。</li>
+              <li>body 不得超过 16 KiB。</li>
+              <li>JSON 必须可解析。</li>
+              <li>同一 request schema 必须通过。</li>
+              <li>workspace 必须匹配服务端配置。</li>
+            </ol>
+            <span class="path">apps/web/app/api/repair-requests/route.ts</span>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Response map</span>
+        <h2>状态码与 contract</h2>
+        <div class="reference-card">
+          <p><code>200</code> — validated；明确没有 <code>runId</code></p>
+          <p><code>400</code> — malformed JSON</p>
+          <p><code>413</code> — body 超限</p>
+          <p><code>415</code> — 非 JSON media type</p>
+          <p><code>422</code> — schema、版本或 workspace 不支持</p>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Change checklist</span>
+        <h2>改 schema 时</h2>
+        <ol>
+          <li>先改一条单测并看到红。</li>
+          <li>改 <code>packages/contracts/src/index.ts</code>。</li>
+          <li>更新 draft 生产者，不复制校验规则。</li>
+          <li>更新 route boundary tests。</li>
+          <li>运行 format、lint、typecheck、test、build。</li>
+        </ol>
+      </section>
+
+      <footer>
+        <p>
+          Lesson:
+          <a href="../lessons/0001-one-schema-two-boundaries.html"
+            >一份 Schema，为什么要验证两次？</a
+          >
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "prism",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --filter=@prism/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:contracts": "pnpm --filter @prism/contracts test",
+    "test:prototype": "pnpm --filter @prism/web test:prototype",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@prism/tooling-config": "workspace:*",
+    "prettier": "3.9.6",
+    "turbo": "2.10.7",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "packageManager": "pnpm@9.15.9"
+}

@@ -1,0 +1,41 @@
+{
+  "name": "@prism/tooling-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./eslint/base": "./eslint/base.mjs",
+    "./eslint/next": "./eslint/next.mjs",
+    "./prettier": "./prettier.mjs",
+    "./vitest": "./vitest.mjs",
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/library.json": "./tsconfig/library.json",
+    "./tsconfig/nextjs.json": "./tsconfig/nextjs.json"
+  },
+  "dependencies": {
+    "@eslint/eslintrc": "3.3.6",
+    "@eslint/js": "9.39.5",
+    "eslint-config-next": "15.5.21",
+    "typescript-eslint": "8.65.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  },
+  "peerDependenciesMeta": {
+    "eslint": {
+      "optional": true
+    },
+    "prettier": {
+      "optional": true
+    },
+    "typescript": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
+  }
+}

@@ -4,13 +4,34 @@ Prism is a standalone TypeScript Visual SWE harness. It accepts a natural-langua
 
 ## Current status
 
-The developer-ready architecture is approved. Product implementation has not started.
+The developer-ready architecture is approved. The first implementation slice is
+now built: a production-shaped Next.js Field Desk, shared Zod repair-request
+contracts, browser/server validation, and honest empty Run surfaces. Run
+creation, persistence, orchestration, Pi, UI-TARS, browser evidence, and replay
+remain planned work rather than implemented capability.
 
 - [Read the canonical Prism roadmap](docs/prism-roadmap.md)
 - [Open the completed Wayfinder map](.scratch/prism/issues/00-design-the-dual-route-prism-architecture.md)
 - [Read the selected technical baseline](docs/TECH-STACK.md)
 - [Review the deferred dashboard-adapter expansion](.scratch/prism/scenarios.md)
 - [Read the local tracker conventions](docs/agents/issue-tracker.md)
+- [Open the selected Field Desk UI prototype](apps/web/app/prototype/prism/NOTES.md)
+
+Run the current product shell:
+
+```bash
+pnpm install
+pnpm dev
+```
+
+The Field Desk is at `/`; the selected throwaway prototype remains available at
+`/prototype/prism` for regression comparison.
+
+Run the repeatable prototype-isolation regression with:
+
+```bash
+pnpm test:prototype
+```
 
 ## First product boundary
 
@@ -26,13 +47,17 @@ GitHub, Vercel, and Supabase dashboard repair is a deferred adapter direction, n
 
 ## Delivery sequence
 
-The approved roadmap does not itself authorize implementation. The intended handoff is:
+Implementation tickets are published under `.scratch/prism-implementation/`.
+The current handoff is:
 
 ```text
-logic prototype
-→ record the verdict and amend the specification if needed
-→ publish R1–R13 as implementation tickets
-→ implement M1 through R9
+selected Field Desk prototype
+→ real Field Desk and shared request contracts
+→ durable Run creation and replayable state
+→ controlled workspace and browser evidence paths
+→ first complete round-button tracer bullet
 ```
 
-The prototype is throwaway validation work. Its terminal shell stays on a prototype branch; only validated decisions return to the main branch.
+The prototype remains throwaway validation work. Production code preserves its
+workspace-first information hierarchy but does not import its mock Runs, DAG,
+evidence, or verdicts.

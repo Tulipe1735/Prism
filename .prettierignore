@@ -1,0 +1,14 @@
+.agents/
+.scratch/
+.next/
+.pnpm-store/
+.turbo/
+AGENTS.md
+apps/web/app/prototype/
+coverage/
+docs/
+LICENSE
+node_modules/
+pnpm-lock.yaml
+README.md
+skills-lock.json
