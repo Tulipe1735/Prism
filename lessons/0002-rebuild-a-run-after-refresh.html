@@ -67,7 +67,7 @@ const snapshot = projectRunEvents(manifest, events)
 await this.verifyManifestRequest(manifest)
 await Promise.all(
   snapshot.artifacts
-    .filter((artifact) =&gt; !sameValue(artifact, manifest.requestArtifact))
+    .filter((artifact) =&gt; !isDeepStrictEqual(artifact, manifest.requestArtifact))
     .map((artifact) =&gt; this.readArtifact(artifact))
 )
 await this.repairSnapshotCache(runDirectory, snapshot)</code></pre>
