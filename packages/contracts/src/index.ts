@@ -76,8 +76,8 @@ export const repairRequestSchema = z
       .string()
       .max(2000, "Keep the repair request under 2,000 characters.")
       .refine(
-        (value) => value.trim().length >= 12,
-        "Describe one visible frontend problem in at least 12 characters.",
+        (value) => value.trim().length >= 6,
+        "Describe one visible frontend problem in at least 6 characters.",
       )
       .refine(
         (value) => !hasUnsupportedControlCharacter(value),
