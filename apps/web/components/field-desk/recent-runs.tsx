@@ -1,31 +1,55 @@
+"use client";
+
+import type { RunSummary } from "@prism/contracts";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Search } from "lucide-react";
 import Link from "next/link";
 
-import type { RecentRun } from "@/lib/server/run-repository";
+import { fetchRuns } from "@/lib/client/run-api";
 
-export function RecentRuns({ runs }: { runs: readonly RecentRun[] }) {
+export function RecentRuns({ initialRuns }: { initialRuns: readonly RunSummary[] }) {
+  const runsQuery = useQuery({
+    queryKey: ["runs"],
+    queryFn: fetchRuns,
+    initialData: [...initialRuns],
+  });
+  const runs = runsQuery.data;
+
   return (
     <aside className="border-t-2 border-stone-900">
       <div className="flex min-h-12 items-center justify-between border-b border-stone-400 font-mono text-[0.65rem] font-bold tracking-[0.13em]">
         <span>RECENT RUNS</span>
         <Search aria-hidden size={16} />
       </div>
-      {runs.length === 0 ? (
+      {runsQuery.isError ? (
+        <div
+          className="border-b border-red-400 py-7 text-sm text-red-800"
+          role="status"
+        >
+          Run history could not be refreshed.
+        </div>
+      ) : runs.length === 0 ? (
         <div className="border-b border-stone-400 py-7">
           <p className="font-serif text-2xl">No Runs yet.</p>
           <p className="mt-2 text-xs leading-5 text-stone-600">
-            Validated requests appear here only after durable Run creation is available.
+            A successfully committed repair request will appear here.
           </p>
         </div>
       ) : (
         <ul>
-          {runs.map((run) => (
+          {runs.slice(0, 5).map((run) => (
             <li className="border-b border-stone-400" key={run.id}>
               <Link
                 className="grid grid-cols-[0.5rem_1fr_auto] items-center gap-3 px-2 py-4 transition hover:bg-blue-600/5"
                 href={`/runs/${encodeURIComponent(run.id)}`}
               >
-                <i className="size-1.5 rounded-full bg-blue-600" />
+                <i
+                  className={
+                    run.integrity === "failed"
+                      ? "size-1.5 rounded-full bg-red-700"
+                      : "size-1.5 rounded-full bg-blue-600"
+                  }
+                />
                 <span className="min-w-0">
                   <small className="block font-mono text-[0.58rem] font-bold text-stone-500">
                     {run.id}
@@ -34,7 +58,7 @@ export function RecentRuns({ runs }: { runs: readonly RecentRun[] }) {
                     {run.title}
                   </strong>
                   <span className="mt-1 block text-[0.63rem] text-stone-500">
-                    {run.status}
+                    {run.status} · journal #{run.lastSequence}
                   </span>
                 </span>
                 <ArrowRight aria-hidden size={14} />

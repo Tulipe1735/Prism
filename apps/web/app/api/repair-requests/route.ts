@@ -1,45 +1,16 @@
-import {
-  CONTRACT_ERROR_SCHEMA_VERSION,
-  REPAIR_REQUEST_VALIDATION_SCHEMA_VERSION,
-  contractErrorSchema,
-  formatContractIssues,
-  repairRequestSchema,
-  repairRequestValidationSchema,
-  type ContractError,
-} from "@prism/contracts";
+import { formatContractIssues, repairRequestSchema } from "@prism/contracts";
 
+import { createRun } from "../../../lib/server/run-repository";
 import { isConfiguredWorkspace } from "../../../lib/server/workspace-policy";
+import { contractErrorResponse, JSON_RESPONSE_HEADERS } from "../contract-response";
 
 const MAX_REQUEST_BYTES = 16_384;
-const JSON_RESPONSE_HEADERS = {
-  "cache-control": "no-store",
-  "content-type": "application/json; charset=utf-8",
-};
-
-function errorResponse(
-  status: number,
-  code: ContractError["code"],
-  message: string,
-  issues: ContractError["issues"] = [],
-) {
-  const error = contractErrorSchema.parse({
-    schemaVersion: CONTRACT_ERROR_SCHEMA_VERSION,
-    code,
-    message,
-    issues,
-  });
-
-  return Response.json(error, {
-    status,
-    headers: JSON_RESPONSE_HEADERS,
-  });
-}
 
 export async function POST(request: Request) {
   const contentType = request.headers.get("content-type")?.split(";", 1)[0];
 
   if (contentType?.trim().toLowerCase() !== "application/json") {
-    return errorResponse(
+    return contractErrorResponse(
       415,
       "unsupported_media_type",
       "Send the repair request as application/json.",
@@ -48,7 +19,7 @@ export async function POST(request: Request) {
 
   const declaredLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
-    return errorResponse(
+    return contractErrorResponse(
       413,
       "payload_too_large",
       "The repair request exceeds the 16 KiB boundary.",
@@ -57,7 +28,7 @@ export async function POST(request: Request) {
 
   const rawBody = await request.text();
   if (new TextEncoder().encode(rawBody).byteLength > MAX_REQUEST_BYTES) {
-    return errorResponse(
+    return contractErrorResponse(
       413,
       "payload_too_large",
       "The repair request exceeds the 16 KiB boundary.",
@@ -68,12 +39,16 @@ export async function POST(request: Request) {
   try {
     input = JSON.parse(rawBody) as unknown;
   } catch {
-    return errorResponse(400, "invalid_json", "The request body is not valid JSON.");
+    return contractErrorResponse(
+      400,
+      "invalid_json",
+      "The request body is not valid JSON.",
+    );
   }
 
   const parsedRequest = repairRequestSchema.safeParse(input);
   if (!parsedRequest.success) {
-    return errorResponse(
+    return contractErrorResponse(
       422,
       "invalid_repair_request",
       "The repair request does not match the supported v1 contract.",
@@ -82,7 +57,7 @@ export async function POST(request: Request) {
   }
 
   if (!isConfiguredWorkspace(parsedRequest.data.workspace)) {
-    return errorResponse(
+    return contractErrorResponse(
       422,
       "unsupported_workspace",
       "The requested workspace is not the configured local Prism workspace.",
@@ -96,14 +71,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const validation = repairRequestValidationSchema.parse({
-    schemaVersion: REPAIR_REQUEST_VALIDATION_SCHEMA_VERSION,
-    status: "accepted",
-    request: parsedRequest.data,
-  });
-
-  return Response.json(validation, {
-    status: 200,
-    headers: JSON_RESPONSE_HEADERS,
-  });
+  try {
+    const creation = await createRun(parsedRequest.data);
+    return Response.json(creation, {
+      status: 201,
+      headers: JSON_RESPONSE_HEADERS,
+    });
+  } catch {
+    return contractErrorResponse(
+      500,
+      "run_storage_error",
+      "Prism could not commit the Run to durable storage.",
+    );
+  }
 }

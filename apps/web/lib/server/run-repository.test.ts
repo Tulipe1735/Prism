@@ -1,0 +1,95 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { type RepairRequest, runCreationSchema } from "@prism/contracts";
+import { FileTrajectoryStore } from "@prism/trajectory-store";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { createRun, getRunDossier, listRecentRuns } from "./run-repository";
+
+const request: RepairRequest = {
+  schemaVersion: "prism.repair-request/v1",
+  prompt: "  Make the primary Save button clearly rounded instead of square.  ",
+  workspace: {
+    kind: "local",
+    path: "/workspaces/prism-fixture",
+    displayName: "prism-fixture",
+  },
+  viewport: {
+    width: 1280,
+    height: 720,
+    deviceScaleFactor: 1,
+  },
+};
+
+let dataDirectory: string;
+let previousDataDirectory: string | undefined;
+
+beforeEach(async () => {
+  previousDataDirectory = process.env.PRISM_DATA_DIR;
+  dataDirectory = await mkdtemp(join(tmpdir(), "prism-web-runs-"));
+  process.env.PRISM_DATA_DIR = dataDirectory;
+});
+
+afterEach(async () => {
+  if (previousDataDirectory === undefined) {
+    delete process.env.PRISM_DATA_DIR;
+  } else {
+    process.env.PRISM_DATA_DIR = previousDataDirectory;
+  }
+  await rm(dataDirectory, { recursive: true, force: true });
+});
+
+describe("Run repository", () => {
+  it("creates, lists, and reopens one durable Run without changing its prompt", async () => {
+    const creation = runCreationSchema.parse(await createRun(request));
+
+    expect(creation.status).toBe("created");
+    expect(await listRecentRuns()).toEqual([
+      expect.objectContaining({
+        id: creation.runId,
+        status: "queued",
+        integrity: "verified",
+      }),
+    ]);
+    expect(await getRunDossier(creation.runId)).toMatchObject({
+      id: creation.runId,
+      prompt: request.prompt,
+      status: "queued",
+      integrity: "verified",
+      lastSequence: 2,
+    });
+
+    const reopenedFromDisk = await new FileTrajectoryStore({ dataDirectory }).loadRun(
+      creation.runId,
+    );
+    expect(reopenedFromDisk.manifest.request.prompt).toBe(request.prompt);
+  });
+
+  it("returns a visible terminal dossier when an artifact fails integrity", async () => {
+    const creation = await createRun(request);
+    const store = new FileTrajectoryStore({ dataDirectory });
+    const durableRun = await store.loadRun(creation.runId);
+    const { hash } = durableRun.manifest.requestArtifact;
+    await writeFile(
+      join(dataDirectory, "artifacts", "sha256", hash.slice(0, 2), hash),
+      "tampered artifact",
+      "utf8",
+    );
+
+    expect(await getRunDossier(creation.runId)).toMatchObject({
+      id: creation.runId,
+      status: "terminal_error",
+      integrity: "failed",
+      terminalError: {
+        code: "corrupt_artifact",
+      },
+    });
+  });
+
+  it("returns null for an unknown or unsafe Run ID", async () => {
+    expect(await getRunDossier("run_11111111-1111-4111-8111-111111111111")).toBeNull();
+    expect(await getRunDossier("../../outside")).toBeNull();
+  });
+});

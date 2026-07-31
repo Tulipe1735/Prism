@@ -1,30 +1,40 @@
-import { FlatCompat } from "@eslint/eslintrc";
-import eslint from "@eslint/js";
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import antfu from "@antfu/eslint-config";
+import nextPlugin from "@next/eslint-plugin-next";
 
-const currentDirectory = dirname(fileURLToPath(import.meta.url));
-const compat = new FlatCompat({
-  allConfig: eslint.configs.all,
-  baseDirectory: currentDirectory,
-  recommendedConfig: eslint.configs.recommended,
-});
-
-const nextConfig = [
+const nextConfig = antfu(
   {
-    ignores: ["**/.next/**", "**/.turbo/**", "**/coverage/**", "**/node_modules/**"],
+    type: "app",
+    stylistic: false,
+    typescript: true,
+    react: true,
+    jsonc: false,
+    markdown: false,
+    toml: false,
+    yaml: false,
+    ignores: ["**/.next/**", "**/.turbo/**", "**/coverage/**"],
   },
-  eslint.configs.recommended,
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    files: ["**/*.{ts,tsx}"],
-    rules: {
-      "@typescript-eslint/consistent-type-imports": [
-        "error",
-        { fixStyle: "inline-type-imports" },
-      ],
+    name: "prism/next-plugin",
+    plugins: {
+      "@next/next": nextPlugin,
     },
   },
-];
+  {
+    name: "prism/next",
+    files: ["**/*.{js,jsx,ts,tsx}"],
+    rules: {
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs["core-web-vitals"].rules,
+    },
+  },
+  {
+    name: "prism/typescript",
+    files: ["**/*.{ts,tsx}"],
+    rules: {
+      "test/prefer-lowercase-title": "off",
+      "ts/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
+    },
+  },
+);
 
 export default nextConfig;

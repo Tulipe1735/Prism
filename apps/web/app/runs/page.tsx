@@ -1,7 +1,8 @@
-import { ArrowLeft, Inbox } from "lucide-react";
 import type { Metadata } from "next";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+import { RunHistory } from "@/components/field-desk/run-history";
 import { PrismMark } from "@/components/prism-mark";
 import { listRecentRuns } from "@/lib/server/run-repository";
 
@@ -32,18 +33,11 @@ export default async function RunsPage() {
         <h1 className="mt-3 font-serif text-6xl tracking-[-0.04em]">
           Committed fieldwork.
         </h1>
-        {runs.length === 0 ? (
-          <div className="mt-12 grid min-h-72 place-items-center border-y border-stone-400 bg-white/30 p-8 text-center">
-            <div>
-              <Inbox aria-hidden className="mx-auto" size={28} />
-              <h2 className="mt-5 font-serif text-3xl">No Runs have been created.</h2>
-              <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-stone-600">
-                Prism keeps this view empty instead of presenting prototype records as
-                canonical state.
-              </p>
-            </div>
-          </div>
-        ) : null}
+        <p className="mt-5 max-w-xl text-sm leading-6 text-stone-600">
+          TanStack Query reconciles this view with the server. The status filter is
+          intentionally ephemeral and never changes canonical Run state.
+        </p>
+        <RunHistory initialRuns={runs} />
       </section>
     </main>
   );

@@ -8,11 +8,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { RepairComposer } from "@/components/field-desk/repair-composer";
 import { RecentRuns } from "@/components/field-desk/recent-runs";
+import { RepairComposer } from "@/components/field-desk/repair-composer";
 import { PrismMark } from "@/components/prism-mark";
-import { getConfiguredWorkspace } from "@/lib/server/workspace-policy";
 import { listRecentRuns } from "@/lib/server/run-repository";
+import { getConfiguredWorkspace } from "@/lib/server/workspace-policy";
 
 const defaultViewport = {
   width: 1280,
@@ -25,6 +25,7 @@ export const dynamic = "force-dynamic";
 export default async function FieldDeskPage() {
   const workspace = getConfiguredWorkspace();
   const recentRuns = await listRecentRuns();
+  const activeRun = recentRuns[0];
 
   return (
     <main className="min-h-screen px-5 pb-20 text-stone-900 sm:px-8 lg:px-[4.5vw]">
@@ -67,9 +68,9 @@ export default async function FieldDeskPage() {
             What should Prism repair?
           </h1>
           <p className="mt-6 max-w-md font-serif text-sm leading-7 text-stone-600">
-            Describe the visible problem. Prism validates the request now; a later Run
-            will inspect the repository, reproduce the defect, and return rendered
-            proof.
+            Describe the visible problem. Prism validates both boundaries and commits a
+            durable Run now. Later runtime slices will inspect, repair, and return
+            rendered proof.
           </p>
         </div>
 
@@ -131,33 +132,43 @@ export default async function FieldDeskPage() {
               <FolderGit2 aria-hidden size={20} />
             </div>
             <p className="mt-9 font-mono text-[0.64rem] font-bold tracking-[0.14em] text-stone-500">
-              NO ACTIVE RUN
+              {activeRun ? "LATEST COMMITTED RUN" : "NO ACTIVE RUN"}
             </p>
             <h3 className="mt-2 max-w-lg font-serif text-3xl">
-              Validating a request does not invent fieldwork.
+              {activeRun?.title ?? "No durable fieldwork has been committed yet."}
             </h3>
             <p className="mt-4 max-w-xl text-sm leading-6 text-stone-600">
-              Run creation, persistence, and replay belong to the next runtime slice.
-              This desk will show only committed state.
+              {activeRun
+                ? `Status ${activeRun.status}; journal position ${activeRun.lastSequence}; integrity ${activeRun.integrity}.`
+                : "Create a Run above. This desk shows only state committed to the manifest and journal."}
             </p>
-            <div className="mt-8 flex flex-wrap gap-3 font-mono text-[0.64rem] font-semibold text-stone-600">
-              <span className="inline-flex items-center gap-2 border border-stone-300 px-3 py-2">
-                <Camera aria-hidden size={14} /> Browser evidence pending
-              </span>
-              <span className="inline-flex items-center gap-2 border border-stone-300 px-3 py-2">
-                <Gauge aria-hidden size={14} /> Budget not allocated
-              </span>
-            </div>
+            {activeRun ? (
+              <Link
+                className="mt-8 inline-flex items-center gap-2 font-mono text-[0.64rem] font-bold tracking-[0.08em] underline underline-offset-4"
+                href={`/runs/${encodeURIComponent(activeRun.id)}`}
+              >
+                OPEN RUN DOSSIER <ArrowRight aria-hidden size={14} />
+              </Link>
+            ) : (
+              <div className="mt-8 flex flex-wrap gap-3 font-mono text-[0.64rem] font-semibold text-stone-600">
+                <span className="inline-flex items-center gap-2 border border-stone-300 px-3 py-2">
+                  <Camera aria-hidden size={14} /> Browser evidence pending
+                </span>
+                <span className="inline-flex items-center gap-2 border border-stone-300 px-3 py-2">
+                  <Gauge aria-hidden size={14} /> Budget not allocated
+                </span>
+              </div>
+            )}
           </article>
 
-          <RecentRuns runs={recentRuns} />
+          <RecentRuns initialRuns={recentRuns} />
         </div>
       </section>
 
       <footer className="mt-4 flex flex-wrap items-center gap-4 border-y-2 border-t-stone-900 border-b-stone-400 py-5">
         <PrismMark compact />
         <p className="font-mono text-[0.63rem] font-bold tracking-[0.12em]">
-          VISUAL SWE HARNESS / REQUEST BOUNDARY / VERIFIED
+          VISUAL SWE HARNESS / DURABLE RUN BOUNDARY / VERIFIED
         </p>
         <Link
           className="ml-auto inline-flex items-center gap-2 font-mono text-[0.63rem] font-bold tracking-[0.1em] underline decoration-stone-400 underline-offset-4"

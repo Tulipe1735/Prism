@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prism Durable Run — Reference</title>
+    <link rel="icon" href="../assets/lesson-icon.svg" />
+    <link rel="stylesheet" href="../assets/learning.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="kicker">Prism / Reference / Durable Run v1</span>
+        <h1>刷新重建参考卡</h1>
+        <p class="lede">
+          排查“创建成功，但刷新后不一致”时，用这张卡区分 canonical facts、projection
+          cache 与 browser cache。
+        </p>
+      </header>
+
+      <section>
+        <span class="eyebrow">Canonical hierarchy</span>
+        <h2>四份状态，四种职责</h2>
+        <div class="two-column">
+          <article class="reference-card">
+            <h3>Manifest / immutable</h3>
+            <p>固定 Run ID、创建时间、原始 repair request 与 request artifact 引用。</p>
+            <span class="path">runs/&lt;runId&gt;/manifest.json</span>
+          </article>
+          <article class="reference-card">
+            <h3>Journal / canonical</h3>
+            <p>逐行保存版本化事件；runId 必须一致，sequence 必须从 1 连续增长。</p>
+            <span class="path">runs/&lt;runId&gt;/events.jsonl</span>
+          </article>
+          <article class="reference-card">
+            <h3>Artifact / verified bytes</h3>
+            <p>引用包含 SHA-256、byteLength 与 mediaType；读取时重新计算并比较。</p>
+            <span class="path">artifacts/sha256/&lt;prefix&gt;/&lt;hash&gt;</span>
+          </article>
+          <article class="reference-card">
+            <h3>Snapshot / disposable cache</h3>
+            <p>由 manifest + journal 重建；缺失、无效或过期时可安全改写。</p>
+            <span class="path">runs/&lt;runId&gt;/snapshot.json</span>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Reload algorithm</span>
+        <h2><code>loadRun(runId)</code></h2>
+        <ol>
+          <li>用 <code>runIdSchema</code> 拒绝不安全路径。</li>
+          <li>读取并用 <code>runManifestSchema</code> 校验 manifest。</li>
+          <li>逐行解析 journal；每一行都必须是合法 <code>RunEvent</code>。</li>
+          <li>
+            调用 <code>projectRunEvents</code>，从 <code>null</code> 重建 snapshot。
+          </li>
+          <li>
+            读取 request artifact，验证长度与 SHA-256，再解析为
+            <code>RepairRequest</code> 并与 manifest 中的 request 精确比较。
+          </li>
+          <li>读取 snapshot 引用的其余 artifact，并验证长度与 SHA-256。</li>
+          <li>
+            比较并修复 <code>snapshot.json</code> cache；若 journal 比缓存曾见证的
+            <code>lastSequence</code> 更短，则拒绝降级。
+          </li>
+          <li>把 manifest、events、snapshot 映射成 versioned dossier。</li>
+        </ol>
+        <span class="path"
+          >packages/trajectory-store/src/index.ts →
+          apps/web/lib/server/run-repository.ts</span
+        >
+      </section>
+
+      <section>
+        <span class="eyebrow">Do not confuse</span>
+        <h2>触发器、缓存与真相</h2>
+        <div class="reference-card">
+          <p>
+            <code>router.push / router.refresh</code> — 触发导航和重新渲染，不保存 Run。
+          </p>
+          <p>
+            <code>TanStack Query initialData</code> — 接收服务端
+            dossier，不建立权威事实。
+          </p>
+          <p><code>Zustand statusFilter</code> — 临时筛选器，不改变任何 Run event。</p>
+          <p><code>snapshot.json</code> — 投影缓存，不得覆盖 journal 的结果。</p>
+          <p>
+            <strong>Manifest + journal + verified artifacts</strong> —
+            刷新恢复的事实基础。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Fail closed</span>
+        <h2>损坏映射</h2>
+        <div class="two-column">
+          <article class="reference-card">
+            <h3><code>corrupt_manifest</code></h3>
+            <p>
+              manifest 缺失、JSON/Schema 无效、内部 runId 与目录不匹配，或 request
+              不再等于 hashed request artifact。
+            </p>
+          </article>
+          <article class="reference-card">
+            <h3><code>corrupt_event</code></h3>
+            <p>journal 行无效、事件跳号、Run 不匹配、起始事件错误或终态后仍有事件。</p>
+          </article>
+          <article class="reference-card">
+            <h3><code>corrupt_artifact</code></h3>
+            <p>artifact 缺失、不可读、byteLength 不同或 SHA-256 不匹配。</p>
+          </article>
+          <article class="reference-card">
+            <h3>Visible terminal dossier</h3>
+            <p>Repository 将完整性错误显示为 terminal error，不静默加载不可信状态。</p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Executable evidence</span>
+        <h2>先跑哪三组测试</h2>
+        <ol>
+          <li>
+            <a href="../packages/contracts/src/run-contract.test.ts"
+              >Run contract tests</a
+            >
+            — 版本化数据形状。
+          </li>
+          <li>
+            <a href="../packages/trajectory-store/src/trajectory-store.test.ts"
+              >Trajectory-store tests</a
+            >
+            — 新 store 重开、journal 与 artifact 损坏拒绝。
+          </li>
+          <li>
+            <a href="../apps/web/lib/server/run-repository.test.ts"
+              >Run repository tests</a
+            >
+            — list、dossier 与可见 terminal error。
+          </li>
+        </ol>
+      </section>
+
+      <footer>
+        <p>
+          Lessons:
+          <a href="../lessons/0002-rebuild-a-run-after-refresh.html"
+            >刷新后，为什么还是同一个 Run？</a
+          >
+          ·
+          <a href="../lessons/0001-one-schema-two-boundaries.html"
+            >一份 Schema，为什么要验证两次？</a
+          >
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

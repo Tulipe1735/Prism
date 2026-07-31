@@ -4,11 +4,13 @@ Prism is a standalone TypeScript Visual SWE harness. It accepts a natural-langua
 
 ## Current status
 
-The developer-ready architecture is approved. The first implementation slice is
-now built: a production-shaped Next.js Field Desk, shared Zod repair-request
-contracts, browser/server validation, and honest empty Run surfaces. Run
-creation, persistence, orchestration, Pi, UI-TARS, browser evidence, and replay
-remain planned work rather than implemented capability.
+The developer-ready architecture is approved. The first two implementation
+slices are now built: a production-shaped Next.js Field Desk, shared Zod
+contracts, browser/server validation, durable Run creation, append-only initial
+events, content-addressed request artifacts, rebuildable snapshots, and Run
+history/dossier reopening after refresh. Orchestration, controlled executors,
+Pi, UI-TARS, browser evidence, and end-to-end repair replay remain planned work
+rather than implemented capability.
 
 - [Read the canonical Prism roadmap](docs/prism-roadmap.md)
 - [Open the completed Wayfinder map](.scratch/prism/issues/00-design-the-dual-route-prism-architecture.md)

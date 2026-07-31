@@ -4,10 +4,18 @@ export const REPAIR_REQUEST_SCHEMA_VERSION = "prism.repair-request/v1" as const;
 export const REPAIR_REQUEST_VALIDATION_SCHEMA_VERSION =
   "prism.repair-request-validation/v1" as const;
 export const CONTRACT_ERROR_SCHEMA_VERSION = "prism.contract-error/v1" as const;
+export const ARTIFACT_REF_SCHEMA_VERSION = "prism.artifact-ref/v1" as const;
+export const RUN_MANIFEST_SCHEMA_VERSION = "prism.run-manifest/v1" as const;
+export const RUN_EVENT_SCHEMA_VERSION = "prism.run-event/v1" as const;
+export const RUN_SNAPSHOT_SCHEMA_VERSION = "prism.run-snapshot/v1" as const;
+export const RUN_CREATION_SCHEMA_VERSION = "prism.run-creation/v1" as const;
+export const RUN_LIST_SCHEMA_VERSION = "prism.run-list/v1" as const;
+export const RUN_DOSSIER_RESPONSE_SCHEMA_VERSION =
+  "prism.run-dossier-response/v1" as const;
 
-const absoluteWorkspacePathPattern = /^(?:[A-Za-z]:[\\/]|\/)/;
+const absoluteWorkspacePathPattern = /^(?:[a-z]:[\\/]|\/)/i;
 
-function hasUnsupportedControlCharacter(value: string) {
+function hasUnsupportedControlCharacter(value: string): boolean {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
     const isAllowedWhitespace = codePoint === 9 || codePoint === 10 || codePoint === 13;
@@ -105,6 +113,8 @@ export const contractErrorSchema = z
       "payload_too_large",
       "unsupported_media_type",
       "unsupported_workspace",
+      "run_storage_error",
+      "run_not_found",
     ]),
     message: z.string().min(1),
     issues: z.array(validationIssueSchema),
@@ -118,6 +128,165 @@ export const repairRequestValidationSchema = z
     request: repairRequestSchema,
   })
   .strict();
+
+export const runIdSchema = z
+  .string()
+  .regex(
+    /^run_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    "Run IDs must use the supported run_<uuid> format.",
+  );
+
+const isoDateTimeSchema = z.string().datetime({ offset: true });
+
+export const artifactRefSchema = z
+  .object({
+    schemaVersion: z.literal(ARTIFACT_REF_SCHEMA_VERSION),
+    algorithm: z.literal("sha256"),
+    hash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "Artifact hashes must be lowercase SHA-256 digests."),
+    byteLength: z.number().int().nonnegative(),
+    mediaType: z
+      .string()
+      .min(3)
+      .max(160)
+      .regex(/^[\w!#$&^.+-]+\/[\w!#$&^.+-]+$/),
+  })
+  .strict();
+
+export const terminalRunErrorSchema = z
+  .object({
+    code: z.enum([
+      "corrupt_event",
+      "corrupt_artifact",
+      "corrupt_manifest",
+      "storage_error",
+    ]),
+    message: z.string().min(1).max(500),
+  })
+  .strict();
+
+export const runManifestSchema = z
+  .object({
+    schemaVersion: z.literal(RUN_MANIFEST_SCHEMA_VERSION),
+    runId: runIdSchema,
+    createdAt: isoDateTimeSchema,
+    request: repairRequestSchema,
+    requestArtifact: artifactRefSchema,
+  })
+  .strict();
+
+const runEventEnvelopeShape = {
+  schemaVersion: z.literal(RUN_EVENT_SCHEMA_VERSION),
+  eventId: z.string().uuid(),
+  runId: runIdSchema,
+  sequence: z.number().int().positive(),
+  recordedAt: isoDateTimeSchema,
+  correlationId: z.string().min(1).max(200),
+  causationEventId: z.string().uuid().nullable(),
+};
+
+export const runCreatedEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("run.created"),
+    payload: z.object({ requestArtifact: artifactRefSchema }).strict(),
+  })
+  .strict();
+
+export const runQueuedEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("run.queued"),
+    payload: z.object({}).strict(),
+  })
+  .strict();
+
+export const runTerminalErrorEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("run.terminal-error"),
+    payload: terminalRunErrorSchema,
+  })
+  .strict();
+
+export const runEventSchema = z.discriminatedUnion("type", [
+  runCreatedEventSchema,
+  runQueuedEventSchema,
+  runTerminalErrorEventSchema,
+]);
+
+export const runStatusSchema = z.enum(["created", "queued", "terminal_error"]);
+
+export const runSnapshotSchema = z
+  .object({
+    schemaVersion: z.literal(RUN_SNAPSHOT_SCHEMA_VERSION),
+    runId: runIdSchema,
+    title: z.string().min(1).max(160),
+    status: runStatusSchema,
+    createdAt: isoDateTimeSchema,
+    updatedAt: isoDateTimeSchema,
+    lastSequence: z.number().int().nonnegative(),
+    artifacts: z.array(artifactRefSchema),
+    terminalError: terminalRunErrorSchema.nullable(),
+  })
+  .strict();
+
+export const runCreationSchema = z
+  .object({
+    schemaVersion: z.literal(RUN_CREATION_SCHEMA_VERSION),
+    status: z.literal("created"),
+    runId: runIdSchema,
+    snapshot: runSnapshotSchema,
+  })
+  .strict();
+
+export const runSummarySchema = z
+  .object({
+    id: runIdSchema,
+    title: z.string().min(1).max(160),
+    status: runStatusSchema,
+    createdAt: isoDateTimeSchema.nullable(),
+    updatedAt: isoDateTimeSchema.nullable(),
+    lastSequence: z.number().int().nonnegative(),
+    integrity: z.enum(["verified", "failed"]),
+  })
+  .strict();
+
+export const runDossierSchema = runSummarySchema
+  .extend({
+    prompt: z.string().nullable(),
+    workspace: localWorkspaceSchema.nullable(),
+    viewport: viewportSchema.nullable(),
+    artifacts: z.array(artifactRefSchema),
+    terminalError: terminalRunErrorSchema.nullable(),
+  })
+  .strict();
+
+export const runListSchema = z
+  .object({
+    schemaVersion: z.literal(RUN_LIST_SCHEMA_VERSION),
+    runs: z.array(runSummarySchema),
+  })
+  .strict();
+
+export const runDossierResponseSchema = z
+  .object({
+    schemaVersion: z.literal(RUN_DOSSIER_RESPONSE_SCHEMA_VERSION),
+    dossier: runDossierSchema,
+  })
+  .strict();
+
+export type ArtifactRef = z.infer<typeof artifactRefSchema>;
+export type RunCreation = z.infer<typeof runCreationSchema>;
+export type RunDossier = z.infer<typeof runDossierSchema>;
+export type RunEvent = z.infer<typeof runEventSchema>;
+export type RunList = z.infer<typeof runListSchema>;
+export type RunManifest = z.infer<typeof runManifestSchema>;
+export type RunSnapshot = z.infer<typeof runSnapshotSchema>;
+export type RunStatus = z.infer<typeof runStatusSchema>;
+export type RunSummary = z.infer<typeof runSummarySchema>;
+export type TerminalRunError = z.infer<typeof terminalRunErrorSchema>;
 
 export type ContractError = z.infer<typeof contractErrorSchema>;
 export type LocalWorkspace = z.infer<typeof localWorkspaceSchema>;

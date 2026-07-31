@@ -1,27 +1,24 @@
-import eslint from "@eslint/js";
-import tseslint from "typescript-eslint";
+import antfu from "@antfu/eslint-config";
 
-const baseConfig = [
+const baseConfig = antfu(
   {
-    ignores: [
-      "**/.next/**",
-      "**/.turbo/**",
-      "**/coverage/**",
-      "**/dist/**",
-      "**/node_modules/**",
-    ],
+    type: "lib",
+    stylistic: false,
+    typescript: true,
+    jsonc: false,
+    markdown: false,
+    toml: false,
+    yaml: false,
+    ignores: ["**/.next/**", "**/.turbo/**", "**/coverage/**", "**/dist/**"],
   },
-  eslint.configs.recommended,
-  ...tseslint.configs.recommended,
   {
+    name: "prism/typescript",
     files: ["**/*.{ts,tsx}"],
     rules: {
-      "@typescript-eslint/consistent-type-imports": [
-        "error",
-        { fixStyle: "inline-type-imports" },
-      ],
+      "test/prefer-lowercase-title": "off",
+      "ts/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
     },
   },
-];
+);
 
 export default baseConfig;

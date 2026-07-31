@@ -1,8 +1,9 @@
-import path from "node:path";
-
 import type { LocalWorkspace } from "@prism/contracts";
 
-const windowsAbsolutePathPattern = /^[A-Za-z]:[\\/]/;
+import path from "node:path";
+import process from "node:process";
+
+const windowsAbsolutePathPattern = /^[A-Z]:[\\/]/i;
 
 function displayNameFor(workspacePath: string) {
   return windowsAbsolutePathPattern.test(workspacePath)

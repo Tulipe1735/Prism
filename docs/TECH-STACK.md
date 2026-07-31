@@ -1,10 +1,10 @@
 # Prism technical baseline
 
-Status: `initial Field Desk and shared request contracts implemented`
+Status: `Field Desk, shared contracts, and durable Run storage implemented`
 
 This document describes the current Prism technology boundary. The Field Desk
-and first contract seam are verified; runtime, executor, persistence, browser,
-and evaluation packages remain owned by later implementation tickets.
+and first durable Run seam are verified; runtime, executor, browser, and
+evaluation packages remain owned by later implementation tickets.
 
 ## Product runtime
 
@@ -13,8 +13,11 @@ and evaluation packages remain owned by later implementation tickets.
 | Next.js 15.5.21 + React 19.2.8 | Production Field Desk and second-level Run dossier routes |
 | TypeScript on Node.js | Orchestrator, contracts, runtimes, controlled executors, CLI, and evaluation tooling |
 | pnpm 9.15.9 + Turborepo 2.10.7 | Package boundaries and shared build, typecheck, lint, and test tasks |
-| Zod 4.4.3 | Versioned repair-request and boundary-response validation |
-| Vitest 3.2.7 | Node 18-compatible deterministic contract and route tests |
+| Zod 4.4.3 | Versioned repair-request, Run, event, snapshot, artifact, and boundary-response validation |
+| React Hook Form + TanStack Query | Validated repair composition and client caching of server-owned Run state |
+| React Toastify + Zustand | Submission feedback and ephemeral UI filters; neither is canonical Run state |
+| `@antfu/eslint-config` 4.0.1 + Prettier 3.9.6 | Node 18-compatible lint baseline with formatting kept in Prettier |
+| Vitest 3.2.7 | Node 18-compatible deterministic contract, storage, and route tests |
 | Pi Agent SDK | Embedded Coding Runtime session and coding trajectory events |
 | UI-TARS SDK | Embedded Browser Runtime visual grounding and typed action proposals |
 
@@ -41,13 +44,19 @@ apps/
 packages/
   contracts/
   tooling-config/
+  trajectory-store/
 ```
 
-- `web` owns the real Field Desk, request validation API boundary, Run history
-  empty state, and second-level dossier route.
-- `contracts` currently owns only the v1 repair request, validation receipt,
-  structured boundary error, workspace, and viewport schemas.
-- `tooling-config` shares TypeScript, ESLint, Prettier, and Vitest configuration.
+- `web` owns the real Field Desk, independently validated API boundaries, Run
+  creation mutation, recent history, and second-level dossier route.
+- `contracts` owns the v1 repair request plus the versioned Run Manifest,
+  Run Event, Run Snapshot, ArtifactRef, creation/list/dossier responses, and
+  structured boundary errors.
+- `trajectory-store` owns the immutable manifest, append-only JSONL journal,
+  SHA-256 content-addressed artifacts, and disposable rebuildable snapshot
+  cache.
+- `tooling-config` shares TypeScript, Antfu ESLint, Prettier, and Vitest
+  configuration.
 
 The following approved packages remain planned:
 
@@ -58,7 +67,6 @@ packages/
   runtime-ui-tars/
   workspace-executor/
   action-broker/
-  trajectory-store/
   eval/
 fixtures/
   react-repair/
@@ -70,7 +78,6 @@ fixtures/
 - `runtime-pi` and `runtime-ui-tars` translate SDK events into Prism contracts; neither may execute unrestricted effects or mutate the DAG.
 - `workspace-executor` confines repository reads, patches, commands, and tests.
 - `action-broker` validates browser proposals and owns BrowserExecutor access.
-- `trajectory-store` owns the append-only journal, hashed artifacts, and rebuildable snapshots.
 - `eval` owns deterministic fault tests, React scenarios, and the frozen SWE-bench non-regression manifest.
 
 ## Browser and verification boundary
