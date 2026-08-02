@@ -170,34 +170,32 @@ export async function executeWorkspaceRequest(
     throw new TypeError("Workspace request Run ID does not match the route Run ID.");
   }
 
-  const run = await store.loadRun(parsedRunId.data);
-  const executor = await WorkspaceExecutor.create({
-    workspaceRoot: run.manifest.request.workspace.path,
-    allowedReadPatterns: [
-      "package.json",
-      "README.md",
-      "apps/**/*.{ts,tsx,json,mjs}",
-      "packages/**/*.{ts,tsx,json,mjs}",
-    ],
-    allowedDiscoveryPatterns: [
-      "apps/**/*.{ts,tsx}",
-      "packages/**/*.ts",
-      "**/*.{test,spec}.{ts,tsx}",
-    ],
-    allowedCommands: [
-      {
-        command: { executable: "pnpm", arguments: ["test"] },
-        workingDirectories: ["."],
-      },
-    ],
+  return store.recordWorkspaceEffect(parsedRunId.data, async (run) => {
+    const executor = await WorkspaceExecutor.create({
+      workspaceRoot: run.manifest.request.workspace.path,
+      allowedReadPatterns: [
+        "package.json",
+        "README.md",
+        "apps/**/*.{ts,tsx,json,mjs}",
+        "packages/**/*.{ts,tsx,json,mjs}",
+      ],
+      allowedDiscoveryPatterns: [
+        "apps/**/*.{ts,tsx}",
+        "packages/**/*.ts",
+        "**/*.{test,spec}.{ts,tsx}",
+      ],
+      allowedCommands: [
+        {
+          command: { executable: "pnpm", arguments: ["test"] },
+          workingDirectories: ["."],
+        },
+      ],
+    });
+    const evidence = await executor.execute(request, { signal });
+    const artifact = await store.writeArtifact(
+      `${JSON.stringify(evidence)}\n`,
+      WORKSPACE_EVIDENCE_MEDIA_TYPE,
+    );
+    return workspaceEvidenceRecordSchema.parse({ evidence, artifact });
   });
-  const evidence = await executor.execute(request, { signal });
-  const artifact = await store.writeArtifact(
-    `${JSON.stringify(evidence)}\n`,
-    WORKSPACE_EVIDENCE_MEDIA_TYPE,
-  );
-  const record = workspaceEvidenceRecordSchema.parse({ evidence, artifact });
-  await store.appendWorkspaceEvidence(parsedRunId.data, record);
-
-  return record;
 }

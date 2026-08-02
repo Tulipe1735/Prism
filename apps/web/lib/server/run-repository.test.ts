@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -147,10 +148,63 @@ describe("Run repository", () => {
           }),
         }),
       ]);
+      const dossier = await getRunDossier(creation.runId);
+      expect(dossier).toMatchObject({
+        lastSequence: 4,
+        artifacts: expect.arrayContaining(records.map((record) => record?.artifact)),
+      });
+      expect(dossier?.workspaceEvidence).toHaveLength(2);
+      expect(
+        dossier?.workspaceEvidence.map(({ evidence }) => evidence.requestId).sort(),
+      ).toEqual(records.map((record) => record?.evidence.requestId).sort());
+    } finally {
+      await rm(workspaceDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("serializes concurrent hash-guarded patches before journaling both outcomes", async () => {
+    const workspaceDirectory = await mkdtemp(join(tmpdir(), "prism-patch-workspace-"));
+    const packagePath = join(workspaceDirectory, "package.json");
+    const original = '{"name":"fixture"}\n';
+    await writeFile(packagePath, original);
+    const creation = await createRun({
+      ...request,
+      workspace: {
+        kind: "local",
+        path: workspaceDirectory,
+        displayName: "fixture",
+      },
+    });
+    const expectedSha256 = createHash("sha256").update(original).digest("hex");
+
+    try {
+      const records = await Promise.all(
+        [
+          ["42ee0dfc-a713-49b9-bc60-8c72cced2a26", '{"name":"first"}\n'],
+          ["42ee0dfc-a713-49b9-bc60-8c72cced2a27", '{"name":"second"}\n'],
+        ].map(([requestId, content]) =>
+          executeWorkspaceRequest(creation.runId, {
+            schemaVersion: "prism.workspace-request/v1",
+            requestId,
+            runId: creation.runId,
+            operation: "patch",
+            files: [{ path: "package.json", expectedSha256, content }],
+          }),
+        ),
+      );
+
+      expect(records.map((record) => record?.evidence.status).sort()).toEqual([
+        "denied",
+        "succeeded",
+      ]);
+      expect(
+        records
+          .map((record) => record?.evidence.reasonCode)
+          .filter((reasonCode) => reasonCode !== null),
+      ).toEqual(["patch_conflict"]);
       expect(await getRunDossier(creation.runId)).toMatchObject({
         lastSequence: 4,
-        workspaceEvidence: records,
-        artifacts: expect.arrayContaining(records.map((record) => record?.artifact)),
+        workspaceEvidence: expect.arrayContaining(records),
       });
     } finally {
       await rm(workspaceDirectory, { recursive: true, force: true });

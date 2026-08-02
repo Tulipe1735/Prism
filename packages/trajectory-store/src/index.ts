@@ -319,16 +319,17 @@ export class FileTrajectoryStore {
     });
   }
 
-  async appendWorkspaceEvidence(
+  async recordWorkspaceEffect(
     runIdInput: string,
-    recordInput: unknown,
-  ): Promise<RunSnapshot> {
+    effect: (run: DurableRun) => Promise<unknown>,
+  ): Promise<WorkspaceEvidenceRecord> {
     const runId = runIdSchema.parse(runIdInput);
-    const record: WorkspaceEvidenceRecord =
-      workspaceEvidenceRecordSchema.parse(recordInput);
 
     return this.withRunWrite(runId, async () => {
       const current = await this.loadRun(runId);
+      const record: WorkspaceEvidenceRecord = workspaceEvidenceRecordSchema.parse(
+        await effect(current),
+      );
       const previousEvent = current.events.at(-1);
       const event = asEvent({
         schemaVersion: RUN_EVENT_SCHEMA_VERSION,
@@ -341,7 +342,8 @@ export class FileTrajectoryStore {
         type: "workspace.evidence",
         payload: record,
       });
-      return this.commitEvent(current, event);
+      await this.commitEvent(current, event);
+      return record;
     });
   }
 
