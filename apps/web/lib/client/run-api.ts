@@ -8,6 +8,9 @@ import {
   runListSchema,
   type RunSummary,
   type ValidationIssue,
+  type WorkspaceEvidenceRecord,
+  workspaceEvidenceResponseSchema,
+  type WorkspaceRequest,
 } from "@prism/contracts";
 
 export class RunApiError extends Error {
@@ -80,4 +83,21 @@ export async function fetchRunDossier(runId: string): Promise<RunDossier> {
   }
 
   return parsed.data.dossier;
+}
+
+export async function runWorkspaceRequest(
+  runId: string,
+  request: WorkspaceRequest,
+): Promise<WorkspaceEvidenceRecord> {
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/workspace`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const parsed = workspaceEvidenceResponseSchema.safeParse(await trustedBody(response));
+  if (!parsed.success) {
+    throw new RunApiError("Prism returned an invalid workspace evidence contract.");
+  }
+
+  return parsed.data.record;
 }

@@ -24,6 +24,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       {children}
       <ToastContainer
+        aria-label="Notifications"
         autoClose={4_000}
         closeOnClick
         newestOnTop

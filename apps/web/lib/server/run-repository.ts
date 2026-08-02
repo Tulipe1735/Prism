@@ -1,9 +1,11 @@
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 
 import {
   type RepairRequest,
   RUN_CREATION_SCHEMA_VERSION,
+  RUN_EVENT_SCHEMA_VERSION,
   type RunCreation,
   runCreationSchema,
   type RunDossier,
@@ -12,6 +14,9 @@ import {
   type RunSummary,
   runSummarySchema,
   type TerminalRunError,
+  type WorkspaceEvidenceRecord,
+  workspaceEvidenceRecordSchema,
+  workspaceRequestSchema,
 } from "@prism/contracts";
 import {
   type DurableRun,
@@ -19,6 +24,9 @@ import {
   RunIntegrityError,
   runTitleFromPrompt,
 } from "@prism/trajectory-store";
+import { WorkspaceExecutor } from "@prism/workspace-executor";
+
+const WORKSPACE_EVIDENCE_MEDIA_TYPE = "application/vnd.prism.workspace-evidence+json";
 
 export type RecentRun = RunSummary;
 export type { RunDossier };
@@ -55,6 +63,7 @@ function dossierFromRun(run: DurableRun): RunDossier {
     workspace: run.manifest.request.workspace,
     viewport: run.manifest.request.viewport,
     artifacts: run.snapshot.artifacts,
+    workspaceEvidence: run.snapshot.workspaceEvidence,
     terminalError: run.snapshot.terminalError,
   });
 }
@@ -90,6 +99,7 @@ async function failedDossier(runId: string, error: unknown): Promise<RunDossier>
     workspace: manifest?.request.workspace ?? null,
     viewport: manifest?.request.viewport ?? null,
     artifacts: manifest ? [manifest.requestArtifact] : [],
+    workspaceEvidence: [],
     terminalError,
   });
 }
@@ -143,4 +153,65 @@ export async function getRunDossier(runIdInput: string): Promise<RunDossier | nu
   }
 
   return loadDossier(parsedRunId.data);
+}
+
+export async function executeWorkspaceRequest(
+  runIdInput: string,
+  requestInput: unknown,
+  signal?: AbortSignal,
+): Promise<WorkspaceEvidenceRecord | null> {
+  const parsedRunId = runIdSchema.safeParse(runIdInput);
+  if (!parsedRunId.success) return null;
+
+  const store = getStore();
+  const runIds = await store.listRunIds();
+  if (!runIds.includes(parsedRunId.data)) return null;
+
+  const request = workspaceRequestSchema.parse(requestInput);
+  if (request.runId !== parsedRunId.data) {
+    throw new TypeError("Workspace request Run ID does not match the route Run ID.");
+  }
+
+  const run = await store.loadRun(parsedRunId.data);
+  const executor = await WorkspaceExecutor.create({
+    workspaceRoot: run.manifest.request.workspace.path,
+    allowedReadPatterns: [
+      "package.json",
+      "README.md",
+      "apps/**/*.{ts,tsx,json,mjs}",
+      "packages/**/*.{ts,tsx,json,mjs}",
+    ],
+    allowedDiscoveryPatterns: [
+      "apps/**/*.{ts,tsx}",
+      "packages/**/*.ts",
+      "**/*.{test,spec}.{ts,tsx}",
+    ],
+    allowedCommands: [
+      {
+        command: { executable: "pnpm", arguments: ["test"] },
+        workingDirectories: ["."],
+      },
+    ],
+  });
+  const evidence = await executor.execute(request, { signal });
+  const artifact = await store.writeArtifact(
+    `${JSON.stringify(evidence)}\n`,
+    WORKSPACE_EVIDENCE_MEDIA_TYPE,
+  );
+  const record = workspaceEvidenceRecordSchema.parse({ evidence, artifact });
+  const previousEvent = run.events.at(-1);
+
+  await store.appendEvent({
+    schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+    eventId: randomUUID(),
+    runId: parsedRunId.data,
+    sequence: run.events.length + 1,
+    recordedAt: new Date().toISOString(),
+    correlationId: parsedRunId.data,
+    causationEventId: previousEvent?.eventId ?? null,
+    type: "workspace.evidence",
+    payload: record,
+  });
+
+  return record;
 }

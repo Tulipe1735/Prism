@@ -7,6 +7,7 @@ import {
   readFile,
   rename,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
@@ -141,6 +142,7 @@ export function projectRunEvents(
         updatedAt: event.recordedAt,
         lastSequence: event.sequence,
         artifacts: [event.payload.requestArtifact],
+        workspaceEvidence: [],
         terminalError: null,
       });
       return;
@@ -159,6 +161,24 @@ export function projectRunEvents(
         status: "queued",
         updatedAt: event.recordedAt,
         lastSequence: event.sequence,
+      });
+      return;
+    }
+
+    if (event.type === "workspace.evidence") {
+      if (event.payload.evidence.runId !== manifest.runId) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Workspace evidence must belong to the Run that journals it.",
+        );
+      }
+
+      snapshot = runSnapshotSchema.parse({
+        ...snapshot,
+        updatedAt: event.recordedAt,
+        lastSequence: event.sequence,
+        artifacts: [...snapshot.artifacts, event.payload.artifact],
+        workspaceEvidence: [...snapshot.workspaceEvidence, event.payload],
       });
       return;
     }
@@ -407,7 +427,13 @@ export class FileTrajectoryStore {
       });
     } catch (error) {
       if (isMissingFile(error)) {
-        return [];
+        try {
+          const dataDirectory = await stat(this.dataDirectory);
+          if (dataDirectory.isDirectory()) return [];
+        } catch (dataDirectoryError) {
+          if (isMissingFile(dataDirectoryError)) return [];
+          throw dataDirectoryError;
+        }
       }
       throw error;
     }

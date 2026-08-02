@@ -12,6 +12,10 @@ export const RUN_CREATION_SCHEMA_VERSION = "prism.run-creation/v1" as const;
 export const RUN_LIST_SCHEMA_VERSION = "prism.run-list/v1" as const;
 export const RUN_DOSSIER_RESPONSE_SCHEMA_VERSION =
   "prism.run-dossier-response/v1" as const;
+export const WORKSPACE_REQUEST_SCHEMA_VERSION = "prism.workspace-request/v1" as const;
+export const WORKSPACE_EVIDENCE_SCHEMA_VERSION = "prism.workspace-evidence/v1" as const;
+export const WORKSPACE_EVIDENCE_RESPONSE_SCHEMA_VERSION =
+  "prism.workspace-evidence-response/v1" as const;
 
 const absoluteWorkspacePathPattern = /^(?:[a-z]:[\\/]|\/)/i;
 
@@ -115,6 +119,8 @@ export const contractErrorSchema = z
       "unsupported_workspace",
       "run_storage_error",
       "run_not_found",
+      "invalid_workspace_request",
+      "workspace_execution_error",
     ]),
     message: z.string().min(1),
     issues: z.array(validationIssueSchema),
@@ -151,6 +157,206 @@ export const artifactRefSchema = z
       .min(3)
       .max(160)
       .regex(/^[\w!#$&^.+-]+\/[\w!#$&^.+-]+$/),
+  })
+  .strict();
+
+const relativeWorkspacePathSchema = z
+  .string()
+  .min(1)
+  .max(500)
+  .refine(
+    (value) =>
+      value === "." ||
+      (!value.startsWith("/") &&
+        !value.startsWith("\\") &&
+        !/^[a-z]:/i.test(value) &&
+        !value.includes("\\") &&
+        value
+          .split("/")
+          .every((segment) => segment !== "" && segment !== "." && segment !== "..")),
+    "Workspace paths must be normalized relative paths without traversal.",
+  );
+
+const workspaceGlobSchema = z
+  .string()
+  .min(1)
+  .max(500)
+  .refine(
+    (value) =>
+      !value.startsWith("/") &&
+      !value.startsWith("\\") &&
+      !/^[a-z]:/i.test(value) &&
+      !value.includes("\\") &&
+      !value.split("/").includes(".."),
+    "Workspace globs must stay relative to the workspace.",
+  );
+
+export const workspaceCommandSchema = z
+  .object({
+    executable: z
+      .string()
+      .min(1)
+      .max(120)
+      .regex(/^[\w.+-]+$/),
+    arguments: z
+      .array(
+        z
+          .string()
+          .max(500)
+          .regex(/^[^\0\r\n]*$/),
+      )
+      .max(32),
+  })
+  .strict();
+
+const workspaceRequestEnvelopeShape = {
+  schemaVersion: z.literal(WORKSPACE_REQUEST_SCHEMA_VERSION),
+  requestId: z.string().uuid(),
+  runId: runIdSchema,
+};
+
+export const workspaceInspectRequestSchema = z
+  .object({
+    ...workspaceRequestEnvelopeShape,
+    operation: z.literal("inspect"),
+    paths: z.array(relativeWorkspacePathSchema).max(24),
+    patterns: z.array(workspaceGlobSchema).max(24),
+  })
+  .strict();
+
+export const workspaceTestRequestSchema = z
+  .object({
+    ...workspaceRequestEnvelopeShape,
+    operation: z.literal("test"),
+    command: workspaceCommandSchema,
+    workingDirectory: relativeWorkspacePathSchema,
+    timeoutMs: z.number().int().min(50).max(120_000),
+  })
+  .strict();
+
+export const workspacePatchRequestSchema = z
+  .object({
+    ...workspaceRequestEnvelopeShape,
+    operation: z.literal("patch"),
+    files: z
+      .array(
+        z
+          .object({
+            path: relativeWorkspacePathSchema,
+            expectedSha256: z
+              .string()
+              .regex(/^[0-9a-f]{64}$/)
+              .nullable(),
+            content: z.string().max(262_144),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(24),
+  })
+  .strict();
+
+export const workspaceRequestSchema = z.discriminatedUnion("operation", [
+  workspaceInspectRequestSchema,
+  workspaceTestRequestSchema,
+  workspacePatchRequestSchema,
+]);
+
+const workspaceReadEvidenceSchema = z
+  .object({
+    path: relativeWorkspacePathSchema,
+    byteLength: z.number().int().nonnegative(),
+    capturedSha256: z.string().regex(/^[0-9a-f]{64}$/),
+    content: z.string(),
+    truncated: z.boolean(),
+    redactionCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const workspaceInspectDetailsSchema = z
+  .object({
+    operation: z.literal("inspect"),
+    reads: z.array(workspaceReadEvidenceSchema),
+    discoveredPaths: z.array(relativeWorkspacePathSchema),
+    discoveryTruncated: z.boolean(),
+  })
+  .strict();
+
+const workspaceTestDetailsSchema = z
+  .object({
+    operation: z.literal("test"),
+    command: workspaceCommandSchema,
+    workingDirectory: relativeWorkspacePathSchema,
+    exitCode: z.number().int().nullable(),
+    stdout: z.string(),
+    stderr: z.string(),
+    outputTruncated: z.boolean(),
+    redactionCount: z.number().int().nonnegative(),
+    durationMs: z.number().nonnegative(),
+  })
+  .strict();
+
+const workspacePatchDetailsSchema = z
+  .object({
+    operation: z.literal("patch"),
+    files: z.array(
+      z
+        .object({
+          path: relativeWorkspacePathSchema,
+          beforeSha256: z
+            .string()
+            .regex(/^[0-9a-f]{64}$/)
+            .nullable(),
+          afterSha256: z.string().regex(/^[0-9a-f]{64}$/),
+          byteLength: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export const workspaceEvidenceSchema = z
+  .object({
+    schemaVersion: z.literal(WORKSPACE_EVIDENCE_SCHEMA_VERSION),
+    requestId: z.string().uuid(),
+    runId: runIdSchema,
+    operation: z.enum(["inspect", "test", "patch"]),
+    status: z.enum(["succeeded", "denied", "failed", "timed_out", "cancelled"]),
+    reasonCode: z
+      .enum([
+        "path_escape",
+        "symlink_escape",
+        "path_not_allowlisted",
+        "pattern_not_allowlisted",
+        "command_not_allowlisted",
+        "working_directory_not_allowlisted",
+        "patch_conflict",
+        "output_limit",
+        "execution_failed",
+      ])
+      .nullable(),
+    summary: z.string().min(1).max(500),
+    startedAt: isoDateTimeSchema,
+    finishedAt: isoDateTimeSchema,
+    details: z.discriminatedUnion("operation", [
+      workspaceInspectDetailsSchema,
+      workspaceTestDetailsSchema,
+      workspacePatchDetailsSchema,
+    ]),
+  })
+  .strict();
+
+export const workspaceEvidenceRecordSchema = z
+  .object({
+    evidence: workspaceEvidenceSchema,
+    artifact: artifactRefSchema,
+  })
+  .strict();
+
+export const workspaceEvidenceResponseSchema = z
+  .object({
+    schemaVersion: z.literal(WORKSPACE_EVIDENCE_RESPONSE_SCHEMA_VERSION),
+    record: workspaceEvidenceRecordSchema,
   })
   .strict();
 
@@ -210,10 +416,19 @@ export const runTerminalErrorEventSchema = z
   })
   .strict();
 
+export const workspaceEvidenceEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("workspace.evidence"),
+    payload: workspaceEvidenceRecordSchema,
+  })
+  .strict();
+
 export const runEventSchema = z.discriminatedUnion("type", [
   runCreatedEventSchema,
   runQueuedEventSchema,
   runTerminalErrorEventSchema,
+  workspaceEvidenceEventSchema,
 ]);
 
 export const runStatusSchema = z.enum(["created", "queued", "terminal_error"]);
@@ -228,6 +443,7 @@ export const runSnapshotSchema = z
     updatedAt: isoDateTimeSchema,
     lastSequence: z.number().int().nonnegative(),
     artifacts: z.array(artifactRefSchema),
+    workspaceEvidence: z.array(workspaceEvidenceRecordSchema).default([]),
     terminalError: terminalRunErrorSchema.nullable(),
   })
   .strict();
@@ -259,6 +475,7 @@ export const runDossierSchema = runSummarySchema
     workspace: localWorkspaceSchema.nullable(),
     viewport: viewportSchema.nullable(),
     artifacts: z.array(artifactRefSchema),
+    workspaceEvidence: z.array(workspaceEvidenceRecordSchema).default([]),
     terminalError: terminalRunErrorSchema.nullable(),
   })
   .strict();
@@ -287,6 +504,11 @@ export type RunSnapshot = z.infer<typeof runSnapshotSchema>;
 export type RunStatus = z.infer<typeof runStatusSchema>;
 export type RunSummary = z.infer<typeof runSummarySchema>;
 export type TerminalRunError = z.infer<typeof terminalRunErrorSchema>;
+export type WorkspaceCommand = z.infer<typeof workspaceCommandSchema>;
+export type WorkspaceEvidence = z.infer<typeof workspaceEvidenceSchema>;
+export type WorkspaceEvidenceRecord = z.infer<typeof workspaceEvidenceRecordSchema>;
+export type WorkspaceEvidenceResponse = z.infer<typeof workspaceEvidenceResponseSchema>;
+export type WorkspaceRequest = z.infer<typeof workspaceRequestSchema>;
 
 export type ContractError = z.infer<typeof contractErrorSchema>;
 export type LocalWorkspace = z.infer<typeof localWorkspaceSchema>;

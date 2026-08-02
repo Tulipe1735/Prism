@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prism Workspace Confinement — Reference</title>
+    <link rel="icon" href="../assets/lesson-icon.svg" />
+    <link rel="stylesheet" href="../assets/learning.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="kicker">Prism / Reference / Workspace v1</span>
+        <h1>Workspace confinement 参考卡</h1>
+        <p class="lede">看到拒绝或 runaway command 时，先判断是哪一道门做决定。</p>
+      </header>
+
+      <section>
+        <span class="eyebrow">Three gates</span>
+        <h2>形状、授权、现实</h2>
+        <div class="two-column">
+          <article class="reference-card">
+            <h3>1 · Contract</h3>
+            <p>
+              <code>workspaceRequestSchema</code>
+              拒绝绝对路径、<code>..</code>、反斜杠路径、带换行参数和 shell 形状。
+            </p>
+          </article>
+          <article class="reference-card">
+            <h3>2 · Policy</h3>
+            <p>
+              请求的 glob、文件、完整 argv 与 working directory 必须精确命中注册项。
+            </p>
+          </article>
+          <article class="reference-card">
+            <h3>3 · Reality</h3>
+            <p>
+              <code>realpath</code> 再验真实落点；symlink 不得把读取、写入或 cwd 带出
+              Run workspace。
+            </p>
+          </article>
+          <article class="reference-card">
+            <h3>4 · Evidence</h3>
+            <p>
+              成功、拒绝、超时、取消都是结构化结果；脱敏并截断后才写入 hashed artifact。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Operation map</span>
+        <h2>三种 operation 的不变量</h2>
+        <div class="reference-card">
+          <p>
+            <code>inspect</code> — allowlisted path/pattern → layered .gitignore → no
+            symlink following → bounded read。
+          </p>
+          <p>
+            <code>patch</code> — inside real root → not ignored/symlink → expected
+            SHA-256 matches → sibling temp + rename。
+          </p>
+          <p>
+            <code>test</code> — exact executable + argv + cwd →
+            <code>shell: false</code> → output/redaction limit → full-tree cleanup。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Process cleanup</span>
+        <h2>只杀 parent 不够</h2>
+        <div class="two-column">
+          <article class="reference-card">
+            <h3>POSIX</h3>
+            <p>
+              <code>detached: true</code> 建立 process group；对负 PID 发送 TERM，再用
+              KILL 收尾。
+            </p>
+          </article>
+          <article class="reference-card">
+            <h3>Windows</h3>
+            <p>
+              <code>taskkill /pid &lt;pid&gt; /t /f</code>；<code>/t</code> 包含
+              descendant processes。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <span class="eyebrow">Durable path</span>
+        <h2>从调用到 dossier</h2>
+        <ol>
+          <li><code>POST /api/runs/:runId/workspace</code> 再验 request contract。</li>
+          <li><code>WorkspaceExecutor.execute</code> 返回 bounded evidence。</li>
+          <li><code>writeArtifact</code> 产生 SHA-256 reference。</li>
+          <li><code>workspace.evidence</code> 进入 append-only journal。</li>
+          <li><code>projectRunEvents</code> 重建 dossier evidence。</li>
+        </ol>
+      </section>
+
+      <footer>
+        <p>
+          Lesson:
+          <a href="../lessons/0003-three-gates-before-workspace-effects.html"
+            >Workspace effect 之前的三道门</a
+          >
+          · Previous: <a href="./prism-durable-run.html">Durable Run 参考卡</a>
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

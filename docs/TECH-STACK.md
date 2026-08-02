@@ -1,6 +1,6 @@
 # Prism technical baseline
 
-Status: `Field Desk, shared contracts, and durable Run storage implemented`
+Status: `Field Desk, durable Runs, and confined workspace execution implemented`
 
 This document describes the current Prism technology boundary. The Field Desk
 and first durable Run seam are verified; runtime, executor, browser, and
@@ -18,6 +18,8 @@ evaluation packages remain owned by later implementation tickets.
 | React Toastify + Zustand | Submission feedback and ephemeral UI filters; neither is canonical Run state |
 | `@antfu/eslint-config` 4.0.1 + Prettier 3.9.6 | Node 18-compatible lint baseline with formatting kept in Prettier |
 | Vitest 3.2.7 | Node 18-compatible deterministic contract, storage, and route tests |
+| Execa 9.6.1 | Shell-free execution, bounded output, and cross-platform subprocess lifecycle |
+| fast-glob 3.3.3 + ignore 7.0.6 | Repository discovery without following symlinks, filtered through repository ignore rules |
 | Pi Agent SDK | Embedded Coding Runtime session and coding trajectory events |
 | UI-TARS SDK | Embedded Browser Runtime visual grounding and typed action proposals |
 
@@ -45,6 +47,7 @@ packages/
   contracts/
   tooling-config/
   trajectory-store/
+  workspace-executor/
 ```
 
 - `web` owns the real Field Desk, independently validated API boundaries, Run
@@ -55,6 +58,9 @@ packages/
 - `trajectory-store` owns the immutable manifest, append-only JSONL journal,
   SHA-256 content-addressed artifacts, and disposable rebuildable snapshot
   cache.
+- `workspace-executor` owns real-root path confinement, repository-ignore-aware
+  discovery, bounded and redacted reads, hash-guarded patches, exact command
+  registration, deadlines, cancellation, and complete process-tree cleanup.
 - `tooling-config` shares TypeScript, Antfu ESLint, Prettier, and Vitest
   configuration.
 
@@ -65,7 +71,6 @@ packages/
   orchestrator/
   runtime-pi/
   runtime-ui-tars/
-  workspace-executor/
   action-broker/
   eval/
 fixtures/
@@ -76,7 +81,6 @@ fixtures/
   outcome, evidence, event, and artifact schemas.
 - `orchestrator` owns routing, DAG revisions, scheduling, budgets, cancellation, and the fenced exclusive effect lease.
 - `runtime-pi` and `runtime-ui-tars` translate SDK events into Prism contracts; neither may execute unrestricted effects or mutate the DAG.
-- `workspace-executor` confines repository reads, patches, commands, and tests.
 - `action-broker` validates browser proposals and owns BrowserExecutor access.
 - `eval` owns deterministic fault tests, React scenarios, and the frozen SWE-bench non-regression manifest.
 

@@ -1,10 +1,16 @@
 "use client";
 
-import type { RunDossier } from "@prism/contracts";
-import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, FileKey2 } from "lucide-react";
+import type { RunDossier, WorkspaceRequest } from "@prism/contracts";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FileKey2,
+  FlaskConical,
+  FolderSearch2,
+} from "lucide-react";
 
-import { fetchRunDossier } from "@/lib/client/run-api";
+import { fetchRunDossier, runWorkspaceRequest } from "@/lib/client/run-api";
 
 export function RunDossierView({
   initialDossier,
@@ -13,12 +19,42 @@ export function RunDossierView({
   initialDossier: RunDossier;
   runId: string;
 }) {
+  const queryClient = useQueryClient();
   const dossierQuery = useQuery({
     queryKey: ["runs", runId],
     queryFn: () => fetchRunDossier(runId),
     initialData: initialDossier,
     refetchOnMount: "always",
   });
+  const workspaceMutation = useMutation({
+    mutationFn: (request: WorkspaceRequest) => runWorkspaceRequest(runId, request),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["runs", runId] });
+    },
+  });
+
+  function inspectWorkspace() {
+    workspaceMutation.mutate({
+      schemaVersion: "prism.workspace-request/v1",
+      requestId: crypto.randomUUID(),
+      runId,
+      operation: "inspect",
+      paths: ["package.json"],
+      patterns: ["apps/**/*.{ts,tsx}", "packages/**/*.ts"],
+    });
+  }
+
+  function testWorkspace() {
+    workspaceMutation.mutate({
+      schemaVersion: "prism.workspace-request/v1",
+      requestId: crypto.randomUUID(),
+      runId,
+      operation: "test",
+      command: { executable: "pnpm", arguments: ["test"] },
+      workingDirectory: ".",
+      timeoutMs: 120_000,
+    });
+  }
 
   if (dossierQuery.isFetching) {
     return (
@@ -142,6 +178,123 @@ export function RunDossierView({
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="mt-10 border-t-2 border-stone-900 pt-7">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-stone-500">
+              CONFINED WORKSPACE EVIDENCE
+            </p>
+            <h2 className="mt-2 font-serif text-3xl">
+              What Prism inspected — and stopped
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="inline-flex items-center gap-2 border border-stone-900 px-3 py-2 font-mono text-[0.62rem] font-bold disabled:cursor-wait disabled:opacity-50"
+              disabled={workspaceMutation.isPending}
+              onClick={inspectWorkspace}
+              type="button"
+            >
+              <FolderSearch2 aria-hidden size={14} /> Inspect registered files
+            </button>
+            <button
+              className="inline-flex items-center gap-2 bg-stone-900 px-3 py-2 font-mono text-[0.62rem] font-bold text-stone-50 disabled:cursor-wait disabled:opacity-50"
+              disabled={workspaceMutation.isPending}
+              onClick={testWorkspace}
+              type="button"
+            >
+              <FlaskConical aria-hidden size={14} /> Run allowlisted tests
+            </button>
+          </div>
+        </div>
+
+        {workspaceMutation.isError && (
+          <p
+            className="mt-4 border border-red-800 bg-red-50 p-4 text-sm text-red-900"
+            role="alert"
+          >
+            Prism could not commit the workspace evidence. No wider command or path was
+            attempted.
+          </p>
+        )}
+
+        {dossier.workspaceEvidence.length === 0 ? (
+          <p className="mt-5 border border-dashed border-stone-500 p-5 text-sm text-stone-600">
+            No workspace operation has been journaled yet. Each button submits a typed,
+            bounded request; a denial is evidence too.
+          </p>
+        ) : (
+          <ol className="mt-5 space-y-4">
+            {dossier.workspaceEvidence.map(({ evidence, artifact }) => (
+              <li
+                className="border border-stone-500 bg-white/40 p-5"
+                key={evidence.requestId}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <strong className="font-mono text-[0.68rem] tracking-[0.1em]">
+                    {evidence.operation.toUpperCase()} / {evidence.status.toUpperCase()}
+                  </strong>
+                  <span className="font-mono text-[0.6rem] text-stone-500">
+                    {evidence.reasonCode ?? "policy passed"}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-6">{evidence.summary}</p>
+
+                {evidence.details.operation === "inspect" && (
+                  <div className="mt-4 grid gap-4 text-xs md:grid-cols-2">
+                    <div>
+                      <strong className="font-mono">READS</strong>
+                      <ul className="mt-2 space-y-1">
+                        {evidence.details.reads.map((read) => (
+                          <li className="break-all" key={read.path}>
+                            {read.path} · {read.byteLength} bytes
+                            {read.truncated ? " · truncated" : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <strong className="font-mono">DISCOVERED</strong>
+                      <p className="mt-2">
+                        {evidence.details.discoveredPaths.length} paths
+                        {evidence.details.discoveryTruncated ? " (bounded)" : ""}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {evidence.details.operation === "test" && (
+                  <div className="mt-4 text-xs">
+                    <p className="font-mono">
+                      {evidence.details.command.executable}{" "}
+                      {evidence.details.command.arguments.join(" ")} · exit{" "}
+                      {evidence.details.exitCode ?? "none"}
+                    </p>
+                    {(evidence.details.stdout || evidence.details.stderr) && (
+                      <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap bg-stone-900 p-4 text-[0.68rem] text-stone-50">
+                        {[evidence.details.stdout, evidence.details.stderr]
+                          .filter(Boolean)
+                          .join("\n")}
+                      </pre>
+                    )}
+                  </div>
+                )}
+
+                {evidence.details.operation === "patch" && (
+                  <p className="mt-4 font-mono text-xs">
+                    {evidence.details.files.length} hash-guarded file change(s)
+                  </p>
+                )}
+
+                <p className="mt-4 break-all border-t border-stone-300 pt-3 font-mono text-[0.58rem] text-stone-500">
+                  ARTIFACT SHA-256 / {artifact.hash} / {artifact.byteLength} bytes
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
     </section>
   );

@@ -8,6 +8,8 @@ import {
   runListSchema,
   runManifestSchema,
   runSnapshotSchema,
+  workspaceEvidenceRecordSchema,
+  workspaceRequestSchema,
 } from "./index";
 
 const request = {
@@ -142,5 +144,67 @@ describe("Durable Run contracts", () => {
         },
       }),
     ).toMatchObject({ dossier: { prompt: request.prompt } });
+  });
+
+  it("accepts typed workspace operations and rejects shell-shaped requests", () => {
+    expect(
+      workspaceRequestSchema.parse({
+        schemaVersion: "prism.workspace-request/v1",
+        requestId: "42ee0dfc-a713-49b9-bc60-8c72cced2a24",
+        runId: manifest.runId,
+        operation: "inspect",
+        paths: ["package.json"],
+        patterns: ["packages/**/*.ts"],
+      }),
+    ).toMatchObject({ operation: "inspect" });
+
+    expect(
+      workspaceRequestSchema.safeParse({
+        schemaVersion: "prism.workspace-request/v1",
+        requestId: "42ee0dfc-a713-49b9-bc60-8c72cced2a24",
+        runId: manifest.runId,
+        operation: "test",
+        command: {
+          executable: "pnpm test && rm -rf .",
+          arguments: [],
+        },
+        workingDirectory: ".",
+        timeoutMs: 1_000,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("binds structured workspace evidence to its hashed artifact", () => {
+    const evidence = {
+      schemaVersion: "prism.workspace-evidence/v1",
+      requestId: "42ee0dfc-a713-49b9-bc60-8c72cced2a24",
+      runId: manifest.runId,
+      operation: "inspect",
+      status: "succeeded",
+      reasonCode: null,
+      summary: "Read 1 file and discovered 2 files.",
+      startedAt: "2026-07-31T04:01:00.000Z",
+      finishedAt: "2026-07-31T04:01:00.010Z",
+      details: {
+        operation: "inspect",
+        reads: [
+          {
+            path: "package.json",
+            byteLength: 192,
+            capturedSha256: "b".repeat(64),
+            content: '{"name":"prism"}',
+            truncated: false,
+            redactionCount: 0,
+          },
+        ],
+        discoveredPaths: ["packages/contracts/src/index.ts", "package.json"],
+        discoveryTruncated: false,
+      },
+    } as const;
+
+    expect(workspaceEvidenceRecordSchema.parse({ evidence, artifact })).toMatchObject({
+      evidence: { status: "succeeded" },
+      artifact,
+    });
   });
 });

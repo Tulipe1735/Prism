@@ -6,7 +6,12 @@ import { type RepairRequest, runCreationSchema } from "@prism/contracts";
 import { FileTrajectoryStore } from "@prism/trajectory-store";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { createRun, getRunDossier, listRecentRuns } from "./run-repository";
+import {
+  createRun,
+  executeWorkspaceRequest,
+  getRunDossier,
+  listRecentRuns,
+} from "./run-repository";
 
 const request: RepairRequest = {
   schemaVersion: "prism.repair-request/v1",
@@ -91,5 +96,41 @@ describe("Run repository", () => {
   it("returns null for an unknown or unsafe Run ID", async () => {
     expect(await getRunDossier("run_11111111-1111-4111-8111-111111111111")).toBeNull();
     expect(await getRunDossier("../../outside")).toBeNull();
+  });
+
+  it("stores confined workspace evidence as a hashed artifact in the dossier", async () => {
+    const workspaceDirectory = await mkdtemp(join(tmpdir(), "prism-run-workspace-"));
+    await writeFile(join(workspaceDirectory, "package.json"), '{"name":"fixture"}\n');
+    const creation = await createRun({
+      ...request,
+      workspace: {
+        kind: "local",
+        path: workspaceDirectory,
+        displayName: "fixture",
+      },
+    });
+
+    try {
+      const record = await executeWorkspaceRequest(creation.runId, {
+        schemaVersion: "prism.workspace-request/v1",
+        requestId: "42ee0dfc-a713-49b9-bc60-8c72cced2a24",
+        runId: creation.runId,
+        operation: "inspect",
+        paths: ["package.json"],
+        patterns: [],
+      });
+
+      expect(record).toMatchObject({
+        evidence: { status: "succeeded", operation: "inspect" },
+        artifact: { mediaType: "application/vnd.prism.workspace-evidence+json" },
+      });
+      expect(await getRunDossier(creation.runId)).toMatchObject({
+        lastSequence: 3,
+        workspaceEvidence: [record],
+        artifacts: expect.arrayContaining([record?.artifact]),
+      });
+    } finally {
+      await rm(workspaceDirectory, { recursive: true, force: true });
+    }
   });
 });

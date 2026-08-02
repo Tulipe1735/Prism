@@ -61,6 +61,29 @@
 - [Next.js Route Handlers](https://nextjs.org/docs/15/app/getting-started/route-handlers-and-middleware)
   Primary documentation for `route.ts` and the Web `Request`/`Response` APIs. Use for:
   understanding the server-owned create, list, and dossier boundaries.
+- [Confined WorkspaceExecutor](packages/workspace-executor/src/index.ts) The real path,
+  ignore, patch, command, redaction, deadline, cancellation, and process-tree boundary.
+  Use for: tracing why an operation was accepted or denied.
+- [WorkspaceExecutor behavior tests](packages/workspace-executor/src/workspace-executor.test.ts)
+  Cross-platform executable stories for inspection, exact command registration,
+  traversal, symlink escape, bounded output, patch preconditions, timeout, cancellation,
+  and cleanup.
+- [Workspace evidence Route Handler](apps/web/app/api/runs/[runId]/workspace/route.ts)
+  The independent HTTP schema boundary that commits an executor outcome to a Run.
+- [Execa](https://github.com/sindresorhus/execa) Maintainer documentation for shell-free
+  argument vectors, output handling, errors, cancellation, and Windows behavior. Use
+  for: the command lifecycle inside WorkspaceExecutor.
+- [fast-glob](https://github.com/mrmlnc/fast-glob) Maintainer documentation for bounded
+  file discovery, `cwd`, ignore patterns, and `followSymbolicLinks: false`.
+- [node-ignore](https://github.com/kaelzhang/node-ignore) Maintainer implementation of
+  `.gitignore` matching semantics. Use for: repository-relative ignore layers.
+- [Git `gitignore`](https://git-scm.com/docs/gitignore) Primary specification for root
+  and nested ignore-file precedence.
+- [Node.js child processes](https://nodejs.org/api/child_process.html) Primary
+  documentation for detached POSIX process groups and the warning that killing a parent
+  does not necessarily kill its descendants.
+- [Windows `taskkill`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill)
+  Primary documentation for `/pid`, `/t`, and `/f` process-tree termination.
 
 ## Wisdom (Communities)
 

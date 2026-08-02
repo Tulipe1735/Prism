@@ -75,6 +75,59 @@ describe("FileTrajectoryStore", () => {
     expect(await reopened.loadRun(runId)).toEqual(created);
   });
 
+  it("projects workspace evidence and verifies its content-addressed artifact", async () => {
+    await store.createRun(request);
+    const evidence = {
+      schemaVersion: "prism.workspace-evidence/v1",
+      requestId: "42ee0dfc-a713-49b9-bc60-8c72cced2a24",
+      runId,
+      operation: "inspect",
+      status: "succeeded",
+      reasonCode: null,
+      summary: "Read 1 file and discovered 1 file.",
+      startedAt: recordedAt,
+      finishedAt: recordedAt,
+      details: {
+        operation: "inspect",
+        reads: [
+          {
+            path: "package.json",
+            byteLength: 18,
+            capturedSha256: "b".repeat(64),
+            content: '{"name":"fixture"}',
+            truncated: false,
+            redactionCount: 0,
+          },
+        ],
+        discoveredPaths: ["package.json"],
+        discoveryTruncated: false,
+      },
+    } as const;
+    const artifact = await store.writeArtifact(
+      `${JSON.stringify(evidence)}\n`,
+      "application/vnd.prism.workspace-evidence+json",
+    );
+
+    const snapshot = await store.appendEvent({
+      schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+      eventId: terminalEventId,
+      runId,
+      sequence: 3,
+      recordedAt,
+      correlationId: runId,
+      causationEventId: queuedEventId,
+      type: "workspace.evidence",
+      payload: { evidence, artifact },
+    });
+
+    expect(snapshot).toMatchObject({
+      lastSequence: 3,
+      status: "queued",
+      workspaceEvidence: [{ evidence: { operation: "inspect" }, artifact }],
+    });
+    expect((await store.loadRun(runId)).snapshot).toEqual(snapshot);
+  });
+
   it("validates before append, enforces the next sequence, and keeps the manifest immutable", async () => {
     await store.createRun(request);
     const manifestPath = join(dataDirectory, "runs", runId, "manifest.json");
