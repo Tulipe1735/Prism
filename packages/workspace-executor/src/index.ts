@@ -683,10 +683,26 @@ export class WorkspaceExecutor {
       "SystemRoot",
       "COMSPEC",
     ];
-    const environment: Record<string, string> = { ...this.environment };
+    const environment: Record<string, string> = {};
     for (const key of inherited) {
       const value = process.env[key];
-      if (value !== undefined) environment[key] = value;
+      const normalizedKey = process.platform === "win32" ? key.toLowerCase() : key;
+      const alreadyInherited = Object.keys(environment).some(
+        (candidate) =>
+          (process.platform === "win32" ? candidate.toLowerCase() : candidate) ===
+          normalizedKey,
+      );
+      if (value !== undefined && !alreadyInherited) environment[key] = value;
+    }
+    for (const [key, value] of Object.entries(this.environment)) {
+      if (process.platform === "win32") {
+        for (const inheritedKey of Object.keys(environment)) {
+          if (inheritedKey.toLowerCase() === key.toLowerCase()) {
+            delete environment[inheritedKey];
+          }
+        }
+      }
+      environment[key] = value;
     }
     return environment;
   }

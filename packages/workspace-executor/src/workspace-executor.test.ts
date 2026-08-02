@@ -160,6 +160,28 @@ describe("WorkspaceExecutor", () => {
     });
   });
 
+  it("lets a configured PATH override the ambient executable search path", async () => {
+    const emptyPath = path.join(root, "empty-bin");
+    await mkdir(emptyPath);
+    const pathBoundExecutor = await WorkspaceExecutor.create({
+      workspaceRoot: root,
+      allowedReadPatterns: [],
+      allowedDiscoveryPatterns: [],
+      allowedCommands: [
+        {
+          command: { executable: "node", arguments: ["pass.mjs"] },
+          workingDirectories: ["."],
+        },
+      ],
+      environment: { PATH: emptyPath },
+    });
+
+    expect(await pathBoundExecutor.execute(testRequest("pass.mjs"))).toMatchObject({
+      status: "failed",
+      reasonCode: "execution_failed",
+    });
+  });
+
   it("fails closed on traversal, symlink escape, and an unexpected working directory", async () => {
     const traversal = await executor.execute({
       schemaVersion: "prism.workspace-request/v1",

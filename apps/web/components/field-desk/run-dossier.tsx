@@ -257,10 +257,18 @@ export function RunDossierView({
                     </div>
                     <div>
                       <strong className="font-mono">DISCOVERED</strong>
-                      <p className="mt-2">
-                        {evidence.details.discoveredPaths.length} paths
-                        {evidence.details.discoveryTruncated ? " (bounded)" : ""}
-                      </p>
+                      <ul className="mt-2 space-y-1">
+                        {evidence.details.discoveredPaths.map((discoveredPath) => (
+                          <li className="break-all" key={discoveredPath}>
+                            {discoveredPath}
+                          </li>
+                        ))}
+                      </ul>
+                      {evidence.details.discoveryTruncated && (
+                        <p className="mt-2 font-mono text-stone-500">
+                          Result list truncated at the evidence boundary.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -283,9 +291,18 @@ export function RunDossierView({
                 )}
 
                 {evidence.details.operation === "patch" && (
-                  <p className="mt-4 font-mono text-xs">
-                    {evidence.details.files.length} hash-guarded file change(s)
-                  </p>
+                  <ul className="mt-4 space-y-3 font-mono text-xs">
+                    {evidence.details.files.map((file) => (
+                      <li className="border border-stone-300 p-3" key={file.path}>
+                        <p className="break-all font-bold">{file.path}</p>
+                        <p className="mt-2 break-all">
+                          BEFORE / {file.beforeSha256 ?? "new file"}
+                        </p>
+                        <p className="mt-1 break-all">AFTER / {file.afterSha256}</p>
+                        <p className="mt-1">{file.byteLength} bytes</p>
+                      </li>
+                    ))}
+                  </ul>
                 )}
 
                 <p className="mt-4 break-all border-t border-stone-300 pt-3 font-mono text-[0.58rem] text-stone-500">

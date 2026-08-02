@@ -1,11 +1,9 @@
-import { randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 
 import {
   type RepairRequest,
   RUN_CREATION_SCHEMA_VERSION,
-  RUN_EVENT_SCHEMA_VERSION,
   type RunCreation,
   runCreationSchema,
   type RunDossier,
@@ -199,19 +197,7 @@ export async function executeWorkspaceRequest(
     WORKSPACE_EVIDENCE_MEDIA_TYPE,
   );
   const record = workspaceEvidenceRecordSchema.parse({ evidence, artifact });
-  const previousEvent = run.events.at(-1);
-
-  await store.appendEvent({
-    schemaVersion: RUN_EVENT_SCHEMA_VERSION,
-    eventId: randomUUID(),
-    runId: parsedRunId.data,
-    sequence: run.events.length + 1,
-    recordedAt: new Date().toISOString(),
-    correlationId: parsedRunId.data,
-    causationEventId: previousEvent?.eventId ?? null,
-    type: "workspace.evidence",
-    payload: record,
-  });
+  await store.appendWorkspaceEvidence(parsedRunId.data, record);
 
   return record;
 }

@@ -252,7 +252,7 @@ export const workspacePatchRequestSchema = z
           .strict(),
       )
       .min(1)
-      .max(24),
+      .max(1),
   })
   .strict();
 

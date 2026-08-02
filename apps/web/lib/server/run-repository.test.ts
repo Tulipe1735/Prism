@@ -111,23 +111,46 @@ describe("Run repository", () => {
     });
 
     try {
-      const record = await executeWorkspaceRequest(creation.runId, {
-        schemaVersion: "prism.workspace-request/v1",
-        requestId: "42ee0dfc-a713-49b9-bc60-8c72cced2a24",
-        runId: creation.runId,
-        operation: "inspect",
-        paths: ["package.json"],
-        patterns: [],
-      });
+      const records = await Promise.all(
+        [
+          "42ee0dfc-a713-49b9-bc60-8c72cced2a24",
+          "42ee0dfc-a713-49b9-bc60-8c72cced2a25",
+        ].map((requestId) =>
+          executeWorkspaceRequest(creation.runId, {
+            schemaVersion: "prism.workspace-request/v1",
+            requestId,
+            runId: creation.runId,
+            operation: "inspect",
+            paths: ["package.json"],
+            patterns: [],
+          }),
+        ),
+      );
 
-      expect(record).toMatchObject({
-        evidence: { status: "succeeded", operation: "inspect" },
-        artifact: { mediaType: "application/vnd.prism.workspace-evidence+json" },
-      });
+      expect(records).toEqual([
+        expect.objectContaining({
+          evidence: expect.objectContaining({
+            status: "succeeded",
+            operation: "inspect",
+          }),
+          artifact: expect.objectContaining({
+            mediaType: "application/vnd.prism.workspace-evidence+json",
+          }),
+        }),
+        expect.objectContaining({
+          evidence: expect.objectContaining({
+            status: "succeeded",
+            operation: "inspect",
+          }),
+          artifact: expect.objectContaining({
+            mediaType: "application/vnd.prism.workspace-evidence+json",
+          }),
+        }),
+      ]);
       expect(await getRunDossier(creation.runId)).toMatchObject({
-        lastSequence: 3,
-        workspaceEvidence: [record],
-        artifacts: expect.arrayContaining([record?.artifact]),
+        lastSequence: 4,
+        workspaceEvidence: records,
+        artifacts: expect.arrayContaining(records.map((record) => record?.artifact)),
       });
     } finally {
       await rm(workspaceDirectory, { recursive: true, force: true });

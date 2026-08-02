@@ -172,6 +172,19 @@ describe("Durable Run contracts", () => {
         timeoutMs: 1_000,
       }).success,
     ).toBe(false);
+
+    expect(
+      workspaceRequestSchema.safeParse({
+        schemaVersion: "prism.workspace-request/v1",
+        requestId: "42ee0dfc-a713-49b9-bc60-8c72cced2a24",
+        runId: manifest.runId,
+        operation: "patch",
+        files: [
+          { path: "a.ts", expectedSha256: null, content: "a" },
+          { path: "b.ts", expectedSha256: null, content: "b" },
+        ],
+      }).success,
+    ).toBe(false);
   });
 
   it("binds structured workspace evidence to its hashed artifact", () => {

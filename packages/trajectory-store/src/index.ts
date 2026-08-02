@@ -29,6 +29,8 @@ import {
   type RunSnapshot,
   runSnapshotSchema,
   type TerminalRunError,
+  type WorkspaceEvidenceRecord,
+  workspaceEvidenceRecordSchema,
 } from "@prism/contracts";
 
 const REPAIR_REQUEST_ARTIFACT_MEDIA_TYPE = "application/vnd.prism.repair-request+json";
@@ -313,19 +315,33 @@ export class FileTrajectoryStore {
           `Run ${event.runId} expected event sequence ${expectedSequence}, not ${event.sequence}.`,
         );
       }
+      return this.commitEvent(current, event);
+    });
+  }
 
-      const events = [...current.events, event];
-      const snapshot = projectRunEvents(current.manifest, events);
-      const runDirectory = this.runDirectory(event.runId);
+  async appendWorkspaceEvidence(
+    runIdInput: string,
+    recordInput: unknown,
+  ): Promise<RunSnapshot> {
+    const runId = runIdSchema.parse(runIdInput);
+    const record: WorkspaceEvidenceRecord =
+      workspaceEvidenceRecordSchema.parse(recordInput);
 
-      await appendFile(
-        path.join(runDirectory, "events.jsonl"),
-        serializeJsonLine(event),
-        "utf8",
-      );
-      await this.tryWriteSnapshotCache(runDirectory, snapshot);
-
-      return snapshot;
+    return this.withRunWrite(runId, async () => {
+      const current = await this.loadRun(runId);
+      const previousEvent = current.events.at(-1);
+      const event = asEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: this.eventIdFactory(),
+        runId,
+        sequence: current.events.length + 1,
+        recordedAt: this.clock().toISOString(),
+        correlationId: runId,
+        causationEventId: previousEvent?.eventId ?? null,
+        type: "workspace.evidence",
+        payload: record,
+      });
+      return this.commitEvent(current, event);
     });
   }
 
@@ -548,6 +564,23 @@ export class FileTrajectoryStore {
         { cause: request.success ? undefined : request.error },
       );
     }
+  }
+
+  private async commitEvent(
+    current: DurableRun,
+    event: RunEvent,
+  ): Promise<RunSnapshot> {
+    const events = [...current.events, event];
+    const snapshot = projectRunEvents(current.manifest, events);
+    const runDirectory = this.runDirectory(event.runId);
+
+    await appendFile(
+      path.join(runDirectory, "events.jsonl"),
+      serializeJsonLine(event),
+      "utf8",
+    );
+    await this.tryWriteSnapshotCache(runDirectory, snapshot);
+    return snapshot;
   }
 
   private async atomicWrite(
