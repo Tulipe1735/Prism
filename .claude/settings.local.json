@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\tulipe\\\\projects\\\\prism\")",
+      "Bash(python -c ' *)",
+      "Bash(pnpm --filter @prism/contracts typecheck)"
+    ]
+  }
+}

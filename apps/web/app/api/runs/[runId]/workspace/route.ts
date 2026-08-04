@@ -1,3 +1,9 @@
+/**
+ * POST /api/runs/[runId]/workspace —— 对 Run 执行一次受限工作区请求。
+ *
+ * 校验链路：媒体类型 → 体积（512 KiB）→ JSON 合法 → 工作区请求契约 →
+ * 请求的 Run ID 与路由一致。执行与证据落盘成功后返回 201 + 证据记录。
+ */
 import {
   formatContractIssues,
   WORKSPACE_EVIDENCE_RESPONSE_SCHEMA_VERSION,
@@ -11,6 +17,7 @@ import {
   JSON_RESPONSE_HEADERS,
 } from "../../../contract-response";
 
+/** 工作区请求体的体积上限（字节）。 */
 const MAX_WORKSPACE_REQUEST_BYTES = 524_288;
 
 export async function POST(

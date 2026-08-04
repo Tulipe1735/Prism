@@ -17,6 +17,12 @@ import {
   startMockOrchestration,
 } from "@/lib/client/run-api";
 
+/**
+ * 判断 Run 是否仍在推进中（需要轮询）。
+ *
+ * 取最新 DAG 修订：只要存在任一节点尚无进度，或进度仍处于
+ * running/ready/retrying 等未结束状态，就返回 true，从而启用轮询。
+ */
 function shouldPollRunDossier(dossier: RunDossier | undefined): boolean {
   if (!dossier) return false;
   const latestRevision = dossier.dagRevisions[dossier.dagRevisions.length - 1];
@@ -30,10 +36,25 @@ function shouldPollRunDossier(dossier: RunDossier | undefined): boolean {
   });
 }
 
+/** 构造产物下载 URL（按 Run ID + 产物哈希）。 */
 function artifactUrl(runId: string, artifactHash: string): string {
   return `/api/runs/${encodeURIComponent(runId)}/artifacts/${artifactHash}`;
 }
 
+/**
+ * Run 卷宗视图：详情页的核心组件，只读展示一次 Run 的全部持久化状态。
+ *
+ * 板块：
+ *  - 头部：状态徽标 + 标题 + 终止性完整性错误提示；
+ *  - 原始修复请求 + 持久化边界（清单创建时间/工作区/视口）；
+ *  - 哈希产物清单（内容寻址存储的引用）；
+ *  - 浏览器基线（观测前后的事实证据，含截图/trace/DOM 等产物链接）；
+ *  - mock 混合编排（Run DAG 节点进度 + 副作用租约），可启动 mock Run；
+ *  - 受限工作区证据（inspect/test/patch 结果），可发起检查与测试。
+ *
+ * 数据通过 react-query 以 initialDossier 为初始值，Run 未结束时
+ * 每 150ms 轮询刷新。
+ */
 export function RunDossierView({
   initialDossier,
   runId,
@@ -49,12 +70,14 @@ export function RunDossierView({
     refetchInterval: (query) => (shouldPollRunDossier(query.state.data) ? 150 : false),
     refetchOnMount: "always",
   });
+  // 工作区请求（检查/测试）的变更
   const workspaceMutation = useMutation({
     mutationFn: (request: WorkspaceRequest) => runWorkspaceRequest(runId, request),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["runs", runId] });
     },
   });
+  // 启动 mock 编排的变更
   const orchestrationMutation = useMutation({
     mutationFn: () => startMockOrchestration(runId),
     onSuccess: async () => {
@@ -62,6 +85,7 @@ export function RunDossierView({
     },
   });
 
+  /** 发起一次受限工作区"检查"：读取 package.json + 发现源码文件。 */
   function inspectWorkspace() {
     workspaceMutation.mutate({
       schemaVersion: "prism.workspace-request/v1",
@@ -73,6 +97,7 @@ export function RunDossierView({
     });
   }
 
+  /** 发起一次受限工作区"测试"：运行允许列表内的 pnpm test。 */
   function testWorkspace() {
     workspaceMutation.mutate({
       schemaVersion: "prism.workspace-request/v1",
@@ -85,6 +110,7 @@ export function RunDossierView({
     });
   }
 
+  // 首次拉取中（无初始数据）时显示检查占位
   if (dossierQuery.isFetching && !dossierQuery.data) {
     return (
       <section className="py-12">
@@ -123,6 +149,7 @@ export function RunDossierView({
 
   return (
     <section className="py-12">
+      {/* 头部：Run 标识 + 完整性/状态徽标 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="font-mono text-[0.64rem] font-bold tracking-[0.14em]">
           COMMITTED RUN / JOURNAL #{dossier.lastSequence}
@@ -144,6 +171,7 @@ export function RunDossierView({
       </div>
       <h1 className="mt-3 max-w-4xl font-serif text-5xl">{dossier.title}</h1>
 
+      {/* 终止性完整性错误：拒绝加载不可信字节 */}
       {dossier.terminalError && (
         <div
           className="mt-9 border-2 border-red-800 bg-red-50 p-5 text-red-900"
@@ -159,6 +187,7 @@ export function RunDossierView({
         </div>
       )}
 
+      {/* 原始修复请求 + 持久化边界 */}
       <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem]">
         <article className="border-y-2 border-stone-900 py-7">
           <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-stone-500">
@@ -196,6 +225,7 @@ export function RunDossierView({
         </aside>
       </div>
 
+      {/* 哈希产物清单 */}
       <section className="mt-10 border-t border-stone-400 pt-7">
         <h2 className="inline-flex items-center gap-2 font-serif text-3xl">
           <FileKey2 aria-hidden size={22} /> Hashed artifacts
@@ -214,6 +244,7 @@ export function RunDossierView({
         </ul>
       </section>
 
+      {/* 浏览器基线：变更前观测的事实证据 */}
       <section className="mt-10 border-t-2 border-stone-900 pt-7">
         <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-stone-500">
           BROKERED BROWSER BASELINES
@@ -285,6 +316,7 @@ export function RunDossierView({
                         · {baseline.trace.byteLength} bytes · {baseline.dom.byteLength}{" "}
                         byte DOM
                       </span>
+                      {/* 其余证据产物：DOM / 无障碍 / 几何 / 控制台 / 网络 */}
                       <div className="mt-3 flex flex-wrap gap-2">
                         {[
                           ["Open target DOM", baseline.dom.hash],
@@ -317,6 +349,7 @@ export function RunDossierView({
         )}
       </section>
 
+      {/* mock 混合编排：Run DAG + 副作用租约 */}
       <section className="mt-10 border-t-2 border-stone-900 pt-7">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -325,6 +358,7 @@ export function RunDossierView({
             </p>
             <h2 className="mt-2 font-serif text-3xl">Dual-runtime Run DAG</h2>
           </div>
+          {/* 仅当尚无 DAG 修订时允许启动 mock Run */}
           <button
             className="border border-stone-900 px-3 py-2 font-mono text-[0.62rem] font-bold disabled:cursor-not-allowed disabled:opacity-50"
             disabled={orchestrationMutation.isPending || Boolean(latestRevision)}
@@ -352,6 +386,7 @@ export function RunDossierView({
             fences.
           </p>
         ) : (
+          /* 最新修订的节点列表：类型/状态/前驱/DAG 修订/运行时/进度 */
           <ol className="mt-5 space-y-3">
             {latestRevision.nodes.map((node) => {
               const progress = nodeProgressByNode.get(node.nodeId);
@@ -400,6 +435,7 @@ export function RunDossierView({
         )}
       </section>
 
+      {/* 受限工作区证据：检查 / 测试结果 */}
       <section className="mt-10 border-t-2 border-stone-900 pt-7">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -462,6 +498,7 @@ export function RunDossierView({
                 </div>
                 <p className="mt-3 text-sm leading-6">{evidence.summary}</p>
 
+                {/* inspect 详情：读取清单 + 发现路径 */}
                 {evidence.details.operation === "inspect" && (
                   <div className="mt-4 grid gap-4 text-xs md:grid-cols-2">
                     <div>
@@ -493,6 +530,7 @@ export function RunDossierView({
                   </div>
                 )}
 
+                {/* test 详情：命令、退出码、标准输出/错误 */}
                 {evidence.details.operation === "test" && (
                   <div className="mt-4 text-xs">
                     <p className="font-mono">
@@ -510,6 +548,7 @@ export function RunDossierView({
                   </div>
                 )}
 
+                {/* patch 详情：改动前后哈希 */}
                 {evidence.details.operation === "patch" && (
                   <ul className="mt-4 space-y-3 font-mono text-xs">
                     {evidence.details.files.map((file) => (

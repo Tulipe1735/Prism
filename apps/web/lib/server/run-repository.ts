@@ -1,3 +1,17 @@
+/**
+ * Field Desk 服务端 Run 仓库（repository）
+ *
+ * 位于 API 路由层与底层包之间，负责把 HTTP 语义组装成领域操作：
+ *  - 惰性单例的 FileTrajectoryStore（按 PRISM_DATA_DIR 解析数据目录）；
+ *  - Run 创建 / 列表 / 卷宗读取，损坏时降级为 failed 卷宗而非抛错；
+ *  - mock 混合编排的启动与等待（进程内单例，带初始修订门闩）；
+ *  - 工作区请求执行（用 WorkspaceExecutor 受限执行并落证据）；
+ *  - 浏览器基线采集（用 BrowserExecutor 采集并把产物写入存储）；
+ *  - 内容寻址产物读取。
+ *
+ * 除明确调用方错误（Run ID 不匹配）外，业务失败大多返回 null 或
+ * 降级卷宗，由路由层决定 HTTP 状态码。
+ */
 import path from "node:path";
 import process from "node:process";
 
@@ -30,31 +44,42 @@ import {
 } from "@prism/trajectory-store";
 import { WorkspaceExecutor } from "@prism/workspace-executor";
 
+/** 工作区证据产物的媒体类型。 */
 const WORKSPACE_EVIDENCE_MEDIA_TYPE = "application/vnd.prism.workspace-evidence+json";
+/** 浏览器证据产物的媒体类型。 */
 const BROWSER_EVIDENCE_MEDIA_TYPE = "application/vnd.prism.browser-evidence+json";
 
+/** 浏览器基线未配置（缺少 PRISM_BROWSER_BASE_URL）时抛出的错误。 */
 export class BrowserBaselineConfigurationError extends Error {}
 
 export type RecentRun = RunSummary;
 export type { RunDossier };
 
+/** 惰性初始化的全局轨迹存储单例。 */
 let activeStore: { dataDirectory: string; store: FileTrajectoryStore } | undefined;
+/** 进程内一次 mock 混合运行的活动句柄。 */
 interface ActiveMockHybridRun {
+  /** 首个 DAG 修订已写入日志的门闩（写入成功前启动请求不返回）。 */
   initialRevisionCommitted: Promise<void>;
+  /** 整个 mock 运行完成的 promise。 */
   completion: Promise<void>;
 }
 
+/** 进程内活动 mock 运行表，键为 dataDirectory:runId。 */
 const activeMockHybridRuns = new Map<string, ActiveMockHybridRun>();
 
+/** 生成活动 mock 运行的 Map 键。 */
 function mockRunKey(dataDirectory: string, runId: string): string {
   return `${dataDirectory}:${runId}`;
 }
 
+/** 解析数据目录：优先 PRISM_DATA_DIR，否则回退到 ".prism"。 */
 function getDataDirectory() {
   const configured = process.env.PRISM_DATA_DIR?.trim();
   return path.resolve(configured && configured.length > 0 ? configured : ".prism");
 }
 
+/** 获取（或惰性创建）全局轨迹存储单例。 */
 function getStore() {
   const dataDirectory = getDataDirectory();
   if (!activeStore || activeStore.dataDirectory !== dataDirectory) {
@@ -67,6 +92,7 @@ function getStore() {
   return activeStore.store;
 }
 
+/** 从一次已加载的 DurableRun 组装可返回的卷宗（integrity=verified）。 */
 function dossierFromRun(run: DurableRun): RunDossier {
   return runDossierSchema.parse({
     id: run.manifest.runId,
@@ -90,13 +116,19 @@ function dossierFromRun(run: DurableRun): RunDossier {
   });
 }
 
+/**
+ * 构造一个"读取失败"的降级卷宗（integrity=failed）。
+ *
+ * 尽可能从清单恢复展示信息（标题/请求/工作区），其余字段置空，
+ * 并写入终止错误。清单损坏时只保留最基础的标题。
+ */
 async function failedDossier(runId: string, error: unknown): Promise<RunDossier> {
   const store = getStore();
   let manifest = null;
   try {
     manifest = await store.loadManifest(runId);
   } catch {
-    // A corrupt manifest cannot safely contribute display state.
+    // 清单损坏时不能安全贡献展示状态
   }
 
   const terminalError: TerminalRunError =
@@ -128,6 +160,7 @@ async function failedDossier(runId: string, error: unknown): Promise<RunDossier>
   });
 }
 
+/** 加载卷宗：正常路径返回 verified 卷宗，失败路径降级为 failed 卷宗。 */
 async function loadDossier(runId: string): Promise<RunDossier> {
   try {
     return dossierFromRun(await getStore().loadRun(runId));
@@ -136,6 +169,9 @@ async function loadDossier(runId: string): Promise<RunDossier> {
   }
 }
 
+/**
+ * 创建一次新的 Run（持久化清单与初始事件），返回创建响应。
+ */
 export async function createRun(request: RepairRequest): Promise<RunCreation> {
   const run = await getStore().createRun(request);
   return runCreationSchema.parse({
@@ -145,6 +181,16 @@ export async function createRun(request: RepairRequest): Promise<RunCreation> {
     snapshot: run.snapshot,
   });
 }
+
+/**
+ * 启动一次 mock 混合编排运行。
+ *
+ * 幂等：同一 Run 已在运行则等其初始修订写入后直接返回 true。
+ * 首次启动时构造 OrchestrationJournal（把编排写入转发到轨迹存储），
+ * 用门闩等待首个 DAG 修订落盘后再返回，保证调用方看到的 Run 已可继续。
+ *
+ * @returns true 表示编排已在运行或已启动；false 表示 Run 不存在/ID 非法
+ */
 export async function startMockHybridRun(runIdInput: string): Promise<boolean> {
   const parsedRunId = runIdSchema.safeParse(runIdInput);
   if (!parsedRunId.success) return false;
@@ -162,6 +208,7 @@ export async function startMockHybridRun(runIdInput: string): Promise<boolean> {
 
   const run = await store.loadRun(parsedRunId.data);
 
+  // 门闩：首个 DAG 修订（revision 1）写入日志时放行启动请求
   let resolveInitialRevision: (() => void) | undefined;
   let rejectInitialRevision: ((reason?: unknown) => void) | undefined;
   let initialRevisionCommitted = false;
@@ -195,6 +242,7 @@ export async function startMockHybridRun(runIdInput: string): Promise<boolean> {
     })
     .then(() => undefined)
     .catch((error) => {
+      // 若首个修订尚未落盘即失败，放开门闩并让启动请求收到错误
       if (!initialRevisionCommitted) {
         rejectInitialRevision?.(error);
       }
@@ -211,6 +259,11 @@ export async function startMockHybridRun(runIdInput: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * 等待一次 mock 混合运行完成，返回最终卷宗。
+ *
+ * @returns 运行结束后的卷宗；Run 不存在/ID 非法返回 null
+ */
 export async function waitForMockHybridRun(
   runIdInput: string,
 ): Promise<RunDossier | null> {
@@ -223,6 +276,11 @@ export async function waitForMockHybridRun(
   return getRunDossier(parsedRunId.data);
 }
 
+/**
+ * 列出最近 Run 摘要，按创建时间倒序。
+ *
+ * 读取失败的 Run 以降级摘要（terminal_error / integrity=failed）参与排序。
+ */
 export async function listRecentRuns(): Promise<readonly RecentRun[]> {
   const runIds = await getStore().listRunIds();
   const dossiers = await Promise.all(runIds.map((runId) => loadDossier(runId)));
@@ -242,6 +300,11 @@ export async function listRecentRuns(): Promise<readonly RecentRun[]> {
     .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""));
 }
 
+/**
+ * 获取单个 Run 的卷宗。
+ *
+ * @returns 卷宗；Run 不存在或 ID 非法返回 null（区别于读取失败的降级卷宗）
+ */
 export async function getRunDossier(runIdInput: string): Promise<RunDossier | null> {
   const parsedRunId = runIdSchema.safeParse(runIdInput);
   if (!parsedRunId.success) {
@@ -256,6 +319,16 @@ export async function getRunDossier(runIdInput: string): Promise<RunDossier | nu
   return loadDossier(parsedRunId.data);
 }
 
+/**
+ * 对某 Run 执行一次工作区请求，并把证据落盘为一条工作区证据事件。
+ *
+ * WorkspaceExecutor 按 Run 请求中的工作区路径配置受限读写与允许命令
+ * （读源码目录、发现测试文件、运行 pnpm test）。执行结果连同其内容
+ * 寻址产物一并作为 evidence record 持久化。
+ *
+ * @throws TypeError 请求的 Run ID 与路由 Run ID 不一致时
+ * @returns 证据记录；Run 不存在或 ID 非法返回 null
+ */
 export async function executeWorkspaceRequest(
   runIdInput: string,
   requestInput: unknown,
@@ -303,6 +376,7 @@ export async function executeWorkspaceRequest(
   });
 }
 
+/** 读取浏览器基线基础 URL；未配置时抛出配置错误。 */
 function browserBaseUrl(): string {
   const configured = process.env.PRISM_BROWSER_BASE_URL?.trim();
   if (!configured) {
@@ -314,10 +388,17 @@ function browserBaseUrl(): string {
   return configured;
 }
 
+/** 构建身份标识，默认 "development"。 */
 function browserBuildIdentity(): string {
   return process.env.PRISM_BUILD_ID?.trim() || "development";
 }
 
+/**
+ * 为某 Run 采集一次浏览器基线，并把全部产物写入存储、证据事件落盘。
+ *
+ * @throws TypeError 请求的 Run ID 与路由 Run ID 不一致时
+ * @returns 完整基线记录；Run 不存在或 ID 非法返回 null
+ */
 export async function captureBrowserBaseline(
   runIdInput: string,
   requestInput: unknown,
@@ -344,6 +425,7 @@ export async function captureBrowserBaseline(
       executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
     });
     const capture = await executor.captureBaseline(request);
+    // 7 类产物并行写入内容寻址存储
     const [screenshot, dom, accessibility, computed, consoleArtifact, network, trace] =
       await Promise.all([
         store.writeArtifact(capture.artifacts.screenshot, "image/png"),
@@ -371,6 +453,11 @@ export async function captureBrowserBaseline(
   });
 }
 
+/**
+ * 读取某 Run 快照中引用的内容寻址产物。
+ *
+ * @returns 产物引用与字节内容；Run/产物不存在或 ID 非法返回 null
+ */
 export async function getRunArtifact(
   runIdInput: string,
   artifactHash: string,

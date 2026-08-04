@@ -1,11 +1,17 @@
 import { cn } from "@/lib/cn";
 
+/**
+ * Prism 品牌标识：三色棱镜线 + "PRISM / VISUAL SWE HARNESS" 字标。
+ *
+ * compact 用于页眉/角落等紧凑场景，缩小图形与字号并隐藏副标题。
+ */
 export function PrismMark({ compact = false }: { compact?: boolean }) {
   return (
     <span
       aria-label="Prism"
       className={cn("inline-flex items-center gap-2.5", compact && "gap-1.5")}
     >
+      {/* 棱镜图形：三条旋转的线段构成 */}
       <span
         aria-hidden
         className={cn(

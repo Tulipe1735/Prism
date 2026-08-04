@@ -1,5 +1,22 @@
+/**
+ * Prism 共享契约（contracts）包
+ *
+ * 本包集中定义 Prism 系统中所有跨模块共享的数据契约：修复请求（repair
+ * request）、Run 清单与快照、追加式事件日志、工作区证据、浏览器基线、
+ * Run DAG 编排结构等。
+ *
+ * 每个契约都以 Zod schema 声明，具备两层用途：
+ *  1. 运行时校验 —— 在进程/模块边界（HTTP 请求、事件落盘、跨包调用）验证数据合法性；
+ *  2. 类型推导 —— 通过 `z.infer` 自动导出 TypeScript 类型，保证全栈类型一致。
+ *
+ * 版本号采用 "prism.<name>/v1" 格式，schema 一旦发布不再变更字段语义，
+ * 如需演进必须引入新版本号，从而支持旧数据安全升级。
+ */
 import { z } from "zod";
 
+// ---------------------------------------------------------------------------
+// 版本常量：每个独立契约一个稳定标识，用于落盘数据的自描述与演进判断
+// ---------------------------------------------------------------------------
 export const REPAIR_REQUEST_SCHEMA_VERSION = "prism.repair-request/v1" as const;
 export const REPAIR_REQUEST_VALIDATION_SCHEMA_VERSION =
   "prism.repair-request-validation/v1" as const;
@@ -28,8 +45,17 @@ export const BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION =
 export const BROWSER_ACTION_RECORD_SCHEMA_VERSION =
   "prism.browser-action-record/v1" as const;
 
+/**
+ * 匹配绝对工作区路径的正则：Windows 盘符路径（如 C:\foo）或 POSIX 根路径（/foo）。
+ */
 const absoluteWorkspacePathPattern = /^(?:[a-z]:[\\/]|\/)/i;
 
+/**
+ * 检测字符串中是否含不受支持的控件字符。
+ *
+ * 允许保留的空白只有制表符（9）、换行（10）、回车（13）；其余码点小于 32
+ * 或等于 127 的控件字符一律视为非法，防止路径/提示词中混入异常字节。
+ */
 function hasUnsupportedControlCharacter(value: string): boolean {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
@@ -46,6 +72,11 @@ function hasUnsupportedControlCharacter(value: string): boolean {
   return false;
 }
 
+/**
+ * 本地工作区描述：Prism v1 只支持本地目录。
+ *
+ * path 必须是绝对路径且不含 NUL 字符；displayName 为展示名。
+ */
 export const localWorkspaceSchema = z
   .object({
     kind: z.literal("local", {
@@ -71,6 +102,9 @@ export const localWorkspaceSchema = z
   })
   .strict();
 
+/**
+ * 浏览器视口描述：固定宽/高范围及设备像素比，用于浏览器运行时截图与基线。
+ */
 export const viewportSchema = z
   .object({
     width: z
@@ -90,6 +124,12 @@ export const viewportSchema = z
   })
   .strict();
 
+/**
+ * 前端修复请求：一次自然语言修复任务的整体入参。
+ *
+ * 包含请求文案 prompt、目标工作区与浏览器视口；prompt 至少 6 字符、
+ * 上限 2000 字符，且不得含非法控件字符。
+ */
 export const repairRequestSchema = z
   .object({
     schemaVersion: z.literal(REPAIR_REQUEST_SCHEMA_VERSION, {
@@ -111,6 +151,9 @@ export const repairRequestSchema = z
   })
   .strict();
 
+/**
+ * 单条校验问题：定位到具体字段路径的校验失败描述。
+ */
 export const validationIssueSchema = z
   .object({
     path: z.string().min(1),
@@ -119,6 +162,12 @@ export const validationIssueSchema = z
   })
   .strict();
 
+/**
+ * 契约错误响应：所有被拒绝的请求统一返回此结构。
+ *
+ * code 枚举了各类错误（非法 JSON、请求不合法、工作区/浏览器执行失败等），
+ * issues 承载 Zod 校验失败的具体明细。
+ */
 export const contractErrorSchema = z
   .object({
     schemaVersion: z.literal(CONTRACT_ERROR_SCHEMA_VERSION),
@@ -141,6 +190,9 @@ export const contractErrorSchema = z
   })
   .strict();
 
+/**
+ * 修复请求校验通过响应：包裹原始请求，status 固定为 "accepted"。
+ */
 export const repairRequestValidationSchema = z
   .object({
     schemaVersion: z.literal(REPAIR_REQUEST_VALIDATION_SCHEMA_VERSION),
@@ -149,6 +201,9 @@ export const repairRequestValidationSchema = z
   })
   .strict();
 
+/**
+ * Run 标识：固定 "run_" 前缀 + 合法 UUID 格式（版本 4），全局唯一。
+ */
 export const runIdSchema = z
   .string()
   .regex(
@@ -156,8 +211,17 @@ export const runIdSchema = z
     "Run IDs must use the supported run_<uuid> format.",
   );
 
+/**
+ * 带时区偏移的 ISO 日期时间字符串，用于所有时间戳字段。
+ */
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 
+/**
+ * 内容寻址产物引用（ArtifactRef）。
+ *
+ * 文件/内容以 SHA-256 摘要标识，配合字节数与媒体类型，可在不可变存储中
+ * 定位并校验任意二进制/文本产物（截图、DOM、日志、补丁等）。
+ */
 export const artifactRefSchema = z
   .object({
     schemaVersion: z.literal(ARTIFACT_REF_SCHEMA_VERSION),
@@ -174,10 +238,16 @@ export const artifactRefSchema = z
   })
   .strict();
 
+/**
+ * 通用 SHA-256 摘要格式：64 位小写十六进制。
+ */
 const sha256Schema = z
   .string()
   .regex(/^[0-9a-f]{64}$/, "Values must use a lowercase SHA-256 digest.");
 
+/**
+ * 浏览器路由：本地路径形态，必须以单个 "/" 开头、不含 "\\" 与协议双斜杠。
+ */
 const browserRouteSchema = z
   .string()
   .min(1)
@@ -188,6 +258,9 @@ const browserRouteSchema = z
     "Browser routes must be normalized local paths.",
   );
 
+/**
+ * 语义浏览器目标：按 ARIA 角色 + 可访问名定位元素，可选精确匹配。
+ */
 const semanticBrowserTargetSchema = z
   .object({
     kind: z.literal("semantic"),
@@ -197,6 +270,10 @@ const semanticBrowserTargetSchema = z
   })
   .strict();
 
+/**
+ * 混合浏览器目标：语义定位之上叠加屏幕坐标边框（grounding），
+ * 便于 UI-TARS 这类模型在视觉坐标与语义元素之间对齐。
+ */
 const hybridBrowserTargetSchema = z
   .object({
     kind: z.literal("hybrid"),
@@ -214,6 +291,10 @@ const hybridBrowserTargetSchema = z
   })
   .strict();
 
+/**
+ * 浏览器观测引用：指回一次已产生的观测 —— 观测 ID、当前 URL、视口、
+ * 页面状态哈希与截图哈希，用于在动作前后建立可校验的对照。
+ */
 export const browserObservationReferenceSchema = z
   .object({
     observationId: z.string().uuid(),
@@ -224,6 +305,9 @@ export const browserObservationReferenceSchema = z
   })
   .strict();
 
+/**
+ * 坐标浏览器目标：直接以视口内像素坐标定位，必须落于给定视口范围内。
+ */
 const coordinateBrowserTargetSchema = z
   .object({
     kind: z.literal("coordinate"),
@@ -240,17 +324,26 @@ const coordinateBrowserTargetSchema = z
     "Coordinate targets must remain inside their bound viewport.",
   );
 
+/**
+ * 浏览器目标联合：语义 / 混合 / 坐标三种定位方式按 kind 判别。
+ */
 export const browserTargetSchema = z.discriminatedUnion("kind", [
   semanticBrowserTargetSchema,
   hybridBrowserTargetSchema,
   coordinateBrowserTargetSchema,
 ]);
 
+/**
+ * 浏览器采集目标：仅语义 / 混合（不含坐标），用于建立基线的观测采集。
+ */
 export const browserCaptureTargetSchema = z.discriminatedUnion("kind", [
   semanticBrowserTargetSchema,
   hybridBrowserTargetSchema,
 ]);
 
+/**
+ * 浏览器基线请求：请求为某 Run 在指定路由上对某个目标建立可复现基线。
+ */
 export const browserBaselineRequestSchema = z
   .object({
     schemaVersion: z.literal(BROWSER_BASELINE_REQUEST_SCHEMA_VERSION),
@@ -261,6 +354,13 @@ export const browserBaselineRequestSchema = z
   })
   .strict();
 
+/**
+ * 浏览器基线记录：一次完整基线观测的不可变结果。
+ *
+ * 记录构建身份、浏览器版本、视口、目标及其身份指纹，并把观测得到的
+ * 截图 / DOM / 无障碍树 / 计算样式 / 控制台 / 网络 / trace 作为内容寻址
+ * 产物落盘；superRefine 强制观测引用的截图哈希与提交产物哈希一致。
+ */
 export const browserBaselineRecordSchema = z
   .object({
     schemaVersion: z.literal(BROWSER_BASELINE_SCHEMA_VERSION),
@@ -286,6 +386,7 @@ export const browserBaselineRecordSchema = z
   })
   .strict()
   .superRefine((baseline, context) => {
+    // 观测引用的截图摘要必须与已提交的截图产物一致，防止观测/产物错位
     if (baseline.observation.screenshotHash !== baseline.screenshot.hash) {
       context.addIssue({
         code: "custom",
@@ -295,6 +396,9 @@ export const browserBaselineRecordSchema = z
     }
   });
 
+/**
+ * 浏览器基线响应：包裹一条基线记录。
+ */
 export const browserBaselineResponseSchema = z
   .object({
     schemaVersion: z.literal(BROWSER_BASELINE_RESPONSE_SCHEMA_VERSION),
@@ -302,6 +406,11 @@ export const browserBaselineResponseSchema = z
   })
   .strict();
 
+/**
+ * 浏览器动作提议：模型或自动化逻辑提议对某目标执行一次点击。
+ *
+ * origin 标明提议来源（ui-tars 模型 / automation 自动化逻辑）。
+ */
 export const browserActionProposalSchema = z
   .object({
     schemaVersion: z.literal(BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION),
@@ -313,6 +422,9 @@ export const browserActionProposalSchema = z
   })
   .strict();
 
+/**
+ * 浏览器动作记录：一次动作提议的完整生命周期 —— 策略裁决 + 执行结果 + 前后观测。
+ */
 export const browserActionRecordSchema = z
   .object({
     schemaVersion: z.literal(BROWSER_ACTION_RECORD_SCHEMA_VERSION),
@@ -335,18 +447,33 @@ export const browserActionRecordSchema = z
   })
   .strict();
 
+// ---------------------------------------------------------------------------
+// Run DAG 编排结构：路由分类、节点注册表、修订、进度与副作用租约
+// ---------------------------------------------------------------------------
 export const RUN_DAG_REVISION_SCHEMA_VERSION = "prism.run-dag-revision/v1" as const;
 export const ROUTER_DECISION_SCHEMA_VERSION = "prism.router-decision/v1" as const;
 export const RUN_NODE_PROGRESS_SCHEMA_VERSION = "prism.run-node-progress/v1" as const;
 export const EFFECT_LEASE_SCHEMA_VERSION = "prism.effect-lease/v1" as const;
 
+/**
+ * 运行体归属：节点由哪类运行时执行 —— 编码（coding）/ 浏览器（browser）/ 编排器（orchestrator）。
+ */
 export const runtimeOwnerSchema = z.enum(["coding", "browser", "orchestrator"]);
+
+/**
+ * 副作用类别：区分只读操作与真正改变系统的效果，用于并发/租约控制。
+ */
 export const effectClassSchema = z.enum([
   "read_only",
   "source_effect",
   "browser_effect",
   "none",
 ]);
+
+/**
+ * Run DAG 节点类型：工作区检查 / 浏览器观测 / 工作区补丁 / 浏览器验证 /
+ * 任务完成 / 路由重分类。
+ */
 export const runDagNodeTypeSchema = z.enum([
   "workspace.inspect",
   "browser.observe",
@@ -355,12 +482,21 @@ export const runDagNodeTypeSchema = z.enum([
   "task.complete",
   "route.reclassify",
 ]);
+
+/**
+ * 路由分类结果：任务被判定为纯编码（coding）/ 纯浏览器（browser）/
+ * 混合（hybrid）或暂不确定（uncertain）。
+ */
 export const routerClassificationSchema = z.enum([
   "coding",
   "browser",
   "hybrid",
   "uncertain",
 ]);
+
+/**
+ * DAG 节点运行状态。
+ */
 export const runNodeStateSchema = z.enum([
   "ready",
   "running",
@@ -369,6 +505,10 @@ export const runNodeStateSchema = z.enum([
   "blocked",
   "retrying",
 ]);
+
+/**
+ * 节点结果请求：运行时回报节点执行完毕后希望编排器做的后续动作。
+ */
 export const nodeOutcomeRequestSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("none") }).strict(),
   z
@@ -397,6 +537,16 @@ export const nodeOutcomeRequestSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
+/**
+ * Run DAG 节点注册表：按节点类型声明归属运行时、副作用类别与合法后继。
+ *
+ * 这是 DAG 合法性的权威来源：
+ *  - workspace.inspect / browser.observe 是只读的，可互相衔接；
+ *  - workspace.patch 是源码副作用，只能以 browser.verify 收尾；
+ *  - browser.verify 是浏览器副作用，可重试、可完成任务或回退补丁；
+ *  - task.complete 是终点，无后继；
+ *  - route.reclassify 只读，仅能调度新一轮只读检查。
+ */
 export const runDagNodeRegistry = {
   "workspace.inspect": {
     runtime: "coding",
@@ -430,6 +580,9 @@ export const runDagNodeRegistry = {
   },
 } as const;
 
+/**
+ * DAG 节点声明：校验节点必须使用注册表中匹配的运行时与副作用类别。
+ */
 export const runDagNodeSchema = z
   .object({
     nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
@@ -442,6 +595,7 @@ export const runDagNodeSchema = z
   .strict()
   .superRefine((node, context) => {
     const expected = runDagNodeRegistry[node.nodeType];
+    // 节点声明的运行时/副作用类别必须与注册表一致，否则图不合法
     if (
       node.runtime !== expected.runtime ||
       node.effectClass !== expected.effectClass
@@ -453,6 +607,9 @@ export const runDagNodeSchema = z
     }
   });
 
+/**
+ * 环检测：DFS 三色标记法判断 DAG 是否含环（含环的图不可编排）。
+ */
 function hasDagCycle(nodes: readonly RunDagNode[]): boolean {
   const byId = new Map(nodes.map((node) => [node.nodeId, node]));
   const visiting = new Set<string>();
@@ -473,6 +630,12 @@ function hasDagCycle(nodes: readonly RunDagNode[]): boolean {
   return nodes.some((node) => visit(node.nodeId));
 }
 
+/**
+ * Run DAG 修订：一次编排计划的全量快照。
+ *
+ * 校验不变量：节点 ID 唯一、边必须是注册表中的合法后继、uncertain 路由
+ * 只能先调度只读证据、整图无环。
+ */
 export const runDagRevisionSchema = z
   .object({
     schemaVersion: z.literal(RUN_DAG_REVISION_SCHEMA_VERSION),
@@ -487,6 +650,7 @@ export const runDagRevisionSchema = z
     const byId = new Map(revision.nodes.map((node) => [node.nodeId, node]));
 
     revision.nodes.forEach((node, index) => {
+      // 节点 ID 必须唯一
       if (nodeIds.has(node.nodeId)) {
         context.addIssue({
           code: "custom",
@@ -496,6 +660,7 @@ export const runDagRevisionSchema = z
       }
       nodeIds.add(node.nodeId);
 
+      // 每条前驱边都必须属于注册表中声明的合法后继关系
       node.predecessorIds.forEach((predecessorId) => {
         const predecessor = byId.get(predecessorId);
         const allowed = predecessor
@@ -511,6 +676,7 @@ export const runDagRevisionSchema = z
         }
       });
 
+      // uncertain 路由在重分类前只允许只读证据节点
       if (
         revision.classification === "uncertain" &&
         node.effectClass !== "read_only" &&
@@ -525,6 +691,7 @@ export const runDagRevisionSchema = z
       }
     });
 
+    // 整图不允许存在环
     if (hasDagCycle(revision.nodes)) {
       context.addIssue({
         code: "custom",
@@ -534,6 +701,11 @@ export const runDagRevisionSchema = z
     }
   });
 
+/**
+ * 路由器决策：编排开始时由 Router 判定任务分类并给出首个 DAG 修订。
+ *
+ * 校验决策分类与初始修订一致，且初始修订必须是 revision 1。
+ */
 export const routerDecisionSchema = z
   .object({
     schemaVersion: z.literal(ROUTER_DECISION_SCHEMA_VERSION),
@@ -565,6 +737,9 @@ export const routerDecisionSchema = z
     }
   });
 
+/**
+ * 节点结果：运行时回报单个节点执行完毕的结论（含证据与后续请求）。
+ */
 export const nodeOutcomeSchema = z
   .object({
     nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
@@ -581,6 +756,9 @@ export const nodeOutcomeSchema = z
   })
   .strict();
 
+/**
+ * DAG 节点进度：编排器将节点状态变更写入事件日志的持久化快照。
+ */
 export const runNodeProgressSchema = z
   .object({
     schemaVersion: z.literal(RUN_NODE_PROGRESS_SCHEMA_VERSION),
@@ -600,6 +778,11 @@ export const runNodeProgressSchema = z
   })
   .strict();
 
+/**
+ * 副作用租约：同一时刻只允许一个节点持有 source/browser 副作用权。
+ *
+ * 通过单调递增的 token 串行化副作用节点，避免并发补丁/浏览器操作互相踩踏。
+ */
 export const effectLeaseSchema = z
   .object({
     schemaVersion: z.literal(EFFECT_LEASE_SCHEMA_VERSION),
@@ -611,6 +794,9 @@ export const effectLeaseSchema = z
   })
   .strict();
 
+/**
+ * 相对工作区路径：必须归一化（"/" 分隔），禁止绝对路径、反斜杠、"."/".." 越界。
+ */
 const relativeWorkspacePathSchema = z
   .string()
   .min(1)
@@ -628,6 +814,9 @@ const relativeWorkspacePathSchema = z
     "Workspace paths must be normalized relative paths without traversal.",
   );
 
+/**
+ * 工作区 glob 模式：必须相对工作区，禁止绝对路径、反斜杠与 ".." 越级。
+ */
 const workspaceGlobSchema = z
   .string()
   .min(1)
@@ -642,6 +831,9 @@ const workspaceGlobSchema = z
     "Workspace globs must stay relative to the workspace.",
   );
 
+/**
+ * 工作区命令：由可执行名与参数数组构成，用于运行允许列表内的测试命令。
+ */
 export const workspaceCommandSchema = z
   .object({
     executable: z
@@ -660,12 +852,18 @@ export const workspaceCommandSchema = z
   })
   .strict();
 
+/**
+ * 工作区请求公共信封：schema 版本 + 请求 ID + 所属 Run ID。
+ */
 const workspaceRequestEnvelopeShape = {
   schemaVersion: z.literal(WORKSPACE_REQUEST_SCHEMA_VERSION),
   requestId: z.string().uuid(),
   runId: runIdSchema,
 };
 
+/**
+ * 工作区检查请求：只读列出/读取指定路径与 glob 匹配的文件内容。
+ */
 export const workspaceInspectRequestSchema = z
   .object({
     ...workspaceRequestEnvelopeShape,
@@ -675,6 +873,9 @@ export const workspaceInspectRequestSchema = z
   })
   .strict();
 
+/**
+ * 工作区测试请求：在指定工作目录运行一条允许列表内的测试命令。
+ */
 export const workspaceTestRequestSchema = z
   .object({
     ...workspaceRequestEnvelopeShape,
@@ -685,6 +886,12 @@ export const workspaceTestRequestSchema = z
   })
   .strict();
 
+/**
+ * 工作区补丁请求：最多改一个文件，要求提供期望的原始 SHA-256（可空）。
+ *
+ * expectedSha256 用于哈希守卫：若磁盘内容与期望不符则拒绝应用，
+ * 防止并发修改导致补丁失配。
+ */
 export const workspacePatchRequestSchema = z
   .object({
     ...workspaceRequestEnvelopeShape,
@@ -707,12 +914,18 @@ export const workspacePatchRequestSchema = z
   })
   .strict();
 
+/**
+ * 工作区请求联合：按 operation 判别 inspect / test / patch 三种操作。
+ */
 export const workspaceRequestSchema = z.discriminatedUnion("operation", [
   workspaceInspectRequestSchema,
   workspaceTestRequestSchema,
   workspacePatchRequestSchema,
 ]);
 
+/**
+ * 工作区读取证据：单次文件读取的产物（内容、截断标记与脱敏计数）。
+ */
 const workspaceReadEvidenceSchema = z
   .object({
     path: relativeWorkspacePathSchema,
@@ -724,6 +937,9 @@ const workspaceReadEvidenceSchema = z
   })
   .strict();
 
+/**
+ * inspect 操作的结果详情：读取清单 + 发现路径集合。
+ */
 const workspaceInspectDetailsSchema = z
   .object({
     operation: z.literal("inspect"),
@@ -733,6 +949,9 @@ const workspaceInspectDetailsSchema = z
   })
   .strict();
 
+/**
+ * test 操作的结果详情：退出码、标准输出/错误与执行耗时。
+ */
 const workspaceTestDetailsSchema = z
   .object({
     operation: z.literal("test"),
@@ -747,6 +966,9 @@ const workspaceTestDetailsSchema = z
   })
   .strict();
 
+/**
+ * patch 操作的结果详情：每个文件的改动前后摘要。
+ */
 const workspacePatchDetailsSchema = z
   .object({
     operation: z.literal("patch"),
@@ -766,6 +988,12 @@ const workspacePatchDetailsSchema = z
   })
   .strict();
 
+/**
+ * 工作区证据：一次工作区操作的完整结果记录。
+ *
+ * status 区分成功 / 拒绝 / 失败 / 超时 / 取消；reasonCode 枚举具体拒绝
+ * 原因（路径逃逸、未允许列表、补丁冲突、输出超限等）。
+ */
 export const workspaceEvidenceSchema = z
   .object({
     schemaVersion: z.literal(WORKSPACE_EVIDENCE_SCHEMA_VERSION),
@@ -797,6 +1025,9 @@ export const workspaceEvidenceSchema = z
   })
   .strict();
 
+/**
+ * 工作区证据记录：证据本身 + 其内容寻址产物引用。
+ */
 export const workspaceEvidenceRecordSchema = z
   .object({
     evidence: workspaceEvidenceSchema,
@@ -804,6 +1035,9 @@ export const workspaceEvidenceRecordSchema = z
   })
   .strict();
 
+/**
+ * 工作区证据响应：包裹一条工作区证据记录。
+ */
 export const workspaceEvidenceResponseSchema = z
   .object({
     schemaVersion: z.literal(WORKSPACE_EVIDENCE_RESPONSE_SCHEMA_VERSION),
@@ -811,6 +1045,9 @@ export const workspaceEvidenceResponseSchema = z
   })
   .strict();
 
+/**
+ * 终止性 Run 错误：存储层或事件日志损坏时记录的不可恢复错误。
+ */
 export const terminalRunErrorSchema = z
   .object({
     code: z.enum([
@@ -823,6 +1060,9 @@ export const terminalRunErrorSchema = z
   })
   .strict();
 
+/**
+ * Run 清单：Run 创建时的不可变声明，含原始修复请求与其产物引用。
+ */
 export const runManifestSchema = z
   .object({
     schemaVersion: z.literal(RUN_MANIFEST_SCHEMA_VERSION),
@@ -833,6 +1073,10 @@ export const runManifestSchema = z
   })
   .strict();
 
+/**
+ * 运行事件公共信封：所有事件共有的字段 —— ID、所属 Run、单调序号、
+ * 关联/致因 ID（用于重建因果链与重放）。
+ */
 const runEventEnvelopeShape = {
   schemaVersion: z.literal(RUN_EVENT_SCHEMA_VERSION),
   eventId: z.string().uuid(),
@@ -843,6 +1087,9 @@ const runEventEnvelopeShape = {
   causationEventId: z.string().uuid().nullable(),
 };
 
+/**
+ * Run 创建事件：事件日志首条，锚定请求产物。
+ */
 export const runCreatedEventSchema = z
   .object({
     ...runEventEnvelopeShape,
@@ -851,6 +1098,9 @@ export const runCreatedEventSchema = z
   })
   .strict();
 
+/**
+ * Run 排队事件：Run 进入等待执行队列。
+ */
 export const runQueuedEventSchema = z
   .object({
     ...runEventEnvelopeShape,
@@ -859,6 +1109,9 @@ export const runQueuedEventSchema = z
   })
   .strict();
 
+/**
+ * Run 终止错误事件：写入不可恢复的存储/日志错误。
+ */
 export const runTerminalErrorEventSchema = z
   .object({
     ...runEventEnvelopeShape,
@@ -867,6 +1120,9 @@ export const runTerminalErrorEventSchema = z
   })
   .strict();
 
+/**
+ * 工作区证据事件：落盘一条工作区证据记录。
+ */
 export const workspaceEvidenceEventSchema = z
   .object({
     ...runEventEnvelopeShape,
@@ -875,6 +1131,9 @@ export const workspaceEvidenceEventSchema = z
   })
   .strict();
 
+/**
+ * 浏览器基线事件：落盘一条浏览器基线记录。
+ */
 export const browserBaselineEventSchema = z
   .object({
     ...runEventEnvelopeShape,
@@ -883,6 +1142,9 @@ export const browserBaselineEventSchema = z
   })
   .strict();
 
+/**
+ * 浏览器动作事件：落盘一条浏览器动作记录。
+ */
 export const browserActionEventSchema = z
   .object({
     ...runEventEnvelopeShape,
@@ -891,6 +1153,9 @@ export const browserActionEventSchema = z
   })
   .strict();
 
+/**
+ * DAG 修订事件：编排器扩展/变更 DAG 时落盘新修订。
+ */
 export const runDagRevisionEventSchema = z
   .object({
     ...runEventEnvelopeShape,
@@ -899,6 +1164,9 @@ export const runDagRevisionEventSchema = z
   })
   .strict();
 
+/**
+ * DAG 节点进度事件：落盘某个节点的一次进度变更。
+ */
 export const runNodeProgressEventSchema = z
   .object({
     ...runEventEnvelopeShape,
@@ -907,6 +1175,9 @@ export const runNodeProgressEventSchema = z
   })
   .strict();
 
+/**
+ * 副作用租约事件：落盘副作用租约的获取/释放。
+ */
 export const effectLeaseEventSchema = z
   .object({
     ...runEventEnvelopeShape,
@@ -915,6 +1186,9 @@ export const effectLeaseEventSchema = z
   })
   .strict();
 
+/**
+ * 运行事件联合：按 type 判别全部事件类型，构成追加式事件日志的基本单元。
+ */
 export const runEventSchema = z.discriminatedUnion("type", [
   runCreatedEventSchema,
   runQueuedEventSchema,
@@ -927,8 +1201,17 @@ export const runEventSchema = z.discriminatedUnion("type", [
   effectLeaseEventSchema,
 ]);
 
+/**
+ * Run 生命周期状态：已创建 / 排队中 / 终止错误。
+ */
 export const runStatusSchema = z.enum(["created", "queued", "terminal_error"]);
 
+/**
+ * Run 快照：由事件日志重放聚合出的当前状态。
+ *
+ * 列表字段（证据、基线、动作、DAG 修订、节点进度）都是历史事件的累积结果，
+ * 保证可从日志完全重建。
+ */
 export const runSnapshotSchema = z
   .object({
     schemaVersion: z.literal(RUN_SNAPSHOT_SCHEMA_VERSION),
@@ -949,6 +1232,9 @@ export const runSnapshotSchema = z
   })
   .strict();
 
+/**
+ * Run 创建响应：返回新 Run 的 ID 与初始快照。
+ */
 export const runCreationSchema = z
   .object({
     schemaVersion: z.literal(RUN_CREATION_SCHEMA_VERSION),
@@ -958,6 +1244,9 @@ export const runCreationSchema = z
   })
   .strict();
 
+/**
+ * Run 摘要：列表页使用的精简信息，含完整性标记（可安全打开）。
+ */
 export const runSummarySchema = z
   .object({
     id: runIdSchema,
@@ -970,6 +1259,12 @@ export const runSummarySchema = z
   })
   .strict();
 
+/**
+ * Run 卷宗（dossier）：详情页使用的完整只读视图。
+ *
+ * 在 runSummarySchema 基础上扩展原始请求、工作区、视口以及全部累积状态；
+ * 若清单损坏则 prompt/workspace/viewport 可为空。
+ */
 export const runDossierSchema = runSummarySchema
   .extend({
     prompt: z.string().nullable(),
@@ -986,6 +1281,9 @@ export const runDossierSchema = runSummarySchema
   })
   .strict();
 
+/**
+ * Run 列表响应：一组 Run 摘要。
+ */
 export const runListSchema = z
   .object({
     schemaVersion: z.literal(RUN_LIST_SCHEMA_VERSION),
@@ -993,6 +1291,9 @@ export const runListSchema = z
   })
   .strict();
 
+/**
+ * Run 卷宗响应：包裹单份卷宗。
+ */
 export const runDossierResponseSchema = z
   .object({
     schemaVersion: z.literal(RUN_DOSSIER_RESPONSE_SCHEMA_VERSION),
@@ -1000,6 +1301,9 @@ export const runDossierResponseSchema = z
   })
   .strict();
 
+/**
+ * 编排启动响应：异步启动编排，返回 Run ID。
+ */
 export const orchestrationStartResponseSchema = z
   .object({
     schemaVersion: z.literal(ORCHESTRATION_START_RESPONSE_SCHEMA_VERSION),
@@ -1008,6 +1312,9 @@ export const orchestrationStartResponseSchema = z
   })
   .strict();
 
+// ---------------------------------------------------------------------------
+// 类型导出：全部由上方 schema 推导，跨包使用时直接引用这些类型
+// ---------------------------------------------------------------------------
 export type OrchestrationStartResponse = z.infer<
   typeof orchestrationStartResponseSchema
 >;
@@ -1057,6 +1364,13 @@ export type RepairRequestValidation = z.infer<typeof repairRequestValidationSche
 export type ValidationIssue = z.infer<typeof validationIssueSchema>;
 export type Viewport = z.infer<typeof viewportSchema>;
 
+/**
+ * 将 Zod 校验错误转换为契约化的 ValidationIssue 列表。
+ *
+ * @param error Zod 校验产生的错误对象
+ * @returns 每条 issue 扁平化为 { path, code, message }；路径以 "." 连接，
+ *   根级错误路径记为 "<root>"
+ */
 export function formatContractIssues(error: z.ZodError): ValidationIssue[] {
   return error.issues.map((issue) => ({
     path:

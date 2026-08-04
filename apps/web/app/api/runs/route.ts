@@ -1,3 +1,6 @@
+/**
+ * GET /api/runs —— Run 摘要列表。
+ */
 import { RUN_LIST_SCHEMA_VERSION, runListSchema } from "@prism/contracts";
 
 import { listRecentRuns } from "../../../lib/server/run-repository";

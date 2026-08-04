@@ -1,3 +1,9 @@
+/**
+ * GET /api/runs/[runId] —— 单个 Run 的卷宗。
+ *
+ * 读取失败（存储不可读）返回 500 run_storage_error；Run 不存在返回
+ * 404 run_not_found；成功返回 200 + RunDossier。
+ */
 import {
   CONTRACT_ERROR_SCHEMA_VERSION,
   contractErrorSchema,

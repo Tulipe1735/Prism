@@ -14,14 +14,24 @@ import { PrismMark } from "@/components/prism-mark";
 import { listRecentRuns } from "@/lib/server/run-repository";
 import { getConfiguredWorkspace } from "@/lib/server/workspace-policy";
 
+/** Field Desk 默认浏览器视口（提交请求时写入 Run 清单）。 */
 const defaultViewport = {
   width: 1280,
   height: 720,
   deviceScaleFactor: 1,
 } as const;
 
+/** 每次请求都动态渲染，确保最近 Run 与服务端存储一致。 */
 export const dynamic = "force-dynamic";
 
+/**
+ * Field Desk 首页（服务端组件）。
+ *
+ * 服务端读取配置工作区与最近 Run 摘要后渲染：
+ *  - 页眉：Prism 标识 + 导航；
+ *  - 主区：修复请求编辑器（RepairComposer）+ 规划运行流程说明；
+ *  - 活跃字段：最新已提交 Run 的入口 + 最近 Run 侧栏。
+ */
 export default async function FieldDeskPage() {
   const workspace = getConfiguredWorkspace();
   const recentRuns = await listRecentRuns();
@@ -59,6 +69,7 @@ export default async function FieldDeskPage() {
         </div>
       </header>
 
+      {/* 主区：文案 + 请求编辑器 + 规划运行流程 */}
       <section className="grid items-start gap-9 py-14 lg:grid-cols-[minmax(15rem,0.8fr)_minmax(27rem,1.35fr)_minmax(14rem,0.65fr)] lg:gap-[3.5vw] lg:py-24">
         <div>
           <span className="inline-block bg-stone-900 px-2 py-1 font-mono text-[0.64rem] font-bold tracking-[0.14em] text-stone-50">
@@ -76,6 +87,7 @@ export default async function FieldDeskPage() {
 
         <RepairComposer workspace={workspace} viewport={defaultViewport} />
 
+        {/* 规划中的运行流程：Understand → Reproduce → Repair & prove */}
         <aside className="rotate-[0.35deg] bg-blue-600 p-6 text-blue-50 shadow-[-7px_7px_0_rgba(41,37,36,0.14)]">
           <div className="flex items-center justify-between border-b border-blue-100/50 pb-4 font-mono text-[0.63rem] font-bold tracking-[0.13em]">
             <span>PLANNED RUN FLOW</span>
@@ -112,6 +124,7 @@ export default async function FieldDeskPage() {
         </aside>
       </section>
 
+      {/* 活跃字段：最新已提交 Run + 最近 Run 侧栏 */}
       <section className="border-t-2 border-stone-900 py-12">
         <div className="mb-9 grid gap-3 md:grid-cols-[minmax(15rem,0.75fr)_minmax(20rem,1fr)]">
           <div>

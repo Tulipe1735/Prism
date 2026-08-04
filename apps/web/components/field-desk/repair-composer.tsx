@@ -18,6 +18,14 @@ import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { RunApiError, submitRepairRequest } from "@/lib/client/run-api";
 
+/**
+ * 修复请求编辑器：Field Desk 首页的核心表单。
+ *
+ * 用 react-hook-form + zod 校验实时驱动，字段级错误内联显示；
+ * 提交通过 submitRepairRequest 创建 Run，成功后失效 Run 列表缓存并
+ * 跳转到新 Run 的卷宗页；服务端返回的契约化校验问题（issues）也会
+ * 逐条列出。
+ */
 export function RepairComposer({
   viewport,
   workspace,
@@ -71,6 +79,7 @@ export function RepairComposer({
         () => toast.error("Fix the highlighted request before creating a Run."),
       )}
     >
+      {/* 顶部栏：当前工作区与契约版本 */}
       <div className="flex min-h-12 items-center justify-between gap-4 border-b border-stone-400 px-4">
         <span className="inline-flex min-w-0 items-center gap-2 font-mono text-[0.67rem] font-semibold">
           <FolderGit2 aria-hidden className="shrink-0" size={15} />
@@ -83,6 +92,7 @@ export function RepairComposer({
         </span>
       </div>
 
+      {/* 修复请求文案输入区 */}
       <div className="px-5 pt-5">
         <Label.Root
           className="font-mono text-[0.63rem] font-bold tracking-[0.12em]"
@@ -111,6 +121,7 @@ export function RepairComposer({
         </p>
       </div>
 
+      {/* 底部栏：视口信息、就绪状态与提交按钮 */}
       <div className="flex flex-col gap-3 border-t border-stone-400 p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="inline-flex items-center gap-2 px-2 font-mono text-[0.62rem] font-semibold text-stone-600">
           <Monitor aria-hidden size={15} />
@@ -129,6 +140,7 @@ export function RepairComposer({
         </Button>
       </div>
 
+      {/* 提交失败区：错误消息 + 服务端字段级问题 */}
       {creation.isError && (
         <div
           aria-live="polite"

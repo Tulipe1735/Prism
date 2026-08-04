@@ -7,6 +7,12 @@ import Link from "next/link";
 
 import { fetchRuns } from "@/lib/client/run-api";
 
+/**
+ * Field Desk 首页侧栏：最近 5 条 Run 的摘要列表。
+ *
+ * 用 react-query 以服务端渲染的 initialRuns 为初始数据，后台再刷新；
+ * 展示每条 Run 的完整性圆点、ID、标题、状态与日志序号，点击进入卷宗。
+ */
 export function RecentRuns({ initialRuns }: { initialRuns: readonly RunSummary[] }) {
   const runsQuery = useQuery({
     queryKey: ["runs"],
@@ -43,6 +49,7 @@ export function RecentRuns({ initialRuns }: { initialRuns: readonly RunSummary[]
                 className="grid grid-cols-[0.5rem_1fr_auto] items-center gap-3 px-2 py-4 transition hover:bg-blue-600/5"
                 href={`/runs/${encodeURIComponent(run.id)}`}
               >
+                {/* 完整性圆点：红色表示 integrity=failed，蓝色表示已校验 */}
                 <i
                   className={
                     run.integrity === "failed"

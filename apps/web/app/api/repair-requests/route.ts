@@ -1,12 +1,21 @@
+/**
+ * POST /api/repair-requests —— 创建一次修复 Run。
+ *
+ * 严格校验链路：媒体类型 → 请求体积（16 KiB）→ JSON 合法 → 修复请求
+ * 契约 → 工作区是否为已配置的本地工作区。全部通过后持久化创建 Run，
+ * 返回 201 + RunCreation。
+ */
 import { formatContractIssues, repairRequestSchema } from "@prism/contracts";
 
 import { createRun } from "../../../lib/server/run-repository";
 import { isConfiguredWorkspace } from "../../../lib/server/workspace-policy";
 import { contractErrorResponse, JSON_RESPONSE_HEADERS } from "../contract-response";
 
+/** 修复请求体的体积上限（字节）。 */
 const MAX_REQUEST_BYTES = 16_384;
 
 export async function POST(request: Request) {
+  // 1. 媒体类型必须为 application/json
   const contentType = request.headers.get("content-type")?.split(";", 1)[0];
 
   if (contentType?.trim().toLowerCase() !== "application/json") {
@@ -17,6 +26,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // 2. 体积上限：先看声明的 content-length，再按实际字节数双重校验
   const declaredLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
     return contractErrorResponse(
@@ -35,6 +45,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // 3. 请求体必须是合法 JSON
   let input: unknown;
   try {
     input = JSON.parse(rawBody) as unknown;
@@ -46,6 +57,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // 4. 必须符合修复请求 v1 契约
   const parsedRequest = repairRequestSchema.safeParse(input);
   if (!parsedRequest.success) {
     return contractErrorResponse(
@@ -56,6 +68,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // 5. 目标工作区必须是已配置的本地工作区
   if (!isConfiguredWorkspace(parsedRequest.data.workspace)) {
     return contractErrorResponse(
       422,
@@ -71,6 +84,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // 6. 持久化创建 Run
   try {
     const creation = await createRun(parsedRequest.data);
     return Response.json(creation, {

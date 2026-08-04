@@ -1,3 +1,10 @@
+/**
+ * POST /api/runs/[runId]/browser-baseline —— 为 Run 采集一次浏览器基线。
+ *
+ * 校验链路：媒体类型 → 体积（64 KiB）→ JSON 合法 → 基线请求契约 →
+ * 请求的 Run ID 与路由一致。浏览器未配置（无 PRISM_BROWSER_BASE_URL）
+ * 返回 409 browser_baseline_not_configured；成功返回 201 + 基线记录。
+ */
 import {
   BROWSER_BASELINE_RESPONSE_SCHEMA_VERSION,
   browserBaselineRequestSchema,
@@ -11,6 +18,7 @@ import {
 } from "../../../../../lib/server/run-repository";
 import { contractErrorResponse, JSON_RESPONSE_HEADERS } from "../../../contract-response";
 
+/** 浏览器基线请求体的体积上限（字节）。 */
 const MAX_BROWSER_BASELINE_REQUEST_BYTES = 65_536;
 
 export async function POST(

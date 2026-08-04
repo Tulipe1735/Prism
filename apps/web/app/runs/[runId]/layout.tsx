@@ -3,6 +3,11 @@ import Link from "next/link";
 
 import { PrismMark } from "@/components/prism-mark";
 
+/**
+ * Run 卷宗布局：页眉 + 面包屑导航 + 子页面内容。
+ *
+ * 从路由参数解析 runId 用于面包屑末级展示。
+ */
 export default async function RunDossierLayout({
   children,
   params,
@@ -20,6 +25,7 @@ export default async function RunDossierLayout({
           RUN DOSSIER
         </span>
       </header>
+      {/* 面包屑：Field Desk / Runs / 当前 Run ID */}
       <nav
         aria-label="Breadcrumb"
         className="flex items-center gap-2 border-b border-stone-400 py-4 font-mono text-[0.63rem] font-semibold"

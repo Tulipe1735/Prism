@@ -8,6 +8,7 @@ import Link from "next/link";
 import { type RunStatusFilter, useFieldDeskStore } from "@/lib/client/field-desk-store";
 import { fetchRuns } from "@/lib/client/run-api";
 
+/** 状态筛选下拉的选项集合。 */
 const filters: Array<{ label: string; value: RunStatusFilter }> = [
   { label: "All statuses", value: "all" },
   { label: "Created", value: "created" },
@@ -15,6 +16,13 @@ const filters: Array<{ label: string; value: RunStatusFilter }> = [
   { label: "Terminal error", value: "terminal_error" },
 ];
 
+/**
+ * Run 历史页面：全部 Run 的列表，支持按状态筛选。
+ *
+ * 挂载时总是重新拉取（refetchOnMount: "always"）以校验持久化存储；
+ * 拉取期间显示"检查中"占位，出错时隐藏缓存条目并显示警告。
+ * 筛选状态来自全局 field-desk-store。
+ */
 export function RunHistory({ initialRuns }: { initialRuns: readonly RunSummary[] }) {
   const statusFilter = useFieldDeskStore((state) => state.runStatusFilter);
   const setStatusFilter = useFieldDeskStore((state) => state.setRunStatusFilter);
@@ -25,6 +33,7 @@ export function RunHistory({ initialRuns }: { initialRuns: readonly RunSummary[]
     refetchOnMount: "always",
   });
 
+  // 首次拉取中（无初始数据兜底）时显示检查占位
   if (runsQuery.isFetching) {
     return (
       <div
@@ -52,6 +61,7 @@ export function RunHistory({ initialRuns }: { initialRuns: readonly RunSummary[]
     );
   }
 
+  // 按当前筛选状态过滤
   const visibleRuns = runsQuery.data.filter(
     (run) => statusFilter === "all" || run.status === statusFilter,
   );

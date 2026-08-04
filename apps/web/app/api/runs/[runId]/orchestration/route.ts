@@ -1,3 +1,9 @@
+/**
+ * POST /api/runs/[runId]/orchestration —— 启动一次 mock 混合编排。
+ *
+ * Run 不存在返回 404；启动成功返回 202 + orchestration-start 响应
+ * （编排在后台异步推进，首个 DAG 修订落盘后本次请求即返回）。
+ */
 import {
   ORCHESTRATION_START_RESPONSE_SCHEMA_VERSION,
   orchestrationStartResponseSchema,

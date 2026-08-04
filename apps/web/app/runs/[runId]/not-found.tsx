@@ -3,6 +3,11 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 
+/**
+ * Run 卷宗 404 页：找不到对应 Run 的持久化清单时展示。
+ *
+ * 明确说明"原型记录不会替代缺失的运行时状态"，并提供返回入口。
+ */
 export default function RunDossierNotFound() {
   return (
     <section className="grid min-h-[28rem] place-items-center py-12 text-center">

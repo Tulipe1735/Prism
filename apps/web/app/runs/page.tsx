@@ -10,8 +10,15 @@ export const metadata: Metadata = {
   title: "Runs",
 };
 
+/** 每次请求都动态渲染，确保列表与服务端存储一致。 */
 export const dynamic = "force-dynamic";
 
+/**
+ * Run 历史页面（服务端组件）：渲染 RunHistory 客户端组件。
+ *
+ * 服务端预取全部 Run 摘要作为初始数据，客户端用 TanStack Query
+ * 刷新与筛选。状态筛选是纯临时 UI 状态，绝不改变规范 Run 状态。
+ */
 export default async function RunsPage() {
   const runs = await listRecentRuns();
 
