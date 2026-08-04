@@ -1,7 +1,9 @@
 import path from "node:path";
 import process from "node:process";
 
+import { BrowserExecutor } from "@prism/action-broker";
 import {
+  type ArtifactRef,
   type BrowserBaselineRecord,
   type BrowserBaselineRequest,
   browserBaselineRequestSchema,
@@ -19,7 +21,6 @@ import {
   workspaceEvidenceRecordSchema,
   workspaceRequestSchema,
 } from "@prism/contracts";
-import { BrowserExecutor } from "@prism/action-broker";
 import {
   type DurableRun,
   FileTrajectoryStore,
@@ -233,7 +234,8 @@ export async function captureBrowserBaseline(
   const parsedRunId = runIdSchema.safeParse(runIdInput);
   if (!parsedRunId.success) return null;
 
-  const request: BrowserBaselineRequest = browserBaselineRequestSchema.parse(requestInput);
+  const request: BrowserBaselineRequest =
+    browserBaselineRequestSchema.parse(requestInput);
   if (request.runId !== parsedRunId.data) {
     throw new TypeError("Browser Baseline Run ID does not match the route Run ID.");
   }
@@ -255,7 +257,10 @@ export async function captureBrowserBaseline(
       await Promise.all([
         store.writeArtifact(capture.artifacts.screenshot, "image/png"),
         store.writeArtifact(capture.artifacts.dom, BROWSER_EVIDENCE_MEDIA_TYPE),
-        store.writeArtifact(capture.artifacts.accessibility, BROWSER_EVIDENCE_MEDIA_TYPE),
+        store.writeArtifact(
+          capture.artifacts.accessibility,
+          BROWSER_EVIDENCE_MEDIA_TYPE,
+        ),
         store.writeArtifact(capture.artifacts.computed, BROWSER_EVIDENCE_MEDIA_TYPE),
         store.writeArtifact(capture.artifacts.console, BROWSER_EVIDENCE_MEDIA_TYPE),
         store.writeArtifact(capture.artifacts.network, BROWSER_EVIDENCE_MEDIA_TYPE),
@@ -273,4 +278,24 @@ export async function captureBrowserBaseline(
       trace,
     };
   });
+}
+
+export async function getRunArtifact(
+  runIdInput: string,
+  artifactHash: string,
+): Promise<{ artifact: ArtifactRef; content: Uint8Array } | null> {
+  const parsedRunId = runIdSchema.safeParse(runIdInput);
+  if (!parsedRunId.success) return null;
+
+  const store = getStore();
+  const runIds = await store.listRunIds();
+  if (!runIds.includes(parsedRunId.data)) return null;
+
+  const run = await store.loadRun(parsedRunId.data);
+  const artifact = run.snapshot.artifacts.find(
+    (candidate) => candidate.hash === artifactHash,
+  );
+  if (!artifact) return null;
+
+  return { artifact, content: await store.readArtifact(artifact) };
 }

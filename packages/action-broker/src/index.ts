@@ -1,18 +1,18 @@
 import {
   BROWSER_ACTION_RECORD_SCHEMA_VERSION,
   type BrowserActionProposal,
-  type BrowserActionRecord,
   browserActionProposalSchema,
+  type BrowserActionRecord,
   browserActionRecordSchema,
   type BrowserObservationReference,
   type BrowserTarget,
 } from "@prism/contracts";
 
-export { BrowserExecutor, type BrowserBaselineCapture, type BrowserExecutorOptions } from "./browser-executor";
+export { type BrowserBaselineCapture, BrowserExecutor, type BrowserExecutorOptions } from "./browser-executor";
 
 export interface BrowserPort {
-  observe(): Promise<BrowserObservationReference>;
-  click(target: BrowserTarget): Promise<void>;
+  observe: () => Promise<BrowserObservationReference>;
+  click: (target: BrowserTarget) => Promise<void>;
 }
 
 export interface ActionBrokerOptions {

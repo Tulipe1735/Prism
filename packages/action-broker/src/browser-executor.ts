@@ -1,16 +1,17 @@
+import { Buffer } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
-  type BrowserBaselineRequest,
+  type BrowserBaselineRecord,
   browserBaselineRequestSchema,
   type BrowserCaptureTarget,
   type BrowserObservationReference,
   type Viewport,
 } from "@prism/contracts";
-import { chromium, type Browser, type BrowserType, type Page } from "playwright-core";
+import { type Browser, type BrowserType, chromium, type Page } from "playwright-core";
 
 export interface BrowserExecutorOptions {
   baseUrl: string;
@@ -23,8 +24,14 @@ export interface BrowserExecutorOptions {
 
 export interface BrowserBaselineCapture {
   baseline: Omit<
-    import("@prism/contracts").BrowserBaselineRecord,
-    "screenshot" | "dom" | "accessibility" | "computed" | "console" | "network" | "trace"
+    BrowserBaselineRecord,
+    | "screenshot"
+    | "dom"
+    | "accessibility"
+    | "computed"
+    | "console"
+    | "network"
+    | "trace"
   >;
   artifacts: {
     screenshot: Buffer;
@@ -41,7 +48,7 @@ function sha256(value: Uint8Array | string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function stableJson(value: unknown): Buffer {
+function jsonLine(value: unknown): Buffer {
   return Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
 }
 
@@ -51,7 +58,9 @@ function localBaseUrl(input: string): URL {
     baseUrl.hostname,
   );
   if (baseUrl.protocol !== "http:" || !isLocalHost) {
-    throw new TypeError("Prism BrowserExecutor only permits an explicit local HTTP base URL.");
+    throw new TypeError(
+      "Prism BrowserExecutor only permits an explicit local HTTP base URL.",
+    );
   }
 
   return baseUrl;
@@ -60,7 +69,9 @@ function localBaseUrl(input: string): URL {
 function localPageUrl(baseUrl: URL, route: string): URL {
   const target = new URL(route, baseUrl);
   if (target.origin !== baseUrl.origin) {
-    throw new TypeError("Prism BrowserExecutor refused a route outside the configured local origin.");
+    throw new TypeError(
+      "Prism BrowserExecutor refused a route outside the configured local origin.",
+    );
   }
 
   return target;
@@ -84,14 +95,14 @@ async function observePage(
     readyState: document.readyState,
     scrollX: window.scrollX,
     scrollY: window.scrollY,
-    bodyText: document.body.innerText,
+    bodyText: document.body.textContent ?? "",
   }));
 
   return {
     observationId: randomUUID(),
     url: page.url(),
     viewport,
-    pageStateHash: sha256(stableJson(state)),
+    pageStateHash: sha256(jsonLine(state)),
     screenshotHash,
   };
 }
@@ -117,7 +128,11 @@ export class BrowserExecutor {
     const traceDirectory = await mkdtemp(path.join(tmpdir(), "prism-browser-trace-"));
     const tracePath = path.join(traceDirectory, "trace.zip");
     const consoleMessages: Array<{ type: string; text: string }> = [];
-    const networkEvents: Array<{ kind: "request" | "response"; url: string; status?: number }> = [];
+    const networkEvents: Array<{
+      kind: "request" | "response";
+      url: string;
+      status?: number;
+    }> = [];
 
     try {
       const context = await browser.newContext({
@@ -128,6 +143,19 @@ export class BrowserExecutor {
         deviceScaleFactor: this.options.viewport.deviceScaleFactor,
         acceptDownloads: false,
       });
+      await context.route("**/*", async (route) => {
+        const request = route.request();
+        const requestUrl = new URL(request.url());
+        if (
+          requestUrl.origin !== this.baseUrl.origin ||
+          !["GET", "HEAD"].includes(request.method())
+        ) {
+          await route.abort();
+          return;
+        }
+
+        await route.continue();
+      });
       const page = await context.newPage();
       page.on("console", (message) => {
         consoleMessages.push({ type: message.type(), text: message.text() });
@@ -136,10 +164,18 @@ export class BrowserExecutor {
         networkEvents.push({ kind: "request", url: resource.url() });
       });
       page.on("response", (resource) => {
-        networkEvents.push({ kind: "response", url: resource.url(), status: resource.status() });
+        networkEvents.push({
+          kind: "response",
+          url: resource.url(),
+          status: resource.status(),
+        });
       });
 
-      await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
+      await context.tracing.start({
+        screenshots: true,
+        snapshots: true,
+        sources: false,
+      });
       await page.goto(targetUrl.toString(), { waitUntil: "networkidle" });
       const locator = page.getByRole(request.target.role as never, {
         name: request.target.name,
@@ -195,9 +231,9 @@ export class BrowserExecutor {
           screenshot,
           dom: Buffer.from(dom, "utf8"),
           accessibility: Buffer.from(accessibility, "utf8"),
-          computed: stableJson(computed),
-          console: stableJson(consoleMessages),
-          network: stableJson(networkEvents),
+          computed: jsonLine(computed),
+          console: jsonLine(consoleMessages),
+          network: jsonLine(networkEvents),
           trace: await readFile(tracePath),
         },
       };

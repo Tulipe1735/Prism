@@ -1,7 +1,7 @@
 import {
+  BROWSER_BASELINE_RESPONSE_SCHEMA_VERSION,
   browserBaselineRequestSchema,
   browserBaselineResponseSchema,
-  BROWSER_BASELINE_RESPONSE_SCHEMA_VERSION,
   formatContractIssues,
 } from "@prism/contracts";
 

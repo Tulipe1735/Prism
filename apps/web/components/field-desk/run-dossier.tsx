@@ -13,6 +13,10 @@ import {
 
 import { fetchRunDossier, runWorkspaceRequest } from "@/lib/client/run-api";
 
+function artifactUrl(runId: string, artifactHash: string): string {
+  return `/api/runs/${encodeURIComponent(runId)}/artifacts/${artifactHash}`;
+}
+
 export function RunDossierView({
   initialDossier,
   runId,
@@ -218,16 +222,59 @@ export function RunDossierView({
                   </div>
                   <div>
                     <dt className="font-mono text-stone-500">OBSERVATION</dt>
-                    <dd className="mt-1 break-all">{baseline.observation.pageStateHash}</dd>
+                    <dd className="mt-1 break-all">
+                      {baseline.observation.pageStateHash}
+                    </dd>
                   </div>
                   <div>
                     <dt className="font-mono text-stone-500">SCREENSHOT SHA-256</dt>
-                    <dd className="mt-1 break-all">{baseline.screenshot.hash}</dd>
+                    <dd className="mt-1 break-all">
+                      {baseline.screenshot.hash}
+                      <a
+                        className="mt-2 inline-block border border-stone-400 px-2 py-1 font-mono text-[0.58rem] text-stone-700 hover:bg-stone-100"
+                        href={artifactUrl(runId, baseline.screenshot.hash)}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Open screenshot
+                      </a>
+                    </dd>
                   </div>
                   <div>
                     <dt className="font-mono text-stone-500">TRACE / EVIDENCE</dt>
                     <dd className="mt-1">
-                      {baseline.trace.byteLength} bytes · {baseline.dom.byteLength} byte DOM
+                      <a
+                        className="border border-stone-400 px-2 py-1 font-mono text-[0.58rem] text-stone-700 hover:bg-stone-100"
+                        href={artifactUrl(runId, baseline.trace.hash)}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Open trace
+                      </a>
+                      <span>
+                        {" "}
+                        · {baseline.trace.byteLength} bytes · {baseline.dom.byteLength}{" "}
+                        byte DOM
+                      </span>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {[
+                          ["Open target DOM", baseline.dom.hash],
+                          ["Open accessibility facts", baseline.accessibility.hash],
+                          ["Open target geometry", baseline.computed.hash],
+                          ["Open console evidence", baseline.console.hash],
+                          ["Open network evidence", baseline.network.hash],
+                        ].map(([label, artifactHash]) => (
+                          <a
+                            className="border border-stone-300 px-2 py-1 font-mono text-[0.58rem] text-stone-700 hover:bg-stone-100"
+                            href={artifactUrl(runId, artifactHash)}
+                            key={`${label}-${artifactHash}`}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            {label}
+                          </a>
+                        ))}
+                      </div>
                     </dd>
                   </div>
                 </dl>
