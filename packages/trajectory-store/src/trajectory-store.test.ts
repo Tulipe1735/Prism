@@ -372,4 +372,73 @@ describe("FileTrajectoryStore", () => {
       code: "corrupt_artifact",
     });
   });
+
+  it("rebuilds durable DAG revisions, node progress, artifacts, and fence state from the journal", async () => {
+    await store.createRun(request);
+    const revision = {
+      schemaVersion: "prism.run-dag-revision/v1" as const,
+      revision: 1,
+      classification: "hybrid" as const,
+      createdAt: recordedAt,
+      nodes: [
+        {
+          nodeId: "node-1-workspace-inspect",
+          nodeType: "workspace.inspect" as const,
+          runtime: "coding" as const,
+          effectClass: "read_only" as const,
+          predecessorIds: [],
+          maxAttempts: 2,
+        },
+        {
+          nodeId: "node-1-browser-observe",
+          nodeType: "browser.observe" as const,
+          runtime: "browser" as const,
+          effectClass: "read_only" as const,
+          predecessorIds: [],
+          maxAttempts: 2,
+        },
+      ],
+    };
+    const artifact = await store.writeArtifact(
+      '{"runtime":"coding"}\n',
+      "application/vnd.prism.runtime-evidence+json",
+    );
+
+    await store.recordDagRevision(runId, revision);
+    await store.recordNodeProgress(runId, {
+      revision: 1,
+      nodeId: "node-1-workspace-inspect",
+      nodeType: "workspace.inspect",
+      attempt: 1,
+      runtime: "coding",
+      effectClass: "read_only",
+      state: "succeeded",
+      summary: "Mock coding runtime inspected the workspace.",
+      artifacts: [artifact],
+      correlationId: runId,
+    });
+    await store.recordEffectLease(runId, {
+      schemaVersion: "prism.effect-lease/v1",
+      token: 1,
+      holderNodeId: "node-1-workspace-inspect",
+      effectClass: "source_effect",
+      state: "released",
+      recordedAt,
+    });
+
+    const reopened = await new FileTrajectoryStore({ dataDirectory }).loadRun(runId);
+    expect(reopened.snapshot).toMatchObject({
+      dagRevisions: [revision],
+      nodeProgress: [
+        {
+          nodeId: "node-1-workspace-inspect",
+          state: "succeeded",
+          artifacts: [artifact],
+          journalPosition: 4,
+          correlationId: runId,
+        },
+      ],
+      effectLease: { token: 1, state: "released" },
+    });
+  });
 });

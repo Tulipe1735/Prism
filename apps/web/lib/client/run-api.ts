@@ -1,5 +1,7 @@
 import {
   contractErrorSchema,
+  type OrchestrationStartResponse,
+  orchestrationStartResponseSchema,
   type RepairRequest,
   type RunCreation,
   runCreationSchema,
@@ -83,6 +85,22 @@ export async function fetchRunDossier(runId: string): Promise<RunDossier> {
   }
 
   return parsed.data.dossier;
+}
+
+export async function startMockOrchestration(
+  runId: string,
+): Promise<OrchestrationStartResponse> {
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/orchestration`, {
+    method: "POST",
+  });
+  const parsed = orchestrationStartResponseSchema.safeParse(
+    await trustedBody(response),
+  );
+  if (!parsed.success) {
+    throw new RunApiError("Prism returned an invalid orchestration-start contract.");
+  }
+
+  return parsed.data;
 }
 
 export async function runWorkspaceRequest(

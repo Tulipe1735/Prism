@@ -38,6 +38,9 @@ importers:
       '@prism/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@prism/orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/orchestrator
       '@prism/trajectory-store':
         specifier: workspace:^
         version: link:../../packages/trajectory-store
@@ -152,6 +155,28 @@ importers:
       '@prism/tooling-config':
         specifier: workspace:*
         version: link:../tooling-config
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0)
+
+  packages/orchestrator:
+    dependencies:
+      '@prism/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@prism/tooling-config':
+        specifier: workspace:*
+        version: link:../tooling-config
+      '@types/node':
+        specifier: 22.20.1
+        version: 22.20.1
       eslint:
         specifier: 9.39.5
         version: 9.39.5(jiti@2.7.0)

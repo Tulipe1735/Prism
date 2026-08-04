@@ -12,6 +12,8 @@ import {
   executeWorkspaceRequest,
   getRunDossier,
   listRecentRuns,
+  startMockHybridRun,
+  waitForMockHybridRun,
 } from "./run-repository";
 
 const request: RepairRequest = {
@@ -209,5 +211,32 @@ describe("Run repository", () => {
     } finally {
       await rm(workspaceDirectory, { recursive: true, force: true });
     }
+  });
+
+  it("starts a mocked hybrid Run and exposes its durable DAG, progress, artifacts, and fence", async () => {
+    const creation = await createRun(request);
+
+    expect(await startMockHybridRun(creation.runId)).toBe(true);
+
+    const dossier = await waitForMockHybridRun(creation.runId);
+    expect(dossier).toMatchObject({
+      id: creation.runId,
+      dagRevisions: expect.arrayContaining([
+        expect.objectContaining({ revision: 1 }),
+        expect.objectContaining({ revision: 4 }),
+      ]),
+      effectLease: { token: 2, state: "released" },
+    });
+    expect(dossier?.nodeProgress).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nodeType: "workspace.inspect",
+          state: "succeeded",
+          artifacts: [expect.objectContaining({ algorithm: "sha256" })],
+        }),
+        expect.objectContaining({ nodeType: "browser.verify", state: "succeeded" }),
+      ]),
+    );
+    expect(dossier?.artifacts.length).toBeGreaterThan(1);
   });
 });

@@ -21,6 +21,7 @@ import {
   workspaceEvidenceRecordSchema,
   workspaceRequestSchema,
 } from "@prism/contracts";
+import { type OrchestrationJournal, Orchestrator } from "@prism/orchestrator";
 import {
   type DurableRun,
   FileTrajectoryStore,
@@ -38,6 +39,16 @@ export type RecentRun = RunSummary;
 export type { RunDossier };
 
 let activeStore: { dataDirectory: string; store: FileTrajectoryStore } | undefined;
+interface ActiveMockHybridRun {
+  initialRevisionCommitted: Promise<void>;
+  completion: Promise<void>;
+}
+
+const activeMockHybridRuns = new Map<string, ActiveMockHybridRun>();
+
+function mockRunKey(dataDirectory: string, runId: string): string {
+  return `${dataDirectory}:${runId}`;
+}
 
 function getDataDirectory() {
   const configured = process.env.PRISM_DATA_DIR?.trim();
@@ -72,6 +83,9 @@ function dossierFromRun(run: DurableRun): RunDossier {
     workspaceEvidence: run.snapshot.workspaceEvidence,
     browserBaselines: run.snapshot.browserBaselines,
     browserActions: run.snapshot.browserActions,
+    dagRevisions: run.snapshot.dagRevisions,
+    nodeProgress: run.snapshot.nodeProgress,
+    effectLease: run.snapshot.effectLease,
     terminalError: run.snapshot.terminalError,
   });
 }
@@ -130,6 +144,83 @@ export async function createRun(request: RepairRequest): Promise<RunCreation> {
     runId: run.manifest.runId,
     snapshot: run.snapshot,
   });
+}
+export async function startMockHybridRun(runIdInput: string): Promise<boolean> {
+  const parsedRunId = runIdSchema.safeParse(runIdInput);
+  if (!parsedRunId.success) return false;
+
+  const store = getStore();
+  const runIds = await store.listRunIds();
+  if (!runIds.includes(parsedRunId.data)) return false;
+
+  const key = mockRunKey(store.dataDirectory, parsedRunId.data);
+  const activeRun = activeMockHybridRuns.get(key);
+  if (activeRun) {
+    await activeRun.initialRevisionCommitted;
+    return true;
+  }
+
+  const run = await store.loadRun(parsedRunId.data);
+
+  let resolveInitialRevision: (() => void) | undefined;
+  let rejectInitialRevision: ((reason?: unknown) => void) | undefined;
+  let initialRevisionCommitted = false;
+  const initialRevisionReady = new Promise<void>((resolve, reject) => {
+    resolveInitialRevision = resolve;
+    rejectInitialRevision = reject;
+  });
+
+  const journal: OrchestrationJournal = {
+    appendDagRevision: async (revision) => {
+      await store.recordDagRevision(parsedRunId.data, revision);
+      if (revision.revision === 1) {
+        initialRevisionCommitted = true;
+        resolveInitialRevision?.();
+      }
+    },
+    appendNodeProgress: async (progress) => {
+      await store.recordNodeProgress(parsedRunId.data, progress);
+    },
+    appendEffectLease: async (lease) => {
+      await store.recordEffectLease(parsedRunId.data, lease);
+    },
+    writeRuntimeArtifact: (content, mediaType) =>
+      store.writeArtifact(content, mediaType),
+  };
+  const completion = new Orchestrator()
+    .executeMockHybridRun({
+      runId: parsedRunId.data,
+      prompt: run.manifest.request.prompt,
+      journal,
+    })
+    .then(() => undefined)
+    .catch((error) => {
+      if (!initialRevisionCommitted) {
+        rejectInitialRevision?.(error);
+      }
+      return undefined;
+    })
+    .finally(() => {
+      activeMockHybridRuns.delete(key);
+    });
+  activeMockHybridRuns.set(key, {
+    initialRevisionCommitted: initialRevisionReady,
+    completion,
+  });
+  await initialRevisionReady;
+  return true;
+}
+
+export async function waitForMockHybridRun(
+  runIdInput: string,
+): Promise<RunDossier | null> {
+  const parsedRunId = runIdSchema.safeParse(runIdInput);
+  if (!parsedRunId.success) return null;
+
+  const store = getStore();
+  const key = mockRunKey(store.dataDirectory, parsedRunId.data);
+  await activeMockHybridRuns.get(key)?.completion;
+  return getRunDossier(parsedRunId.data);
 }
 
 export async function listRecentRuns(): Promise<readonly RecentRun[]> {

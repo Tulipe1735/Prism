@@ -11,7 +11,24 @@ import {
   FolderSearch2,
 } from "lucide-react";
 
-import { fetchRunDossier, runWorkspaceRequest } from "@/lib/client/run-api";
+import {
+  fetchRunDossier,
+  runWorkspaceRequest,
+  startMockOrchestration,
+} from "@/lib/client/run-api";
+
+function shouldPollRunDossier(dossier: RunDossier | undefined): boolean {
+  if (!dossier) return false;
+  const latestRevision = dossier.dagRevisions[dossier.dagRevisions.length - 1];
+  if (!latestRevision) return false;
+  const progressByNode = new Map(
+    dossier.nodeProgress.map((progress) => [progress.nodeId, progress]),
+  );
+  return latestRevision.nodes.some((node) => {
+    const progress = progressByNode.get(node.nodeId);
+    return !progress || !["succeeded", "failed", "blocked"].includes(progress.state);
+  });
+}
 
 function artifactUrl(runId: string, artifactHash: string): string {
   return `/api/runs/${encodeURIComponent(runId)}/artifacts/${artifactHash}`;
@@ -29,10 +46,17 @@ export function RunDossierView({
     queryKey: ["runs", runId],
     queryFn: () => fetchRunDossier(runId),
     initialData: initialDossier,
+    refetchInterval: (query) => (shouldPollRunDossier(query.state.data) ? 150 : false),
     refetchOnMount: "always",
   });
   const workspaceMutation = useMutation({
     mutationFn: (request: WorkspaceRequest) => runWorkspaceRequest(runId, request),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["runs", runId] });
+    },
+  });
+  const orchestrationMutation = useMutation({
+    mutationFn: () => startMockOrchestration(runId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["runs", runId] });
     },
@@ -61,7 +85,7 @@ export function RunDossierView({
     });
   }
 
-  if (dossierQuery.isFetching) {
+  if (dossierQuery.isFetching && !dossierQuery.data) {
     return (
       <section className="py-12">
         <div className="border-y border-stone-500 py-8 font-mono text-sm" role="status">
@@ -71,7 +95,7 @@ export function RunDossierView({
     );
   }
 
-  if (dossierQuery.isError) {
+  if (dossierQuery.isError || !dossierQuery.data) {
     return (
       <section className="py-12">
         <div
@@ -91,6 +115,11 @@ export function RunDossierView({
   }
 
   const dossier = dossierQuery.data;
+  const latestRevision = dossier.dagRevisions[dossier.dagRevisions.length - 1];
+  const nodeProgressByNode = new Map(
+    dossier.nodeProgress.map((progress) => [progress.nodeId, progress]),
+  );
+  const orchestrationActive = shouldPollRunDossier(dossier);
 
   return (
     <section className="py-12">
@@ -285,6 +314,89 @@ export function RunDossierView({
               </li>
             ))}
           </ol>
+        )}
+      </section>
+
+      <section className="mt-10 border-t-2 border-stone-900 pt-7">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-stone-500">
+              MOCK HYBRID ORCHESTRATION / CANONICAL JOURNAL
+            </p>
+            <h2 className="mt-2 font-serif text-3xl">Dual-runtime Run DAG</h2>
+          </div>
+          <button
+            className="border border-stone-900 px-3 py-2 font-mono text-[0.62rem] font-bold disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={orchestrationMutation.isPending || Boolean(latestRevision)}
+            onClick={() => orchestrationMutation.mutate()}
+            type="button"
+          >
+            {orchestrationMutation.isPending
+              ? "Starting durable Run…"
+              : latestRevision
+                ? "Mock Run committed"
+                : "Start mock hybrid Run"}
+          </button>
+        </div>
+
+        {orchestrationMutation.isError && (
+          <p className="mt-5 border border-red-800 bg-red-50 p-4 text-sm text-red-900">
+            Prism could not start the mock Run. No source or browser effect was
+            attempted.
+          </p>
+        )}
+
+        {!latestRevision ? (
+          <p className="mt-5 border border-dashed border-stone-500 p-5 text-sm text-stone-600">
+            Start the bounded mock Run to observe durable node progress and effect
+            fences.
+          </p>
+        ) : (
+          <ol className="mt-5 space-y-3">
+            {latestRevision.nodes.map((node) => {
+              const progress = nodeProgressByNode.get(node.nodeId);
+              const introducedInRevision = dossier.dagRevisions.find((revision) =>
+                revision.nodes.some((candidate) => candidate.nodeId === node.nodeId),
+              )?.revision;
+              return (
+                <li
+                  className="border border-stone-500 bg-white/40 p-4"
+                  key={node.nodeId}
+                >
+                  <p className="font-mono text-[0.66rem] tracking-[0.08em]">
+                    {node.nodeType} / {progress?.state ?? "ready"}
+                  </p>
+                  <p className="mt-2 break-all font-mono text-[0.58rem] text-stone-500">
+                    READY AFTER{" "}
+                    {node.predecessorIds.length
+                      ? node.predecessorIds.join(", ")
+                      : "root evidence"}
+                    {` / DAG REVISION ${introducedInRevision ?? "unknown"}`}
+                  </p>
+                  <p className="mt-2 text-xs">
+                    {node.runtime} / {node.effectClass} / journal{" "}
+                    {progress ? `#${progress.journalPosition}` : "awaiting"} / artifacts{" "}
+                    {progress?.artifacts.length ?? 0}
+                  </p>
+                  <p className="mt-2 break-all font-mono text-[0.58rem] text-stone-500">
+                    correlation / causation:{" "}
+                    {progress
+                      ? `${progress.correlationId} / ${progress.causationEventId ?? "root"}`
+                      : "awaiting"}
+                  </p>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {latestRevision && (
+          <p className="mt-5 font-mono text-[0.6rem] text-stone-600">
+            {orchestrationActive ? "DURABLE POLL ACTIVE / " : "DURABLE RUN SETTLED / "}
+            EFFECT FENCE{" "}
+            {dossier.effectLease
+              ? `#${dossier.effectLease.token} / ${dossier.effectLease.state}`
+              : "none"}
+          </p>
         )}
       </section>
 

@@ -14,6 +14,7 @@
   "dependencies": {
     "@hookform/resolvers": "5.5.7",
     "@prism/action-broker": "workspace:^",
+    "@prism/orchestrator": "workspace:*",
     "@prism/contracts": "workspace:*",
     "@prism/trajectory-store": "workspace:^",
     "@prism/workspace-executor": "workspace:^",

@@ -21,15 +21,21 @@ import {
   browserActionRecordSchema,
   type BrowserBaselineRecord,
   browserBaselineRecordSchema,
+  type EffectLease,
+  effectLeaseSchema,
   repairRequestSchema,
   RUN_EVENT_SCHEMA_VERSION,
   RUN_MANIFEST_SCHEMA_VERSION,
   RUN_SNAPSHOT_SCHEMA_VERSION,
+  type RunDagRevision,
+  runDagRevisionSchema,
   type RunEvent,
   runEventSchema,
   runIdSchema,
   type RunManifest,
   runManifestSchema,
+  type RunNodeProgress,
+  runNodeProgressSchema,
   type RunSnapshot,
   runSnapshotSchema,
   type TerminalRunError,
@@ -81,7 +87,9 @@ function uniqueArtifacts(
   existing: readonly ArtifactRef[],
   additions: readonly ArtifactRef[],
 ): ArtifactRef[] {
-  const seen = new Set(existing.map((artifact) => `${artifact.algorithm}:${artifact.hash}`));
+  const seen = new Set(
+    existing.map((artifact) => `${artifact.algorithm}:${artifact.hash}`),
+  );
   const unique = [...existing];
 
   additions.forEach((artifact) => {
@@ -181,6 +189,9 @@ export function projectRunEvents(
         workspaceEvidence: [],
         browserBaselines: [],
         browserActions: [],
+        dagRevisions: [],
+        nodeProgress: [],
+        effectLease: null,
         terminalError: null,
       });
       return;
@@ -233,7 +244,10 @@ export function projectRunEvents(
         ...snapshot,
         updatedAt: event.recordedAt,
         lastSequence: event.sequence,
-        artifacts: uniqueArtifacts(snapshot.artifacts, browserBaselineArtifacts(event.payload)),
+        artifacts: uniqueArtifacts(
+          snapshot.artifacts,
+          browserBaselineArtifacts(event.payload),
+        ),
         browserBaselines: [...snapshot.browserBaselines, event.payload],
       });
       return;
@@ -252,6 +266,61 @@ export function projectRunEvents(
         updatedAt: event.recordedAt,
         lastSequence: event.sequence,
         browserActions: [...snapshot.browserActions, event.payload],
+      });
+      return;
+    }
+    if (event.type === "run.dag-revision") {
+      if (event.payload.revision !== snapshot.dagRevisions.length + 1) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Run DAG revisions must append in uninterrupted order.",
+        );
+      }
+
+      snapshot = runSnapshotSchema.parse({
+        ...snapshot,
+        updatedAt: event.recordedAt,
+        lastSequence: event.sequence,
+        dagRevisions: [...snapshot.dagRevisions, event.payload],
+      });
+      return;
+    }
+
+    if (event.type === "run.node-progress") {
+      const revision = snapshot.dagRevisions.find(
+        (candidate) => candidate.revision === event.payload.revision,
+      );
+      const node = revision?.nodes.find(
+        (candidate) => candidate.nodeId === event.payload.nodeId,
+      );
+      if (
+        !node ||
+        event.payload.journalPosition !== event.sequence ||
+        event.payload.correlationId !== event.correlationId ||
+        event.payload.causationEventId !== event.causationEventId
+      ) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Node progress must reference its DAG node and matching journal envelope.",
+        );
+      }
+
+      snapshot = runSnapshotSchema.parse({
+        ...snapshot,
+        updatedAt: event.recordedAt,
+        lastSequence: event.sequence,
+        artifacts: uniqueArtifacts(snapshot.artifacts, event.payload.artifacts),
+        nodeProgress: [...snapshot.nodeProgress, event.payload],
+      });
+      return;
+    }
+
+    if (event.type === "run.effect-lease") {
+      snapshot = runSnapshotSchema.parse({
+        ...snapshot,
+        updatedAt: event.recordedAt,
+        lastSequence: event.sequence,
+        effectLease: event.payload,
       });
       return;
     }
@@ -467,6 +536,104 @@ export class FileTrajectoryStore {
       });
       await this.commitEvent(current, event);
       return record;
+    });
+  }
+  async recordDagRevision(
+    runIdInput: string,
+    revisionInput: unknown,
+  ): Promise<RunDagRevision> {
+    const runId = runIdSchema.parse(runIdInput);
+
+    return this.withRunWrite(runId, async () => {
+      const current = await this.loadRun(runId);
+      const revision = runDagRevisionSchema.parse(revisionInput);
+      if (revision.revision !== current.snapshot.dagRevisions.length + 1) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Run DAG revisions must append after the current durable revision.",
+        );
+      }
+      const previousEvent = current.events.at(-1);
+      const event = asEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: this.eventIdFactory(),
+        runId,
+        sequence: current.events.length + 1,
+        recordedAt: this.clock().toISOString(),
+        correlationId: runId,
+        causationEventId: previousEvent?.eventId ?? null,
+        type: "run.dag-revision",
+        payload: revision,
+      });
+      await this.commitEvent(current, event);
+      return revision;
+    });
+  }
+
+  async recordNodeProgress(
+    runIdInput: string,
+    input: Omit<
+      RunNodeProgress,
+      "schemaVersion" | "journalPosition" | "causationEventId" | "recordedAt"
+    >,
+  ): Promise<RunNodeProgress> {
+    const runId = runIdSchema.parse(runIdInput);
+
+    return this.withRunWrite(runId, async () => {
+      const current = await this.loadRun(runId);
+      const previousEvent = current.events.at(-1);
+      const progress = runNodeProgressSchema.parse({
+        ...input,
+        schemaVersion: "prism.run-node-progress/v1",
+        journalPosition: current.events.length + 1,
+        causationEventId: previousEvent?.eventId ?? null,
+        recordedAt: this.clock().toISOString(),
+      });
+      if (progress.correlationId !== runId) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Node progress must use its Run ID as the correlation ID.",
+        );
+      }
+      const event = asEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: this.eventIdFactory(),
+        runId,
+        sequence: current.events.length + 1,
+        recordedAt: this.clock().toISOString(),
+        correlationId: progress.correlationId,
+        causationEventId: progress.causationEventId,
+        type: "run.node-progress",
+        payload: progress,
+      });
+      await this.commitEvent(current, event);
+      return progress;
+    });
+  }
+
+  async recordEffectLease(
+    runIdInput: string,
+    leaseInput: unknown,
+  ): Promise<EffectLease> {
+    const runId = runIdSchema.parse(runIdInput);
+
+    return this.withRunWrite(runId, async () => {
+      const current = await this.loadRun(runId);
+      const lease = effectLeaseSchema.parse(leaseInput);
+      const previousEvent = current.events.at(-1);
+      const event = asEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: this.eventIdFactory(),
+        runId,
+        sequence: current.events.length + 1,
+        recordedAt: this.clock().toISOString(),
+        correlationId: runId,
+        causationEventId: previousEvent?.eventId ?? null,
+        type: "run.effect-lease",
+        payload: lease,
+      });
+      await this.commitEvent(current, event);
+      return lease;
     });
   }
 

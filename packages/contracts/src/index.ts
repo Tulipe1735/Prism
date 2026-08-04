@@ -12,6 +12,8 @@ export const RUN_CREATION_SCHEMA_VERSION = "prism.run-creation/v1" as const;
 export const RUN_LIST_SCHEMA_VERSION = "prism.run-list/v1" as const;
 export const RUN_DOSSIER_RESPONSE_SCHEMA_VERSION =
   "prism.run-dossier-response/v1" as const;
+export const ORCHESTRATION_START_RESPONSE_SCHEMA_VERSION =
+  "prism.orchestration-start-response/v1" as const;
 export const WORKSPACE_REQUEST_SCHEMA_VERSION = "prism.workspace-request/v1" as const;
 export const WORKSPACE_EVIDENCE_SCHEMA_VERSION = "prism.workspace-evidence/v1" as const;
 export const WORKSPACE_EVIDENCE_RESPONSE_SCHEMA_VERSION =
@@ -181,7 +183,8 @@ const browserRouteSchema = z
   .min(1)
   .max(1_024)
   .refine(
-    (value) => value.startsWith("/") && !value.startsWith("//") && !value.includes("\\"),
+    (value) =>
+      value.startsWith("/") && !value.startsWith("//") && !value.includes("\\"),
     "Browser routes must be normalized local paths.",
   );
 
@@ -328,6 +331,282 @@ export const browserActionRecordSchema = z
       .strict(),
     before: browserObservationReferenceSchema,
     after: browserObservationReferenceSchema.nullable(),
+    recordedAt: isoDateTimeSchema,
+  })
+  .strict();
+
+export const RUN_DAG_REVISION_SCHEMA_VERSION = "prism.run-dag-revision/v1" as const;
+export const ROUTER_DECISION_SCHEMA_VERSION = "prism.router-decision/v1" as const;
+export const RUN_NODE_PROGRESS_SCHEMA_VERSION = "prism.run-node-progress/v1" as const;
+export const EFFECT_LEASE_SCHEMA_VERSION = "prism.effect-lease/v1" as const;
+
+export const runtimeOwnerSchema = z.enum(["coding", "browser", "orchestrator"]);
+export const effectClassSchema = z.enum([
+  "read_only",
+  "source_effect",
+  "browser_effect",
+  "none",
+]);
+export const runDagNodeTypeSchema = z.enum([
+  "workspace.inspect",
+  "browser.observe",
+  "workspace.patch",
+  "browser.verify",
+  "task.complete",
+  "route.reclassify",
+]);
+export const routerClassificationSchema = z.enum([
+  "coding",
+  "browser",
+  "hybrid",
+  "uncertain",
+]);
+export const runNodeStateSchema = z.enum([
+  "ready",
+  "running",
+  "succeeded",
+  "failed",
+  "blocked",
+  "retrying",
+]);
+export const nodeOutcomeRequestSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }).strict(),
+  z
+    .object({
+      kind: z.literal("successor"),
+      nodeType: runDagNodeTypeSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("evidence"),
+      nodeType: z.enum(["workspace.inspect", "browser.observe"]),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("retry"),
+      reason: z.string().trim().min(1).max(500),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("reclassify"),
+      classification: z.enum(["coding", "browser", "hybrid"]),
+    })
+    .strict(),
+]);
+
+export const runDagNodeRegistry = {
+  "workspace.inspect": {
+    runtime: "coding",
+    effectClass: "read_only",
+    legalSuccessors: ["workspace.inspect", "workspace.patch", "browser.observe"],
+  },
+  "browser.observe": {
+    runtime: "browser",
+    effectClass: "read_only",
+    legalSuccessors: ["browser.observe", "workspace.patch", "workspace.inspect"],
+  },
+  "workspace.patch": {
+    runtime: "coding",
+    effectClass: "source_effect",
+    legalSuccessors: ["workspace.patch", "browser.verify"],
+  },
+  "browser.verify": {
+    runtime: "browser",
+    effectClass: "browser_effect",
+    legalSuccessors: ["browser.verify", "task.complete", "workspace.patch"],
+  },
+  "task.complete": {
+    runtime: "orchestrator",
+    effectClass: "none",
+    legalSuccessors: [],
+  },
+  "route.reclassify": {
+    runtime: "orchestrator",
+    effectClass: "read_only",
+    legalSuccessors: ["workspace.inspect", "browser.observe"],
+  },
+} as const;
+
+export const runDagNodeSchema = z
+  .object({
+    nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    nodeType: runDagNodeTypeSchema,
+    runtime: runtimeOwnerSchema,
+    effectClass: effectClassSchema,
+    predecessorIds: z.array(z.string().regex(/^node-[a-z0-9-]{1,120}$/)).max(24),
+    maxAttempts: z.number().int().min(1).max(3),
+  })
+  .strict()
+  .superRefine((node, context) => {
+    const expected = runDagNodeRegistry[node.nodeType];
+    if (
+      node.runtime !== expected.runtime ||
+      node.effectClass !== expected.effectClass
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Run DAG nodes must use the registered runtime and effect class.",
+      });
+    }
+  });
+
+function hasDagCycle(nodes: readonly RunDagNode[]): boolean {
+  const byId = new Map(nodes.map((node) => [node.nodeId, node]));
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  const visit = (nodeId: string): boolean => {
+    if (visiting.has(nodeId)) return true;
+    if (visited.has(nodeId)) return false;
+    const node = byId.get(nodeId);
+    if (!node) return false;
+    visiting.add(nodeId);
+    const cycle = node.predecessorIds.some(visit);
+    visiting.delete(nodeId);
+    visited.add(nodeId);
+    return cycle;
+  };
+
+  return nodes.some((node) => visit(node.nodeId));
+}
+
+export const runDagRevisionSchema = z
+  .object({
+    schemaVersion: z.literal(RUN_DAG_REVISION_SCHEMA_VERSION),
+    revision: z.number().int().positive(),
+    classification: routerClassificationSchema,
+    createdAt: isoDateTimeSchema,
+    nodes: z.array(runDagNodeSchema).min(1).max(64),
+  })
+  .strict()
+  .superRefine((revision, context) => {
+    const nodeIds = new Set<string>();
+    const byId = new Map(revision.nodes.map((node) => [node.nodeId, node]));
+
+    revision.nodes.forEach((node, index) => {
+      if (nodeIds.has(node.nodeId)) {
+        context.addIssue({
+          code: "custom",
+          path: ["nodes", index, "nodeId"],
+          message: "Run DAG node IDs must be unique.",
+        });
+      }
+      nodeIds.add(node.nodeId);
+
+      node.predecessorIds.forEach((predecessorId) => {
+        const predecessor = byId.get(predecessorId);
+        const allowed = predecessor
+          ? (runDagNodeRegistry[predecessor.nodeType]
+              .legalSuccessors as readonly string[])
+          : [];
+        if (!predecessor || !allowed.includes(node.nodeType)) {
+          context.addIssue({
+            code: "custom",
+            path: ["nodes", index, "predecessorIds"],
+            message: "Run DAG edges must be registered legal successors.",
+          });
+        }
+      });
+
+      if (
+        revision.classification === "uncertain" &&
+        node.effectClass !== "read_only" &&
+        node.effectClass !== "none"
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["nodes", index, "effectClass"],
+          message:
+            "Uncertain routes may only schedule read-only evidence before reclassification.",
+        });
+      }
+    });
+
+    if (hasDagCycle(revision.nodes)) {
+      context.addIssue({
+        code: "custom",
+        path: ["nodes"],
+        message: "Run DAG revisions cannot contain graph cycles.",
+      });
+    }
+  });
+
+export const routerDecisionSchema = z
+  .object({
+    schemaVersion: z.literal(ROUTER_DECISION_SCHEMA_VERSION),
+    classification: routerClassificationSchema,
+    confidence: z.number().min(0).max(1),
+    requiredCapabilities: z
+      .array(
+        z.enum(["workspace_read", "browser_read", "source_effect", "browser_effect"]),
+      )
+      .min(1)
+      .max(4),
+    initialRevision: runDagRevisionSchema,
+  })
+  .strict()
+  .superRefine((decision, context) => {
+    if (decision.initialRevision.revision !== 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["initialRevision", "revision"],
+        message: "Router decisions must begin at DAG revision 1.",
+      });
+    }
+    if (decision.initialRevision.classification !== decision.classification) {
+      context.addIssue({
+        code: "custom",
+        path: ["initialRevision", "classification"],
+        message: "The initial DAG revision must match the Router classification.",
+      });
+    }
+  });
+
+export const nodeOutcomeSchema = z
+  .object({
+    nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    attempt: z.number().int().positive(),
+    state: z.enum(["succeeded", "failed", "blocked"]),
+    summary: z.string().trim().min(1).max(500),
+    evidence: z
+      .object({
+        mediaType: z.literal("application/vnd.prism.runtime-evidence+json"),
+        content: z.string().max(32_000),
+      })
+      .strict(),
+    request: nodeOutcomeRequestSchema,
+  })
+  .strict();
+
+export const runNodeProgressSchema = z
+  .object({
+    schemaVersion: z.literal(RUN_NODE_PROGRESS_SCHEMA_VERSION),
+    revision: z.number().int().positive(),
+    nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    nodeType: runDagNodeTypeSchema,
+    attempt: z.number().int().positive(),
+    runtime: runtimeOwnerSchema,
+    effectClass: effectClassSchema,
+    state: runNodeStateSchema,
+    summary: z.string().trim().min(1).max(500),
+    artifacts: z.array(artifactRefSchema).max(12),
+    journalPosition: z.number().int().positive(),
+    correlationId: z.string().min(1).max(200),
+    causationEventId: z.string().uuid().nullable(),
+    recordedAt: isoDateTimeSchema,
+  })
+  .strict();
+
+export const effectLeaseSchema = z
+  .object({
+    schemaVersion: z.literal(EFFECT_LEASE_SCHEMA_VERSION),
+    token: z.number().int().positive(),
+    holderNodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    effectClass: z.enum(["source_effect", "browser_effect"]),
+    state: z.enum(["active", "released"]),
     recordedAt: isoDateTimeSchema,
   })
   .strict();
@@ -612,6 +891,30 @@ export const browserActionEventSchema = z
   })
   .strict();
 
+export const runDagRevisionEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("run.dag-revision"),
+    payload: runDagRevisionSchema,
+  })
+  .strict();
+
+export const runNodeProgressEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("run.node-progress"),
+    payload: runNodeProgressSchema,
+  })
+  .strict();
+
+export const effectLeaseEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("run.effect-lease"),
+    payload: effectLeaseSchema,
+  })
+  .strict();
+
 export const runEventSchema = z.discriminatedUnion("type", [
   runCreatedEventSchema,
   runQueuedEventSchema,
@@ -619,6 +922,9 @@ export const runEventSchema = z.discriminatedUnion("type", [
   workspaceEvidenceEventSchema,
   browserBaselineEventSchema,
   browserActionEventSchema,
+  runDagRevisionEventSchema,
+  runNodeProgressEventSchema,
+  effectLeaseEventSchema,
 ]);
 
 export const runStatusSchema = z.enum(["created", "queued", "terminal_error"]);
@@ -636,6 +942,9 @@ export const runSnapshotSchema = z
     workspaceEvidence: z.array(workspaceEvidenceRecordSchema).default([]),
     browserBaselines: z.array(browserBaselineRecordSchema).default([]),
     browserActions: z.array(browserActionRecordSchema).default([]),
+    dagRevisions: z.array(runDagRevisionSchema).default([]),
+    nodeProgress: z.array(runNodeProgressSchema).default([]),
+    effectLease: effectLeaseSchema.nullable().default(null),
     terminalError: terminalRunErrorSchema.nullable(),
   })
   .strict();
@@ -670,6 +979,9 @@ export const runDossierSchema = runSummarySchema
     workspaceEvidence: z.array(workspaceEvidenceRecordSchema).default([]),
     browserBaselines: z.array(browserBaselineRecordSchema).default([]),
     browserActions: z.array(browserActionRecordSchema).default([]),
+    dagRevisions: z.array(runDagRevisionSchema).default([]),
+    nodeProgress: z.array(runNodeProgressSchema).default([]),
+    effectLease: effectLeaseSchema.nullable().default(null),
     terminalError: terminalRunErrorSchema.nullable(),
   })
   .strict();
@@ -688,14 +1000,40 @@ export const runDossierResponseSchema = z
   })
   .strict();
 
+export const orchestrationStartResponseSchema = z
+  .object({
+    schemaVersion: z.literal(ORCHESTRATION_START_RESPONSE_SCHEMA_VERSION),
+    status: z.literal("started"),
+    runId: runIdSchema,
+  })
+  .strict();
+
+export type OrchestrationStartResponse = z.infer<
+  typeof orchestrationStartResponseSchema
+>;
+
 export type ArtifactRef = z.infer<typeof artifactRefSchema>;
+export type EffectLease = z.infer<typeof effectLeaseSchema>;
+export type EffectClass = z.infer<typeof effectClassSchema>;
+export type NodeOutcome = z.infer<typeof nodeOutcomeSchema>;
+export type RouterClassification = z.infer<typeof routerClassificationSchema>;
+export type RouterDecision = z.infer<typeof routerDecisionSchema>;
+export type RunDagNode = z.infer<typeof runDagNodeSchema>;
+export type RunDagNodeType = z.infer<typeof runDagNodeTypeSchema>;
+export type RunDagRevision = z.infer<typeof runDagRevisionSchema>;
+export type RunNodeProgress = z.infer<typeof runNodeProgressSchema>;
+export type RunNodeState = z.infer<typeof runNodeStateSchema>;
+export type RuntimeOwner = z.infer<typeof runtimeOwnerSchema>;
+
 export type BrowserActionProposal = z.infer<typeof browserActionProposalSchema>;
 export type BrowserActionRecord = z.infer<typeof browserActionRecordSchema>;
 export type BrowserBaselineRecord = z.infer<typeof browserBaselineRecordSchema>;
 export type BrowserBaselineRequest = z.infer<typeof browserBaselineRequestSchema>;
 export type BrowserBaselineResponse = z.infer<typeof browserBaselineResponseSchema>;
 export type BrowserCaptureTarget = z.infer<typeof browserCaptureTargetSchema>;
-export type BrowserObservationReference = z.infer<typeof browserObservationReferenceSchema>;
+export type BrowserObservationReference = z.infer<
+  typeof browserObservationReferenceSchema
+>;
 export type BrowserTarget = z.infer<typeof browserTargetSchema>;
 export type RunCreation = z.infer<typeof runCreationSchema>;
 export type RunDossier = z.infer<typeof runDossierSchema>;

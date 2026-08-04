@@ -5,6 +5,7 @@ import {
   browserActionProposalSchema,
   browserBaselineRecordSchema,
   runCreationSchema,
+  runDagRevisionSchema,
   runDossierResponseSchema,
   runEventSchema,
   runListSchema,
@@ -98,6 +99,55 @@ describe("Durable Run contracts", () => {
     expect(runEventSchema.parse(queuedEvent).type).toBe("run.queued");
     expect(
       runEventSchema.safeParse({ ...queuedEvent, schemaVersion: undefined }).success,
+    ).toBe(false);
+  });
+
+  it("accepts only registered acyclic DAG edges and keeps uncertain routes read-only", () => {
+    const revision = {
+      schemaVersion: "prism.run-dag-revision/v1",
+      revision: 1,
+      classification: "hybrid",
+      createdAt: "2026-08-04T08:00:00.000Z",
+      nodes: [
+        {
+          nodeId: "node-1-workspace-inspect",
+          nodeType: "workspace.inspect",
+          runtime: "coding",
+          effectClass: "read_only",
+          predecessorIds: [],
+          maxAttempts: 2,
+        },
+        {
+          nodeId: "node-1-workspace-patch",
+          nodeType: "workspace.patch",
+          runtime: "coding",
+          effectClass: "source_effect",
+          predecessorIds: ["node-1-workspace-inspect"],
+          maxAttempts: 1,
+        },
+      ],
+    };
+
+    expect(runDagRevisionSchema.parse(revision)).toMatchObject({ revision: 1 });
+    expect(
+      runDagRevisionSchema.safeParse({
+        ...revision,
+        nodes: [
+          ...revision.nodes,
+          {
+            nodeId: "node-1-task-complete",
+            nodeType: "task.complete",
+            runtime: "orchestrator",
+            effectClass: "none",
+            predecessorIds: ["node-1-workspace-inspect"],
+            maxAttempts: 1,
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      runDagRevisionSchema.safeParse({ ...revision, classification: "uncertain" })
+        .success,
     ).toBe(false);
   });
 
