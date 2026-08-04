@@ -17,6 +17,10 @@ import {
   ARTIFACT_REF_SCHEMA_VERSION,
   type ArtifactRef,
   artifactRefSchema,
+  type BrowserActionRecord,
+  browserActionRecordSchema,
+  type BrowserBaselineRecord,
+  browserBaselineRecordSchema,
   repairRequestSchema,
   RUN_EVENT_SCHEMA_VERSION,
   RUN_MANIFEST_SCHEMA_VERSION,
@@ -71,6 +75,36 @@ function hashBytes(bytes: Uint8Array): string {
 
 function serializeJsonLine(value: unknown): string {
   return `${JSON.stringify(value)}\n`;
+}
+
+function uniqueArtifacts(
+  existing: readonly ArtifactRef[],
+  additions: readonly ArtifactRef[],
+): ArtifactRef[] {
+  const seen = new Set(existing.map((artifact) => `${artifact.algorithm}:${artifact.hash}`));
+  const unique = [...existing];
+
+  additions.forEach((artifact) => {
+    const key = `${artifact.algorithm}:${artifact.hash}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(artifact);
+    }
+  });
+
+  return unique;
+}
+
+function browserBaselineArtifacts(baseline: BrowserBaselineRecord): ArtifactRef[] {
+  return [
+    baseline.screenshot,
+    baseline.dom,
+    baseline.accessibility,
+    baseline.computed,
+    baseline.console,
+    baseline.network,
+    baseline.trace,
+  ];
 }
 
 function isMissingFile(error: unknown): boolean {
@@ -145,6 +179,8 @@ export function projectRunEvents(
         lastSequence: event.sequence,
         artifacts: [event.payload.requestArtifact],
         workspaceEvidence: [],
+        browserBaselines: [],
+        browserActions: [],
         terminalError: null,
       });
       return;
@@ -181,6 +217,41 @@ export function projectRunEvents(
         lastSequence: event.sequence,
         artifacts: [...snapshot.artifacts, event.payload.artifact],
         workspaceEvidence: [...snapshot.workspaceEvidence, event.payload],
+      });
+      return;
+    }
+
+    if (event.type === "browser.baseline") {
+      if (event.payload.runId !== manifest.runId) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Browser Baseline evidence must belong to the Run that journals it.",
+        );
+      }
+
+      snapshot = runSnapshotSchema.parse({
+        ...snapshot,
+        updatedAt: event.recordedAt,
+        lastSequence: event.sequence,
+        artifacts: uniqueArtifacts(snapshot.artifacts, browserBaselineArtifacts(event.payload)),
+        browserBaselines: [...snapshot.browserBaselines, event.payload],
+      });
+      return;
+    }
+
+    if (event.type === "browser.action") {
+      if (event.payload.proposal.runId !== manifest.runId) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Browser actions must belong to the Run that journals them.",
+        );
+      }
+
+      snapshot = runSnapshotSchema.parse({
+        ...snapshot,
+        updatedAt: event.recordedAt,
+        lastSequence: event.sequence,
+        browserActions: [...snapshot.browserActions, event.payload],
       });
       return;
     }
@@ -340,6 +411,58 @@ export class FileTrajectoryStore {
         correlationId: runId,
         causationEventId: previousEvent?.eventId ?? null,
         type: "workspace.evidence",
+        payload: record,
+      });
+      await this.commitEvent(current, event);
+      return record;
+    });
+  }
+
+  async recordBrowserEffect(
+    runIdInput: string,
+    effect: (run: DurableRun) => Promise<unknown>,
+  ): Promise<BrowserBaselineRecord> {
+    const runId = runIdSchema.parse(runIdInput);
+
+    return this.withRunWrite(runId, async () => {
+      const current = await this.loadRun(runId);
+      const baseline = browserBaselineRecordSchema.parse(await effect(current));
+      const previousEvent = current.events.at(-1);
+      const event = asEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: this.eventIdFactory(),
+        runId,
+        sequence: current.events.length + 1,
+        recordedAt: this.clock().toISOString(),
+        correlationId: runId,
+        causationEventId: previousEvent?.eventId ?? null,
+        type: "browser.baseline",
+        payload: baseline,
+      });
+      await this.commitEvent(current, event);
+      return baseline;
+    });
+  }
+
+  async recordBrowserAction(
+    runIdInput: string,
+    effect: (run: DurableRun) => Promise<unknown>,
+  ): Promise<BrowserActionRecord> {
+    const runId = runIdSchema.parse(runIdInput);
+
+    return this.withRunWrite(runId, async () => {
+      const current = await this.loadRun(runId);
+      const record = browserActionRecordSchema.parse(await effect(current));
+      const previousEvent = current.events.at(-1);
+      const event = asEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: this.eventIdFactory(),
+        runId,
+        sequence: current.events.length + 1,
+        recordedAt: this.clock().toISOString(),
+        correlationId: runId,
+        causationEventId: previousEvent?.eventId ?? null,
+        type: "browser.action",
         payload: record,
       });
       await this.commitEvent(current, event);

@@ -29,6 +29,9 @@ importers:
       '@hookform/resolvers':
         specifier: 5.5.7
         version: 5.5.7(react-hook-form@7.83.0(react@19.2.8))(zod@4.4.3)
+      '@prism/action-broker':
+        specifier: workspace:^
+        version: link:../../packages/action-broker
       '@prism/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -102,6 +105,31 @@ importers:
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0)
+
+  packages/action-broker:
+    dependencies:
+      '@prism/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      playwright-core:
+        specifier: 1.61.1
+        version: 1.61.1
+    devDependencies:
+      '@prism/tooling-config':
+        specifier: workspace:*
+        version: link:../tooling-config
+      '@types/node':
+        specifier: 22.20.1
+        version: 22.20.1
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -2659,6 +2687,11 @@ packages:
 
   pkg-types@2.3.1:
     resolution: {integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==}
+
+  playwright-core@1.61.1:
+    resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   pluralize@8.0.0:
     resolution: {integrity: sha512-Nc3IT5yHzflTfbjgqWcCPpo7DaKy4FnpB0l/zCAW0Tc7jxAiuqSxHasntB3D7887LSrA93kDJ9IXovxJYxyLCA==}
@@ -5681,6 +5714,8 @@ snapshots:
       confbox: 0.2.4
       exsolve: 1.1.1
       pathe: 2.0.3
+
+  playwright-core@1.61.1: {}
 
   pluralize@8.0.0: {}
 

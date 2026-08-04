@@ -16,6 +16,15 @@ export const WORKSPACE_REQUEST_SCHEMA_VERSION = "prism.workspace-request/v1" as 
 export const WORKSPACE_EVIDENCE_SCHEMA_VERSION = "prism.workspace-evidence/v1" as const;
 export const WORKSPACE_EVIDENCE_RESPONSE_SCHEMA_VERSION =
   "prism.workspace-evidence-response/v1" as const;
+export const BROWSER_BASELINE_REQUEST_SCHEMA_VERSION =
+  "prism.browser-baseline-request/v1" as const;
+export const BROWSER_BASELINE_SCHEMA_VERSION = "prism.browser-baseline/v1" as const;
+export const BROWSER_BASELINE_RESPONSE_SCHEMA_VERSION =
+  "prism.browser-baseline-response/v1" as const;
+export const BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION =
+  "prism.browser-action-proposal/v1" as const;
+export const BROWSER_ACTION_RECORD_SCHEMA_VERSION =
+  "prism.browser-action-record/v1" as const;
 
 const absoluteWorkspacePathPattern = /^(?:[a-z]:[\\/]|\/)/i;
 
@@ -121,6 +130,9 @@ export const contractErrorSchema = z
       "run_not_found",
       "invalid_workspace_request",
       "workspace_execution_error",
+      "invalid_browser_baseline_request",
+      "browser_baseline_not_configured",
+      "browser_execution_error",
     ]),
     message: z.string().min(1),
     issues: z.array(validationIssueSchema),
@@ -157,6 +169,166 @@ export const artifactRefSchema = z
       .min(3)
       .max(160)
       .regex(/^[\w!#$&^.+-]+\/[\w!#$&^.+-]+$/),
+  })
+  .strict();
+
+const sha256Schema = z
+  .string()
+  .regex(/^[0-9a-f]{64}$/, "Values must use a lowercase SHA-256 digest.");
+
+const browserRouteSchema = z
+  .string()
+  .min(1)
+  .max(1_024)
+  .refine(
+    (value) => value.startsWith("/") && !value.startsWith("//") && !value.includes("\\"),
+    "Browser routes must be normalized local paths.",
+  );
+
+const semanticBrowserTargetSchema = z
+  .object({
+    kind: z.literal("semantic"),
+    role: z.string().trim().min(1).max(80),
+    name: z.string().trim().min(1).max(240),
+    exact: z.boolean(),
+  })
+  .strict();
+
+const hybridBrowserTargetSchema = z
+  .object({
+    kind: z.literal("hybrid"),
+    role: z.string().trim().min(1).max(80),
+    name: z.string().trim().min(1).max(240),
+    exact: z.boolean(),
+    grounding: z
+      .object({
+        x: z.number().nonnegative(),
+        y: z.number().nonnegative(),
+        width: z.number().positive(),
+        height: z.number().positive(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const browserObservationReferenceSchema = z
+  .object({
+    observationId: z.string().uuid(),
+    url: z.string().url().max(2_048),
+    viewport: viewportSchema,
+    pageStateHash: sha256Schema,
+    screenshotHash: sha256Schema,
+  })
+  .strict();
+
+const coordinateBrowserTargetSchema = z
+  .object({
+    kind: z.literal("coordinate"),
+    x: z.number().nonnegative(),
+    y: z.number().nonnegative(),
+    observationId: z.string().uuid(),
+    screenshotHash: sha256Schema,
+    pageStateHash: sha256Schema,
+    viewport: viewportSchema,
+  })
+  .strict()
+  .refine(
+    (target) => target.x < target.viewport.width && target.y < target.viewport.height,
+    "Coordinate targets must remain inside their bound viewport.",
+  );
+
+export const browserTargetSchema = z.discriminatedUnion("kind", [
+  semanticBrowserTargetSchema,
+  hybridBrowserTargetSchema,
+  coordinateBrowserTargetSchema,
+]);
+
+export const browserCaptureTargetSchema = z.discriminatedUnion("kind", [
+  semanticBrowserTargetSchema,
+  hybridBrowserTargetSchema,
+]);
+
+export const browserBaselineRequestSchema = z
+  .object({
+    schemaVersion: z.literal(BROWSER_BASELINE_REQUEST_SCHEMA_VERSION),
+    requestId: z.string().uuid(),
+    runId: runIdSchema,
+    route: browserRouteSchema,
+    target: browserCaptureTargetSchema,
+  })
+  .strict();
+
+export const browserBaselineRecordSchema = z
+  .object({
+    schemaVersion: z.literal(BROWSER_BASELINE_SCHEMA_VERSION),
+    baselineId: z.string().uuid(),
+    runId: runIdSchema,
+    buildIdentity: z.string().trim().min(1).max(200),
+    route: browserRouteSchema,
+    browserVersion: z.string().trim().min(1).max(200),
+    viewport: viewportSchema,
+    devicePixelRatio: z.number().positive().max(8),
+    target: browserTargetSchema,
+    targetIdentity: z.string().trim().min(1).max(500),
+    observation: browserObservationReferenceSchema,
+    screenshot: artifactRefSchema,
+    dom: artifactRefSchema,
+    accessibility: artifactRefSchema,
+    computed: artifactRefSchema,
+    console: artifactRefSchema,
+    network: artifactRefSchema,
+    trace: artifactRefSchema,
+    capturedAt: isoDateTimeSchema,
+    supplementalVisualJudgment: z.string().trim().min(1).max(2_000).nullable(),
+  })
+  .strict()
+  .superRefine((baseline, context) => {
+    if (baseline.observation.screenshotHash !== baseline.screenshot.hash) {
+      context.addIssue({
+        code: "custom",
+        path: ["observation", "screenshotHash"],
+        message: "The observation must reference the committed screenshot artifact.",
+      });
+    }
+  });
+
+export const browserBaselineResponseSchema = z
+  .object({
+    schemaVersion: z.literal(BROWSER_BASELINE_RESPONSE_SCHEMA_VERSION),
+    baseline: browserBaselineRecordSchema,
+  })
+  .strict();
+
+export const browserActionProposalSchema = z
+  .object({
+    schemaVersion: z.literal(BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION),
+    proposalId: z.string().uuid(),
+    runId: runIdSchema,
+    origin: z.enum(["ui-tars", "automation"]),
+    action: z.object({ kind: z.literal("click") }).strict(),
+    target: browserTargetSchema,
+  })
+  .strict();
+
+export const browserActionRecordSchema = z
+  .object({
+    schemaVersion: z.literal(BROWSER_ACTION_RECORD_SCHEMA_VERSION),
+    proposal: browserActionProposalSchema,
+    policy: z
+      .object({
+        decision: z.enum(["allowed", "denied", "stale"]),
+        reason: z.string().trim().min(1).max(500),
+      })
+      .strict(),
+    execution: z
+      .object({
+        status: z.enum(["executed", "denied", "stale", "failed"]),
+        message: z.string().trim().min(1).max(500),
+      })
+      .strict(),
+    before: browserObservationReferenceSchema,
+    after: browserObservationReferenceSchema.nullable(),
+    recordedAt: isoDateTimeSchema,
   })
   .strict();
 
@@ -424,11 +596,29 @@ export const workspaceEvidenceEventSchema = z
   })
   .strict();
 
+export const browserBaselineEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("browser.baseline"),
+    payload: browserBaselineRecordSchema,
+  })
+  .strict();
+
+export const browserActionEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("browser.action"),
+    payload: browserActionRecordSchema,
+  })
+  .strict();
+
 export const runEventSchema = z.discriminatedUnion("type", [
   runCreatedEventSchema,
   runQueuedEventSchema,
   runTerminalErrorEventSchema,
   workspaceEvidenceEventSchema,
+  browserBaselineEventSchema,
+  browserActionEventSchema,
 ]);
 
 export const runStatusSchema = z.enum(["created", "queued", "terminal_error"]);
@@ -444,6 +634,8 @@ export const runSnapshotSchema = z
     lastSequence: z.number().int().nonnegative(),
     artifacts: z.array(artifactRefSchema),
     workspaceEvidence: z.array(workspaceEvidenceRecordSchema).default([]),
+    browserBaselines: z.array(browserBaselineRecordSchema).default([]),
+    browserActions: z.array(browserActionRecordSchema).default([]),
     terminalError: terminalRunErrorSchema.nullable(),
   })
   .strict();
@@ -476,6 +668,8 @@ export const runDossierSchema = runSummarySchema
     viewport: viewportSchema.nullable(),
     artifacts: z.array(artifactRefSchema),
     workspaceEvidence: z.array(workspaceEvidenceRecordSchema).default([]),
+    browserBaselines: z.array(browserBaselineRecordSchema).default([]),
+    browserActions: z.array(browserActionRecordSchema).default([]),
     terminalError: terminalRunErrorSchema.nullable(),
   })
   .strict();
@@ -495,6 +689,14 @@ export const runDossierResponseSchema = z
   .strict();
 
 export type ArtifactRef = z.infer<typeof artifactRefSchema>;
+export type BrowserActionProposal = z.infer<typeof browserActionProposalSchema>;
+export type BrowserActionRecord = z.infer<typeof browserActionRecordSchema>;
+export type BrowserBaselineRecord = z.infer<typeof browserBaselineRecordSchema>;
+export type BrowserBaselineRequest = z.infer<typeof browserBaselineRequestSchema>;
+export type BrowserBaselineResponse = z.infer<typeof browserBaselineResponseSchema>;
+export type BrowserCaptureTarget = z.infer<typeof browserCaptureTargetSchema>;
+export type BrowserObservationReference = z.infer<typeof browserObservationReferenceSchema>;
+export type BrowserTarget = z.infer<typeof browserTargetSchema>;
 export type RunCreation = z.infer<typeof runCreationSchema>;
 export type RunDossier = z.infer<typeof runDossierSchema>;
 export type RunEvent = z.infer<typeof runEventSchema>;

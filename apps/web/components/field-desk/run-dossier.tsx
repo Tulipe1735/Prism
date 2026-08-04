@@ -4,6 +4,7 @@ import type { RunDossier, WorkspaceRequest } from "@prism/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  Camera,
   CheckCircle2,
   FileKey2,
   FlaskConical,
@@ -178,6 +179,66 @@ export function RunDossierView({
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="mt-10 border-t-2 border-stone-900 pt-7">
+        <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-stone-500">
+          BROKERED BROWSER BASELINES
+        </p>
+        <h2 className="mt-2 inline-flex items-center gap-2 font-serif text-3xl">
+          <Camera aria-hidden size={22} /> What Prism observed before mutation
+        </h2>
+        {dossier.browserBaselines.length === 0 ? (
+          <p className="mt-5 border border-dashed border-stone-500 p-5 text-sm text-stone-600">
+            No Browser Baseline is committed. Browser evidence can only be captured from
+            an explicitly configured local origin and is never substituted by visual
+            judgment.
+          </p>
+        ) : (
+          <ol className="mt-5 space-y-4">
+            {dossier.browserBaselines.map((baseline) => (
+              <li
+                className="border border-stone-500 bg-white/40 p-5"
+                key={baseline.baselineId}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <strong className="font-mono text-[0.68rem] tracking-[0.1em]">
+                    {baseline.targetIdentity}
+                  </strong>
+                  <span className="font-mono text-[0.6rem] text-stone-500">
+                    {baseline.browserVersion}
+                  </span>
+                </div>
+                <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+                  <div>
+                    <dt className="font-mono text-stone-500">ROUTE / BUILD</dt>
+                    <dd className="mt-1 break-all">
+                      {baseline.route} · {baseline.buildIdentity}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-mono text-stone-500">OBSERVATION</dt>
+                    <dd className="mt-1 break-all">{baseline.observation.pageStateHash}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-mono text-stone-500">SCREENSHOT SHA-256</dt>
+                    <dd className="mt-1 break-all">{baseline.screenshot.hash}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-mono text-stone-500">TRACE / EVIDENCE</dt>
+                    <dd className="mt-1">
+                      {baseline.trace.byteLength} bytes · {baseline.dom.byteLength} byte DOM
+                    </dd>
+                  </div>
+                </dl>
+                <p className="mt-4 border-t border-stone-300 pt-3 text-xs text-stone-600">
+                  Deterministic browser facts are committed above. Supplemental visual
+                  judgment: {baseline.supplementalVisualJudgment ?? "none"}.
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
 
       <section className="mt-10 border-t-2 border-stone-900 pt-7">

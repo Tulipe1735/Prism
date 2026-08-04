@@ -2,7 +2,7 @@
 
 State: open
 Status: ready-for-agent
-Assignee: unassigned
+Assignee: codex
 Blocked by: issues/02-create-and-reopen-runs.md
 
 **What to build:** Let a Prism Run open an allowlisted local page through the BrowserExecutor, capture a deterministic pre-mutation Browser Baseline, and present its evidence in the Run dossier. Every browser input must originate as a typed ActionBroker proposal rather than direct model or GUI control.

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   artifactRefSchema,
+  browserActionProposalSchema,
+  browserBaselineRecordSchema,
   runCreationSchema,
   runDossierResponseSchema,
   runEventSchema,
@@ -219,5 +221,90 @@ describe("Durable Run contracts", () => {
       evidence: { status: "succeeded" },
       artifact,
     });
+  });
+
+  it("binds a Browser Baseline to the exact local observation and its hashed evidence", () => {
+    const screenshot = {
+      ...artifact,
+      hash: "b".repeat(64),
+      mediaType: "image/png",
+    } as const;
+    const evidence = {
+      ...artifact,
+      hash: "c".repeat(64),
+      mediaType: "application/vnd.prism.browser-evidence+json",
+    } as const;
+
+    const baseline = {
+      schemaVersion: "prism.browser-baseline/v1",
+      baselineId: "26a04dcd-0069-45ec-b7ce-c7177e303c5d",
+      runId: manifest.runId,
+      buildIdentity: "fixture@5a6c2ab",
+      route: "/settings/profile",
+      browserVersion: "Chromium 142.0.0.0",
+      viewport: request.viewport,
+      devicePixelRatio: 1,
+      target: { kind: "semantic", role: "button", name: "Save", exact: true },
+      targetIdentity: "role=button[name=Save]",
+      observation: {
+        observationId: "d5d02fbb-a7ec-4cad-85d7-0b6b3ac6c10b",
+        url: "http://127.0.0.1:4173/settings/profile",
+        viewport: request.viewport,
+        pageStateHash: "d".repeat(64),
+        screenshotHash: screenshot.hash,
+      },
+      screenshot,
+      dom: evidence,
+      accessibility: evidence,
+      computed: evidence,
+      console: evidence,
+      network: evidence,
+      trace: { ...evidence, mediaType: "application/zip" },
+      capturedAt: "2026-08-04T04:00:00.000Z",
+      supplementalVisualJudgment: null,
+    } as const;
+
+    expect(browserBaselineRecordSchema.parse(baseline)).toMatchObject({
+      targetIdentity: "role=button[name=Save]",
+      observation: { screenshotHash: screenshot.hash },
+    });
+    expect(
+      browserBaselineRecordSchema.safeParse({
+        ...baseline,
+        observation: { ...baseline.observation, screenshotHash: "e".repeat(64) },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires a coordinate action to carry the exact observation that grounded it", () => {
+    expect(
+      browserActionProposalSchema.parse({
+        schemaVersion: "prism.browser-action-proposal/v1",
+        proposalId: "6b3d5ed9-03ba-49e8-a15e-57ac91ef8ef8",
+        runId: manifest.runId,
+        origin: "ui-tars",
+        action: { kind: "click" },
+        target: {
+          kind: "coordinate",
+          x: 240,
+          y: 160,
+          observationId: "d5d02fbb-a7ec-4cad-85d7-0b6b3ac6c10b",
+          screenshotHash: "b".repeat(64),
+          pageStateHash: "d".repeat(64),
+          viewport: request.viewport,
+        },
+      }),
+    ).toMatchObject({ target: { kind: "coordinate" } });
+
+    expect(
+      browserActionProposalSchema.safeParse({
+        schemaVersion: "prism.browser-action-proposal/v1",
+        proposalId: "6b3d5ed9-03ba-49e8-a15e-57ac91ef8ef8",
+        runId: manifest.runId,
+        origin: "ui-tars",
+        action: { kind: "click" },
+        target: { kind: "coordinate", x: 240, y: 160 },
+      }).success,
+    ).toBe(false);
   });
 });

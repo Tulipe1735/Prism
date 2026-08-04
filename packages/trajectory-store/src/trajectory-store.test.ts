@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  type BrowserBaselineRecord,
   type RepairRequest,
   RUN_EVENT_SCHEMA_VERSION,
   type RunEvent,
@@ -126,6 +127,56 @@ describe("FileTrajectoryStore", () => {
       workspaceEvidence: [{ evidence: { operation: "inspect" }, artifact }],
     });
     expect((await store.loadRun(runId)).snapshot).toEqual(snapshot);
+  });
+
+  it("projects a brokered Browser Baseline and verifies every committed evidence artifact", async () => {
+    await store.createRun(request);
+    const screenshot = await store.writeArtifact(
+      Buffer.from([137, 80, 78, 71]),
+      "image/png",
+    );
+    const evidence = await store.writeArtifact(
+      '{"source":"browser"}\n',
+      "application/vnd.prism.browser-evidence+json",
+    );
+    const trace = await store.writeArtifact(Buffer.from("trace"), "application/zip");
+    const baseline: BrowserBaselineRecord = {
+      schemaVersion: "prism.browser-baseline/v1",
+      baselineId: "f374f1ae-8ce2-432f-af52-c8973588bb0a",
+      runId,
+      buildIdentity: "fixture@5a6c2ab",
+      route: "/settings/profile",
+      browserVersion: "Chromium 142.0.0.0",
+      viewport: request.viewport,
+      devicePixelRatio: 1,
+      target: { kind: "semantic", role: "button", name: "Save", exact: true },
+      targetIdentity: "role=button[name=Save]",
+      observation: {
+        observationId: "42ee0dfc-a713-49b9-bc60-8c72cced2a24",
+        url: "http://127.0.0.1:4173/settings/profile",
+        viewport: request.viewport,
+        pageStateHash: "b".repeat(64),
+        screenshotHash: screenshot.hash,
+      },
+      screenshot,
+      dom: evidence,
+      accessibility: evidence,
+      computed: evidence,
+      console: evidence,
+      network: evidence,
+      trace,
+      capturedAt: recordedAt,
+      supplementalVisualJudgment: null,
+    };
+
+    const committed = await store.recordBrowserEffect(runId, async () => baseline);
+
+    expect(committed).toEqual(baseline);
+    expect((await store.loadRun(runId)).snapshot).toMatchObject({
+      lastSequence: 3,
+      browserBaselines: [{ baselineId: baseline.baselineId, screenshot }],
+      artifacts: expect.arrayContaining([screenshot, evidence, trace]),
+    });
   });
 
   it("validates before append, enforces the next sequence, and keeps the manifest immutable", async () => {
