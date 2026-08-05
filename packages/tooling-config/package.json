@@ -7,7 +7,10 @@
     "./eslint/base": "./eslint/base.mjs",
     "./eslint/next": "./eslint/next.mjs",
     "./prettier": "./prettier.mjs",
-    "./vitest": "./vitest.mjs",
+    "./vitest": {
+      "types": "./vitest.d.ts",
+      "default": "./vitest.mjs"
+    },
     "./tsconfig/base.json": "./tsconfig/base.json",
     "./tsconfig/library.json": "./tsconfig/library.json",
     "./tsconfig/nextjs.json": "./tsconfig/nextjs.json"

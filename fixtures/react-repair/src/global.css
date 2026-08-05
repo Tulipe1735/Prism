@@ -1,0 +1,91 @@
+/* react-repair fixture global styles
+ *
+ * 确定性要求：
+ *  - 字体通过本地 @font-face 打包（DejaVu Sans），不发外部网络请求；
+ *  - 关闭一切动画与过渡，消除非确定性渲染；
+ *  - 按钮固定尺寸，避免字体替换造成控件大小漂移。
+ */
+
+@font-face {
+  font-family: "Fixture Sans";
+  src: url("/fonts/DejaVuSans.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+* {
+  animation: none !important;
+  transition: none !important;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: "Fixture Sans", system-ui, sans-serif;
+  background: #f7f8fa;
+  color: #1f2430;
+}
+
+.page {
+  padding: 32px;
+}
+
+.panel {
+  max-width: 420px;
+  background: #ffffff;
+  border: 1px solid #e2e5ea;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 14px;
+  color: #4a5568;
+}
+
+.text-input {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid #cbd2dc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.hint {
+  font-size: 13px;
+  color: #718096;
+  margin: 0;
+}
+
+/* 已知缺陷：主 Save 按钮是方形。修复应让 border-radius 明显增大。 */
+.save-button {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 20px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 0;
+  box-sizing: border-box;
+  width: 96px;
+  height: 44px;
+}

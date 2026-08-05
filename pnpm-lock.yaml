@@ -124,6 +124,37 @@ importers:
         specifier: 3.2.7
         version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0)
 
+  fixtures/react-repair:
+    dependencies:
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: 19.2.8
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@prism/tooling-config':
+        specifier: workspace:*
+        version: link:../../packages/tooling-config
+      '@types/react':
+        specifier: 19.2.17
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: 19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 7.3.6
+        version: 7.3.6(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0)
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0)
+
   packages/action-broker:
     dependencies:
       '@prism/contracts':
@@ -161,6 +192,37 @@ importers:
       '@prism/tooling-config':
         specifier: workspace:*
         version: link:../tooling-config
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0)
+
+  packages/oracle:
+    dependencies:
+      '@prism/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      execa:
+        specifier: 9.6.1
+        version: 9.6.1
+      playwright-core:
+        specifier: 1.61.1
+        version: 1.61.1
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@prism/tooling-config':
+        specifier: workspace:*
+        version: link:../tooling-config
+      '@types/node':
+        specifier: 22.20.1
+        version: 22.20.1
       eslint:
         specifier: 9.39.5
         version: 9.39.5(jiti@2.7.0)

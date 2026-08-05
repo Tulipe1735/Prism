@@ -20,6 +20,8 @@ import { z } from "zod";
 export const REPAIR_REQUEST_SCHEMA_VERSION = "prism.repair-request/v1" as const;
 export const REPAIR_REQUEST_VALIDATION_SCHEMA_VERSION =
   "prism.repair-request-validation/v1" as const;
+export const FRONTEND_REPAIR_SPEC_SCHEMA_VERSION =
+  "prism.frontend-repair-spec/v1" as const;
 export const CONTRACT_ERROR_SCHEMA_VERSION = "prism.contract-error/v1" as const;
 export const ARTIFACT_REF_SCHEMA_VERSION = "prism.artifact-ref/v1" as const;
 export const RUN_MANIFEST_SCHEMA_VERSION = "prism.run-manifest/v1" as const;
@@ -267,7 +269,7 @@ const browserRouteSchema = z
 /**
  * 语义浏览器目标：按 ARIA 角色 + 可访问名定位元素，可选精确匹配。
  */
-const semanticBrowserTargetSchema = z
+export const semanticBrowserTargetSchema = z
   .object({
     kind: z.literal("semantic"),
     role: z.string().trim().min(1).max(80),
@@ -346,6 +348,67 @@ export const browserCaptureTargetSchema = z.discriminatedUnion("kind", [
   semanticBrowserTargetSchema,
   hybridBrowserTargetSchema,
 ]);
+
+/**
+ * 前端修复规范：归一化后的可判定修复意图，在源码变更前提交。
+ *
+ * 保留原始 prompt，同时把用户可见的修复意图表达为一组可判定的谓词：
+ *  - 目标：语义浏览器目标（ARIA 角色 + 可访问名），不含坐标；
+ *  - 关系谓词：如 after.borderRadius > before.borderRadius（材质级增大，
+ *    即增量与终值都达到阈值）；
+ *  - 不变式谓词：保留标签文本、保持可点击、控件尺寸与声明布局不变量。
+ *
+ * 规范不要求用户给出具体 CSS 值；编码运行时选择合理实现值，浏览器运行时
+ * 用前后渲染观测校验归一化关系。
+ */
+export const frontendRepairPredicateSchema = z.discriminatedUnion("kind", [
+  // 关系谓词：同一渲染指标在 before→after 之间发生材质级增大
+  z
+    .object({
+      kind: z.literal("metric-increase"),
+      metric: z.enum(["borderRadius"]),
+      // 前后增量阈值（px）：after - before 必须达到该值
+      minDeltaPx: z.number().positive(),
+      // 修复后终值阈值（px）：after 必须至少达到该值
+      minAfterPx: z.number().positive(),
+    })
+    .strict(),
+  // 关系谓词：局部目标区域的 before/after 渲染必须实际发生改变
+  z.object({ kind: z.literal("region-clip-differs") }).strict(),
+  // 不变式：目标标签文本保持不变
+  z.object({ kind: z.literal("label-preserved") }).strict(),
+  // 不变式：目标保持可点击（可见、可用、可命中）
+  z.object({ kind: z.literal("clickable") }).strict(),
+  // 不变式：控件尺寸保持在声明容差内
+  z
+    .object({
+      kind: z.literal("size-within"),
+      tolerancePx: z.number().nonnegative(),
+    })
+    .strict(),
+  // 不变式：声明布局位置保持在容差内
+  z
+    .object({
+      kind: z.literal("layout-within"),
+      tolerancePx: z.number().nonnegative(),
+    })
+    .strict(),
+]);
+
+export const frontendRepairSpecSchema = z
+  .object({
+    schemaVersion: z.literal(FRONTEND_REPAIR_SPEC_SCHEMA_VERSION, {
+      error: "This frontend repair spec schema version is not supported.",
+    }),
+    prompt: z
+      .string()
+      .trim()
+      .min(1)
+      .max(2000, "Keep the repair spec under 2,000 characters."),
+    target: semanticBrowserTargetSchema,
+    predicates: z.array(frontendRepairPredicateSchema).min(1).max(16),
+  })
+  .strict();
 
 /**
  * 浏览器基线请求：请求为某 Run 在指定路由上对某个目标建立可复现基线。
@@ -1715,6 +1778,9 @@ export type RepairRequest = z.infer<typeof repairRequestSchema>;
 export type RepairRequestValidation = z.infer<typeof repairRequestValidationSchema>;
 export type ValidationIssue = z.infer<typeof validationIssueSchema>;
 export type Viewport = z.infer<typeof viewportSchema>;
+export type FrontendRepairPredicate = z.infer<typeof frontendRepairPredicateSchema>;
+export type FrontendRepairSpec = z.infer<typeof frontendRepairSpecSchema>;
+export type SemanticBrowserTarget = z.infer<typeof semanticBrowserTargetSchema>;
 
 /**
  * 将 Zod 校验错误转换为契约化的 ValidationIssue 列表。
