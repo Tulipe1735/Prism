@@ -1,0 +1,8 @@
+{
+  "extends": "@prism/tooling-config/tsconfig/library.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"]
+}

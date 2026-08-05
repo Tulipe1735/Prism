@@ -14,6 +14,14 @@
  */
 import {
   type ArtifactRef,
+  BROWSER_RUNTIME_TASK_ENVELOPE_SCHEMA_VERSION,
+  type BrowserActionRecord,
+  type BrowserCaptureTarget,
+  type BrowserRuntimeBudget,
+  type BrowserRuntimeResult,
+  browserRuntimeResultSchema,
+  type BrowserRuntimeTaskEnvelope,
+  type BrowserVerificationReport,
   type EffectLease,
   type NodeOutcome,
   nodeOutcomeSchema,
@@ -273,10 +281,8 @@ export interface OrchestrationJournal {
   appendDagRevision: (revision: RunDagRevision) => Promise<void>;
   appendNodeProgress: (progress: RunNodeProgressInput) => Promise<void>;
   appendEffectLease: (lease: EffectLease) => Promise<void>;
-  writeRuntimeArtifact: (
-    content: string,
-    mediaType: "application/vnd.prism.runtime-evidence+json",
-  ) => Promise<ArtifactRef>;
+  appendBrowserAction: (record: BrowserActionRecord) => Promise<void>;
+  appendVerificationReport: (report: BrowserVerificationReport) => Promise<void>;
 }
 
 /** Pi Coding Runtime 的进程中立调用边界。 */
@@ -287,13 +293,30 @@ export interface CodingRuntime {
   ) => Promise<PiRuntimeResult>;
 }
 
-/** 混合运行输入：Run 标识、请求、日志与真实 Coding Runtime。 */
+/** UI-TARS Browser Runtime 的进程中立调用边界。 */
+export interface BrowserRuntime {
+  execute: (
+    envelope: BrowserRuntimeTaskEnvelope,
+    options?: { signal?: AbortSignal },
+  ) => Promise<BrowserRuntimeResult>;
+}
+
+/** 浏览器节点的本地路由与采集目标配置。 */
+export interface BrowserRunConfig {
+  route: string;
+  target: BrowserCaptureTarget;
+}
+
+/** 混合运行输入：Run 标识、请求、日志与两个真实运行时。 */
 export interface ExecuteHybridRunInput {
   runId: string;
   prompt: string;
   journal: OrchestrationJournal;
   codingRuntime: CodingRuntime;
+  browserRuntime: BrowserRuntime;
+  browserConfig: BrowserRunConfig;
   budget?: RuntimeBudget;
+  browserBudget?: BrowserRuntimeBudget;
   signal?: AbortSignal;
 }
 
@@ -302,7 +325,6 @@ export interface OrchestratorOptions {
   clock?: () => Date;
   router?: Router;
   scheduler?: DagScheduler;
-  placeholderRuntimeDelayMs?: number;
 }
 
 /** 为指定修订/节点类型/尝试生成稳定的节点 ID。 */
@@ -320,23 +342,21 @@ function attemptsFor(nodeType: RunDagNodeType): number {
 }
 
 /**
- * 生成确定性的临时 Browser / Orchestrator 节点结果。
+ * 生成确定性的临时 Orchestrator 节点结果。
  *
- * Coding 节点不会经过这里；browser.verify 请求 task.complete，其他占位节点
- * 请求 none。UI-TARS ticket 会删除 Browser 分支的占位实现。
+ * 真实 Coding 与 Browser 运行时都不经过这里；route.reclassify 由编排器
+ * 自己执行（只读、无外部运行时）。
  */
-function placeholderOutcome(node: RunDagNode, attempt: number): NodeOutcome {
-  const request =
-    node.nodeType === "browser.verify"
-      ? { kind: "successor" as const, nodeType: "task.complete" as const }
-      : { kind: "none" as const };
-
+function orchestratorOutcome(node: RunDagNode, attempt: number): NodeOutcome {
   return nodeOutcomeSchema.parse({
     nodeId: node.nodeId,
     attempt,
     state: "succeeded",
-    summary: `Placeholder ${node.runtime} runtime completed ${node.nodeType}.`,
-    request,
+    summary: `Orchestrator completed ${node.nodeType}.`,
+    request:
+      node.nodeType === "route.reclassify"
+        ? ({ kind: "reclassify", classification: "hybrid" } as const)
+        : ({ kind: "none" } as const),
     failure: null,
   });
 }
@@ -348,6 +368,12 @@ const DEFAULT_RUNTIME_BUDGET: RuntimeBudget = {
   maxTotalTokens: 120_000,
   maxCostUsd: 5,
   maxDurationMs: 300_000,
+};
+
+const DEFAULT_BROWSER_BUDGET: BrowserRuntimeBudget = {
+  maxActions: 12,
+  maxDurationMs: 300_000,
+  maxCostUsd: 5,
 };
 
 function attemptFor(node: RunDagNode): number {
@@ -368,16 +394,11 @@ export class Orchestrator {
   private readonly clock: () => Date;
   private readonly router: Router;
   private readonly scheduler: DagScheduler;
-  private readonly placeholderRuntimeDelayMs: number;
 
   constructor(options: OrchestratorOptions = {}) {
     this.clock = options.clock ?? (() => new Date());
     this.router = options.router ?? new Router(this.clock);
     this.scheduler = options.scheduler ?? new DagScheduler({ clock: this.clock });
-    this.placeholderRuntimeDelayMs = Math.max(
-      0,
-      options.placeholderRuntimeDelayMs ?? 75,
-    );
   }
 
   /**
@@ -505,6 +526,7 @@ export class Orchestrator {
     const completedNodeIds = new Set<string>();
     const artifacts: ArtifactRef[] = [];
     const budget = input.budget ?? DEFAULT_RUNTIME_BUDGET;
+    const browserBudget = input.browserBudget ?? DEFAULT_BROWSER_BUDGET;
 
     await input.journal.appendDagRevision(revision);
 
@@ -568,24 +590,54 @@ export class Orchestrator {
               await input.codingRuntime.execute(envelope, { signal: input.signal }),
             );
             result = runtimeResult;
-          } else {
-            if (this.placeholderRuntimeDelayMs > 0) {
-              await new Promise<void>((resolve) => {
-                setTimeout(resolve, this.placeholderRuntimeDelayMs);
-              });
-            }
-            const outcome = placeholderOutcome(node, attempt);
-            const artifact = await input.journal.writeRuntimeArtifact(
-              JSON.stringify({
-                runtime: node.runtime,
-                nodeId: node.nodeId,
-                attempt,
-                nodeType: node.nodeType,
-                placeholder: true,
-              }),
-              "application/vnd.prism.runtime-evidence+json",
+          } else if (node.runtime === "browser") {
+            const idempotencyKey = `${input.runId}:${revision.revision}:${node.nodeId}:${attempt}`;
+            const envelope: BrowserRuntimeTaskEnvelope = {
+              schemaVersion: BROWSER_RUNTIME_TASK_ENVELOPE_SCHEMA_VERSION,
+              runId: input.runId,
+              dagRevision: revision.revision,
+              nodeId: node.nodeId,
+              nodeType: node.nodeType as "browser.observe" | "browser.verify",
+              attempt,
+              maxAttempts: node.maxAttempts,
+              runtime: "browser",
+              prompt: input.prompt,
+              inputArtifacts: uniqueArtifacts(artifacts),
+              authority: {
+                route: input.browserConfig.route,
+                target: input.browserConfig.target,
+                intent:
+                  node.nodeType === "browser.verify" ? input.prompt.slice(0, 500) : null,
+                maxActions: browserBudget.maxActions,
+              },
+              budget: browserBudget,
+              deadline: new Date(
+                this.clock().getTime() + browserBudget.maxDurationMs,
+              ).toISOString(),
+              cancellationId: `cancel:${idempotencyKey}`,
+              correlationId: input.runId,
+              causationEventId: null,
+              idempotencyKey,
+            };
+            const runtimeResult = browserRuntimeResultSchema.parse(
+              await input.browserRuntime.execute(envelope, { signal: input.signal }),
             );
-            result = { outcome, artifacts: [artifact] };
+            await Promise.all(
+              runtimeResult.browserActions.map((record) =>
+                input.journal.appendBrowserAction(record),
+              ),
+            );
+            if (runtimeResult.verificationReport) {
+              await input.journal.appendVerificationReport(
+                runtimeResult.verificationReport,
+              );
+            }
+            result = runtimeResult;
+          } else {
+            result = {
+              outcome: orchestratorOutcome(node, attempt),
+              artifacts: [],
+            };
           }
           artifacts.push(...result.artifacts);
           await input.journal.appendNodeProgress({

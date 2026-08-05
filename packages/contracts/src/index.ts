@@ -44,6 +44,12 @@ export const BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION =
   "prism.browser-action-proposal/v1" as const;
 export const BROWSER_ACTION_RECORD_SCHEMA_VERSION =
   "prism.browser-action-record/v1" as const;
+export const BROWSER_VERIFICATION_REPORT_SCHEMA_VERSION =
+  "prism.browser-verification-report/v1" as const;
+export const BROWSER_RUNTIME_TASK_ENVELOPE_SCHEMA_VERSION =
+  "prism.browser-task-envelope/v1" as const;
+export const BROWSER_RUNTIME_RESULT_SCHEMA_VERSION =
+  "prism.browser-runtime-result/v1" as const;
 
 /**
  * 匹配绝对工作区路径的正则：Windows 盘符路径（如 C:\foo）或 POSIX 根路径（/foo）。
@@ -447,6 +453,127 @@ export const browserActionRecordSchema = z
   })
   .strict();
 
+/**
+ * 浏览器验证断言：一次意图链定的可判定断言或补充性视觉判断。
+ *
+ * intentLinked 表示断言直接绑定到本次修复意图；kind 区分确定性
+ * （deterministic，由可重复的渲染/交互谓词判定）与补充性
+ * （supplemental，如 UI-TARS 的定性视觉判断）。
+ */
+export const browserVerificationAssertionSchema = z
+  .object({
+    assertion: z.string().trim().min(1).max(500),
+    intentLinked: z.boolean(),
+    kind: z.enum(["deterministic", "supplemental"]),
+    status: z.enum(["passed", "failed", "inconclusive"]),
+    evidenceRefs: z.array(artifactRefSchema).max(12),
+  })
+  .strict();
+
+/**
+ * 浏览器验证报告：browser.verify 节点的判定结论。
+ *
+ * verdict 只能是 passed / failed / inconclusive。superRefine 强制一条
+ * 不变量：verdict 为 passed 时，必须至少有一条意图链定的确定性断言
+ * 通过 —— UI-TARS 的定性视觉判断（kind=supplemental）单独不能构成
+ * 通过证据。
+ */
+export const browserVerificationReportSchema = z
+  .object({
+    schemaVersion: z.literal(BROWSER_VERIFICATION_REPORT_SCHEMA_VERSION),
+    reportId: z.string().uuid(),
+    runId: runIdSchema,
+    nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    attempt: z.number().int().positive(),
+    intent: z.string().trim().min(1).max(500),
+    verdict: z.enum(["passed", "failed", "inconclusive"]),
+    assertions: z.array(browserVerificationAssertionSchema).min(1).max(24),
+    evidenceRefs: z.array(artifactRefSchema).max(24),
+    limitations: z.array(z.string().trim().min(1).max(500)).max(12),
+    redactions: z.array(z.string().trim().min(1).max(500)).max(24),
+    recordedAt: isoDateTimeSchema,
+  })
+  .strict()
+  .superRefine((report, context) => {
+    if (
+      report.verdict === "passed" &&
+      !report.assertions.some(
+        (assertion) =>
+          assertion.intentLinked &&
+          assertion.kind === "deterministic" &&
+          assertion.status === "passed",
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["verdict"],
+        message:
+          "A passing BrowserVerificationReport requires an intent-linked deterministic predicate.",
+      });
+    }
+  });
+
+/** UI-TARS Browser Runtime 的资源预算：动作、时间与费用上限。 */
+export const browserRuntimeBudgetSchema = z
+  .object({
+    maxActions: z.number().int().min(1).max(64),
+    maxDurationMs: z.number().int().min(50).max(3_600_000),
+    maxCostUsd: z.number().finite().nonnegative().max(1_000),
+  })
+  .strict();
+
+/**
+ * 交给同进程 UI-TARS 会话的完整、版本化浏览器任务边界。
+ *
+ * authority 携带本地路由、采集目标、验证意图与动作上限；browser.verify
+ * 必须携带 intent（供确定性谓词与 UI-TARS 判断绑定），browser.observe
+ * 可以没有。所有输入仍须通过 ActionBroker 提案，运行时不能自行放权。
+ */
+export const browserRuntimeTaskEnvelopeSchema = z
+  .object({
+    schemaVersion: z.literal(BROWSER_RUNTIME_TASK_ENVELOPE_SCHEMA_VERSION),
+    runId: runIdSchema,
+    dagRevision: z.number().int().positive(),
+    nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    nodeType: z.enum(["browser.observe", "browser.verify"]),
+    attempt: z.number().int().positive(),
+    maxAttempts: z.number().int().min(1).max(3),
+    runtime: z.literal("browser"),
+    prompt: z.string().min(1).max(2_000),
+    inputArtifacts: z.array(artifactRefSchema).max(24),
+    authority: z
+      .object({
+        route: browserRouteSchema,
+        target: browserCaptureTargetSchema,
+        intent: z.string().trim().min(1).max(500).nullable(),
+        maxActions: z.number().int().min(1).max(64),
+      })
+      .strict(),
+    budget: browserRuntimeBudgetSchema,
+    deadline: isoDateTimeSchema,
+    cancellationId: z.string().min(1).max(200),
+    correlationId: z.string().min(1).max(200),
+    causationEventId: z.string().uuid().nullable(),
+    idempotencyKey: z.string().min(1).max(300),
+  })
+  .strict()
+  .superRefine((envelope, context) => {
+    if (envelope.nodeType === "browser.verify" && !envelope.authority.intent) {
+      context.addIssue({
+        code: "custom",
+        path: ["authority", "intent"],
+        message: "Browser verify nodes require an intent-linked verification intent.",
+      });
+    }
+    if (envelope.attempt > envelope.maxAttempts) {
+      context.addIssue({
+        code: "custom",
+        path: ["attempt"],
+        message: "The runtime attempt cannot exceed the DAG node retry bound.",
+      });
+    }
+  });
+
 // ---------------------------------------------------------------------------
 // Run DAG 编排结构：路由分类、节点注册表、修订、进度与副作用租约
 // ---------------------------------------------------------------------------
@@ -759,11 +886,46 @@ export const nodeOutcomeSchema = z
           "malformed_sdk_output",
           "process_cleanup_failed",
           "workspace_execution_failed",
+          "browser_execution_failed",
+          "verification_failed",
         ]),
         retryable: z.boolean(),
       })
       .strict()
       .nullable(),
+  })
+  .strict();
+
+/** 浏览器运行时的资源用量：模型、循环、动作提议/执行次数与费用。 */
+export const browserResourceUsageSchema = z
+  .object({
+    model: z
+      .object({
+        provider: z.string().trim().min(1).max(120),
+        id: z.string().trim().min(1).max(200),
+      })
+      .strict(),
+    modelCalls: z.number().int().nonnegative(),
+    loopCount: z.number().int().nonnegative(),
+    actionsProposed: z.number().int().nonnegative(),
+    actionsExecuted: z.number().int().nonnegative(),
+    costUsd: z.number().finite().nonnegative(),
+    durationMs: z.number().nonnegative(),
+  })
+  .strict();
+
+/**
+ * UI-TARS Browser Runtime 的唯一返回形态：已校验的节点结果、已提交的产物
+ * 引用、浏览器动作记录、可选验证报告与资源用量。strict() 拒绝任何旁路数据。
+ */
+export const browserRuntimeResultSchema = z
+  .object({
+    schemaVersion: z.literal(BROWSER_RUNTIME_RESULT_SCHEMA_VERSION),
+    outcome: nodeOutcomeSchema,
+    artifacts: z.array(artifactRefSchema).max(24),
+    browserActions: z.array(browserActionRecordSchema).max(24),
+    verificationReport: browserVerificationReportSchema.nullable(),
+    usage: browserResourceUsageSchema,
   })
   .strict();
 
@@ -1310,6 +1472,17 @@ export const browserActionEventSchema = z
   .strict();
 
 /**
+ * 浏览器验证事件：落盘一条浏览器验证报告。
+ */
+export const browserVerificationEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("browser.verification"),
+    payload: browserVerificationReportSchema,
+  })
+  .strict();
+
+/**
  * DAG 修订事件：编排器扩展/变更 DAG 时落盘新修订。
  */
 export const runDagRevisionEventSchema = z
@@ -1352,6 +1525,7 @@ export const runEventSchema = z.discriminatedUnion("type", [
   workspaceEvidenceEventSchema,
   browserBaselineEventSchema,
   browserActionEventSchema,
+  browserVerificationEventSchema,
   runDagRevisionEventSchema,
   runNodeProgressEventSchema,
   effectLeaseEventSchema,
@@ -1381,6 +1555,9 @@ export const runSnapshotSchema = z
     workspaceEvidence: z.array(workspaceEvidenceRecordSchema).default([]),
     browserBaselines: z.array(browserBaselineRecordSchema).default([]),
     browserActions: z.array(browserActionRecordSchema).default([]),
+    browserVerificationReports: z
+      .array(browserVerificationReportSchema)
+      .default([]),
     dagRevisions: z.array(runDagRevisionSchema).default([]),
     nodeProgress: z.array(runNodeProgressSchema).default([]),
     effectLease: effectLeaseSchema.nullable().default(null),
@@ -1430,6 +1607,9 @@ export const runDossierSchema = runSummarySchema
     workspaceEvidence: z.array(workspaceEvidenceRecordSchema).default([]),
     browserBaselines: z.array(browserBaselineRecordSchema).default([]),
     browserActions: z.array(browserActionRecordSchema).default([]),
+    browserVerificationReports: z
+      .array(browserVerificationReportSchema)
+      .default([]),
     dagRevisions: z.array(runDagRevisionSchema).default([]),
     nodeProgress: z.array(runNodeProgressSchema).default([]),
     effectLease: effectLeaseSchema.nullable().default(null),
@@ -1501,7 +1681,19 @@ export type BrowserCaptureTarget = z.infer<typeof browserCaptureTargetSchema>;
 export type BrowserObservationReference = z.infer<
   typeof browserObservationReferenceSchema
 >;
+export type BrowserRuntimeResult = z.infer<typeof browserRuntimeResultSchema>;
+export type BrowserRuntimeTaskEnvelope = z.infer<
+  typeof browserRuntimeTaskEnvelopeSchema
+>;
+export type BrowserRuntimeBudget = z.infer<typeof browserRuntimeBudgetSchema>;
+export type BrowserResourceUsage = z.infer<typeof browserResourceUsageSchema>;
 export type BrowserTarget = z.infer<typeof browserTargetSchema>;
+export type BrowserVerificationAssertion = z.infer<
+  typeof browserVerificationAssertionSchema
+>;
+export type BrowserVerificationReport = z.infer<
+  typeof browserVerificationReportSchema
+>;
 export type RunCreation = z.infer<typeof runCreationSchema>;
 export type RunDossier = z.infer<typeof runDossierSchema>;
 export type RunEvent = z.infer<typeof runEventSchema>;

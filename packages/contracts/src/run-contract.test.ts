@@ -4,6 +4,9 @@ import {
   artifactRefSchema,
   browserActionProposalSchema,
   browserBaselineRecordSchema,
+  browserRuntimeResultSchema,
+  browserRuntimeTaskEnvelopeSchema,
+  browserVerificationReportSchema,
   piRuntimeResultSchema,
   runCreationSchema,
   runDagRevisionSchema,
@@ -425,6 +428,135 @@ describe("Durable Run contracts", () => {
         origin: "ui-tars",
         action: { kind: "click" },
         target: { kind: "coordinate", x: 240, y: 160 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("bounds a browser runtime with a versioned task envelope and committed-only result", () => {
+    const envelope = {
+      schemaVersion: "prism.browser-task-envelope/v1",
+      runId: manifest.runId,
+      dagRevision: 2,
+      nodeId: "node-2-browser-verify-attempt-1",
+      nodeType: "browser.verify",
+      attempt: 1,
+      maxAttempts: 1,
+      runtime: "browser",
+      prompt: "Verify the Save button is visibly rounded.",
+      inputArtifacts: [artifact],
+      authority: {
+        route: "/settings/profile",
+        target: { kind: "semantic", role: "button", name: "Save", exact: true },
+        intent: "The primary Save button renders with a materially rounded radius.",
+        maxActions: 8,
+      },
+      budget: {
+        maxActions: 8,
+        maxDurationMs: 60_000,
+        maxCostUsd: 1,
+      },
+      deadline: "2026-08-05T09:05:00.000Z",
+      cancellationId: "cancel-6dbf6f33-69c4-4e5f-9898-3f693735f5f0",
+      correlationId: manifest.runId,
+      causationEventId: createdEvent.eventId,
+      idempotencyKey: `${manifest.runId}:2:node-2-browser-verify-attempt-1:1`,
+    } as const;
+
+    expect(browserRuntimeTaskEnvelopeSchema.parse(envelope)).toEqual(envelope);
+    expect(
+      browserRuntimeTaskEnvelopeSchema.safeParse({
+        ...envelope,
+        authority: { ...envelope.authority, intent: null },
+      }).success,
+    ).toBe(false);
+    expect(
+      browserRuntimeTaskEnvelopeSchema.safeParse({
+        ...envelope,
+        nodeType: "workspace.patch",
+      }).success,
+    ).toBe(false);
+
+    const result = {
+      schemaVersion: "prism.browser-runtime-result/v1",
+      outcome: {
+        nodeId: envelope.nodeId,
+        attempt: 1,
+        state: "succeeded",
+        summary: "The rendered radius matched the intent-linked predicate.",
+        request: { kind: "successor", nodeType: "task.complete" },
+        failure: null,
+      },
+      artifacts: [artifact],
+      browserActions: [],
+      verificationReport: null,
+      usage: {
+        model: { provider: "ui-tars", id: "ui-tars-1.5" },
+        modelCalls: 3,
+        loopCount: 3,
+        actionsProposed: 1,
+        actionsExecuted: 1,
+        costUsd: 0,
+        durationMs: 250,
+      },
+    } as const;
+
+    expect(browserRuntimeResultSchema.parse(result)).toEqual(result);
+    expect(
+      browserRuntimeResultSchema.safeParse({
+        ...result,
+        rawModelOutput: "uncommitted visual prose",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("labels UI-TARS judgment supplemental and refuses a passing report without a deterministic predicate", () => {
+    const assertion = {
+      assertion: "The primary Save button radius is at least 8px.",
+      intentLinked: true,
+      kind: "deterministic",
+      status: "passed",
+      evidenceRefs: [artifact],
+    } as const;
+
+    const report = {
+      schemaVersion: "prism.browser-verification-report/v1",
+      reportId: "c6a5d1e9-3f2a-4c8b-9e7d-1a2b3c4d5e6f",
+      runId: manifest.runId,
+      nodeId: "node-2-browser-verify-attempt-1",
+      attempt: 1,
+      intent: "The primary Save button renders with a materially rounded radius.",
+      verdict: "passed",
+      assertions: [
+        assertion,
+        {
+          assertion: "UI-TARS judged the button visually rounded.",
+          intentLinked: false,
+          kind: "supplemental",
+          status: "passed",
+          evidenceRefs: [],
+        },
+      ],
+      evidenceRefs: [artifact],
+      limitations: [],
+      redactions: [],
+      recordedAt: "2026-08-05T09:00:01.000Z",
+    } as const;
+
+    expect(browserVerificationReportSchema.parse(report)).toMatchObject({
+      verdict: "passed",
+    });
+    expect(
+      browserVerificationReportSchema.safeParse({
+        ...report,
+        assertions: report.assertions.map((item) =>
+          item === assertion ? { ...item, kind: "supplemental" as const } : item,
+        ),
+      }).success,
+    ).toBe(false);
+    expect(
+      browserVerificationReportSchema.safeParse({
+        ...report,
+        assertions: [{ ...assertion, status: "failed" as const }],
       }).success,
     ).toBe(false);
   });

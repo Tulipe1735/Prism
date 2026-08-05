@@ -37,6 +37,8 @@ import {
   browserActionRecordSchema,
   type BrowserBaselineRecord,
   browserBaselineRecordSchema,
+  type BrowserVerificationReport,
+  browserVerificationReportSchema,
   type EffectLease,
   effectLeaseSchema,
   repairRequestSchema,
@@ -243,6 +245,7 @@ export function projectRunEvents(
         workspaceEvidence: [],
         browserBaselines: [],
         browserActions: [],
+        browserVerificationReports: [],
         dagRevisions: [],
         nodeProgress: [],
         effectLease: null,
@@ -322,6 +325,26 @@ export function projectRunEvents(
         updatedAt: event.recordedAt,
         lastSequence: event.sequence,
         browserActions: [...snapshot.browserActions, event.payload],
+      });
+      return;
+    }
+    if (event.type === "browser.verification") {
+      if (event.payload.runId !== manifest.runId) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Browser Verification reports must belong to the Run that journals them.",
+        );
+      }
+
+      snapshot = runSnapshotSchema.parse({
+        ...snapshot,
+        updatedAt: event.recordedAt,
+        lastSequence: event.sequence,
+        artifacts: uniqueArtifacts(
+          snapshot.artifacts,
+          event.payload.evidenceRefs,
+        ),
+        browserVerificationReports: [...snapshot.browserVerificationReports, event.payload],
       });
       return;
     }
@@ -627,6 +650,35 @@ export class FileTrajectoryStore {
       });
       await this.commitEvent(current, event);
       return record;
+    });
+  }
+
+  /**
+   * 记录一条浏览器验证报告：先执行副作用生成报告，再原子追加事件。
+   */
+  async recordBrowserVerification(
+    runIdInput: string,
+    effect: (run: DurableRun) => Promise<unknown>,
+  ): Promise<BrowserVerificationReport> {
+    const runId = runIdSchema.parse(runIdInput);
+
+    return this.withRunWrite(runId, async () => {
+      const current = await this.loadRun(runId);
+      const report = browserVerificationReportSchema.parse(await effect(current));
+      const previousEvent = current.events.at(-1);
+      const event = asEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: this.eventIdFactory(),
+        runId,
+        sequence: current.events.length + 1,
+        recordedAt: this.clock().toISOString(),
+        correlationId: runId,
+        causationEventId: previousEvent?.eventId ?? null,
+        type: "browser.verification",
+        payload: report,
+      });
+      await this.commitEvent(current, event);
+      return report;
     });
   }
 

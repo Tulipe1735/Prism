@@ -179,6 +179,45 @@ describe("FileTrajectoryStore", () => {
     });
   });
 
+  it("journals a Browser Verification Report and projects its evidence refs into the snapshot", async () => {
+    await store.createRun(request);
+    const evidenceRef = await store.writeArtifact(
+      Buffer.from("browser-evidence"),
+      "application/vnd.prism.browser-evidence+json",
+    );
+    const report = {
+      schemaVersion: "prism.browser-verification-report/v1",
+      reportId: "c6a5d1e9-3f2a-4c8b-9e7d-1a2b3c4d5e6f",
+      runId,
+      nodeId: "node-2-browser-verify-attempt-1",
+      attempt: 1,
+      intent: "The primary Save button renders with a materially rounded radius.",
+      verdict: "passed",
+      assertions: [
+        {
+          assertion: "The primary Save button radius is at least 8px.",
+          intentLinked: true,
+          kind: "deterministic",
+          status: "passed",
+          evidenceRefs: [],
+        },
+      ],
+      evidenceRefs: [evidenceRef],
+      limitations: [],
+      redactions: [],
+      recordedAt,
+    };
+
+    const committed = await store.recordBrowserVerification(runId, async () => report);
+
+    expect(committed).toEqual(report);
+    expect((await store.loadRun(runId)).snapshot).toMatchObject({
+      lastSequence: 3,
+      browserVerificationReports: [{ reportId: report.reportId, verdict: "passed" }],
+      artifacts: expect.arrayContaining([evidenceRef]),
+    });
+  });
+
   it("validates before append, enforces the next sequence, and keeps the manifest immutable", async () => {
     await store.createRun(request);
     const manifestPath = join(dataDirectory, "runs", runId, "manifest.json");

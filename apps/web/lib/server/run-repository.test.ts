@@ -1,11 +1,16 @@
 import type { PiSessionFactory } from "@prism/runtime-pi";
-
+import type { UiTarsSessionFactory } from "@prism/runtime-ui-tars";
 import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
 
-import { type RepairRequest, runCreationSchema } from "@prism/contracts";
+import { join } from "node:path";
+import {
+  type BrowserResourceUsage,
+  type RepairRequest,
+  runCreationSchema,
+} from "@prism/contracts";
+
 import { FileTrajectoryStore } from "@prism/trajectory-store";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -35,11 +40,14 @@ const request: RepairRequest = {
 
 let dataDirectory: string;
 let previousDataDirectory: string | undefined;
+let previousBrowserBaseUrl: string | undefined;
 
 beforeEach(async () => {
   previousDataDirectory = process.env.PRISM_DATA_DIR;
+  previousBrowserBaseUrl = process.env.PRISM_BROWSER_BASE_URL;
   dataDirectory = await mkdtemp(join(tmpdir(), "prism-web-runs-"));
   process.env.PRISM_DATA_DIR = dataDirectory;
+  process.env.PRISM_BROWSER_BASE_URL = "http://127.0.0.1:4173";
 });
 
 afterEach(async () => {
@@ -47,6 +55,11 @@ afterEach(async () => {
     delete process.env.PRISM_DATA_DIR;
   } else {
     process.env.PRISM_DATA_DIR = previousDataDirectory;
+  }
+  if (previousBrowserBaseUrl === undefined) {
+    delete process.env.PRISM_BROWSER_BASE_URL;
+  } else {
+    process.env.PRISM_BROWSER_BASE_URL = previousBrowserBaseUrl;
   }
   await rm(dataDirectory, { recursive: true, force: true });
 });
@@ -243,9 +256,23 @@ describe("Run repository", () => {
       initialPackage,
       repairedPackage,
     );
+    const uiTarsSessionFactory = scriptedSuccessfulUiTarsSessionFactory();
+    const browserPortFactory = scriptedBrowserPortFactory();
 
     try {
-      expect(await startHybridRun(creation.runId, { piSessionFactory })).toBe(true);
+      expect(
+        await startHybridRun(creation.runId, {
+          piSessionFactory,
+          uiTarsSessionFactory,
+          browserPortFactory,
+          verifier: {
+            verify: async () => ({
+              assertion: "The Save button rendered within the intent-linked predicate.",
+              status: "passed",
+            }),
+          },
+        }),
+      ).toBe(true);
 
       const dossier = await waitForHybridRun(creation.runId);
       expect(dossier).toMatchObject({
@@ -348,6 +375,68 @@ function scriptedSuccessfulPiSessionFactory(
       abort: async () => undefined,
       dispose: () => undefined,
       getUsage: () => usage,
+    }),
+  };
+}
+
+/** 脚本化 UI-TARS 会话工厂：直接驱动 operator 完成一次观测与验证。 */
+function scriptedSuccessfulUiTarsSessionFactory(): UiTarsSessionFactory {
+  const usage: BrowserResourceUsage = {
+    model: { provider: "scripted-ui-tars", id: "scripted-1" },
+    modelCalls: 1,
+    loopCount: 1,
+    actionsProposed: 0,
+    actionsExecuted: 0,
+    costUsd: 0,
+    durationMs: 1,
+  };
+  return {
+    model: usage.model,
+    create: async ({ operator }) => ({
+      run: async () => {
+        await operator.screenshot();
+        await operator.execute({
+          prediction: "finished()",
+          parsedPrediction: {
+            action_type: "finished",
+            action_inputs: {},
+            reflection: "The allowlisted page was observed.",
+            thought: "Task complete.",
+          },
+          screenWidth: 1280,
+          screenHeight: 720,
+          scaleFactor: 1,
+          factors: [1, 1],
+        });
+      },
+      abort: async () => undefined,
+      dispose: () => undefined,
+      getUsage: () => usage,
+    }),
+  };
+}
+
+/** 脚本化浏览器端口工厂：返回不依赖真实 Chromium 的观测端口。 */
+function scriptedBrowserPortFactory() {
+  const viewport = { width: 1280, height: 720, deviceScaleFactor: 1 };
+  const observation = {
+    observationId: "d5d02fbb-a7ec-4cad-85d7-0b6b3ac6c10b",
+    url: "http://127.0.0.1:4173/",
+    viewport,
+    pageStateHash: "a".repeat(64),
+    screenshotHash: "b".repeat(64),
+  };
+  return {
+    create: async () => ({
+      observe: async () => observation,
+      screenshot: async () => ({
+        base64:
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        scaleFactor: 1,
+        observation,
+      }),
+      click: async () => undefined,
+      dispose: async () => undefined,
     }),
   };
 }

@@ -2,7 +2,6 @@ import type { RunDagNode, RuntimeTaskEnvelope } from "@prism/contracts";
 import { describe, expect, it } from "vitest";
 
 import { DagScheduler, Orchestrator, Router } from "./index";
-
 describe("Router", () => {
   it("emits a validated hybrid initial revision with only registered read-only nodes", () => {
     const decision = new Router(() => new Date("2026-08-04T08:00:00.000Z")).route({
@@ -111,6 +110,10 @@ describe("Orchestrator", () => {
       [];
     const leases: string[] = [];
     const codingEnvelopes: RuntimeTaskEnvelope[] = [];
+    const browserEnvelopes: Array<{
+      nodeType: string;
+      authority: { route: string; intent: string | null };
+    }> = [];
     const artifact = {
       schemaVersion: "prism.artifact-ref/v1" as const,
       algorithm: "sha256" as const,
@@ -128,7 +131,8 @@ describe("Orchestrator", () => {
       appendEffectLease: async (lease: { state: string; token: number }) => {
         leases.push(`${lease.state}:${lease.token}`);
       },
-      writeRuntimeArtifact: async () => artifact,
+      appendBrowserAction: async () => undefined,
+      appendVerificationReport: async () => undefined,
     };
 
     const codingRuntime = {
@@ -163,6 +167,43 @@ describe("Orchestrator", () => {
       },
     };
 
+    const browserRuntime = {
+      execute: async (envelope: {
+        nodeId: string;
+        attempt: number;
+        nodeType: string;
+        authority: { route: string; intent: string | null };
+      }) => {
+        browserEnvelopes.push(envelope);
+        return {
+          schemaVersion: "prism.browser-runtime-result/v1" as const,
+          outcome: {
+            nodeId: envelope.nodeId,
+            attempt: envelope.attempt,
+            state: "succeeded" as const,
+            summary: "UI-TARS observed and verified the allowlisted page.",
+            request:
+              envelope.nodeType === "browser.verify"
+                ? ({ kind: "successor", nodeType: "task.complete" } as const)
+                : ({ kind: "successor", nodeType: "workspace.patch" } as const),
+            failure: null,
+          },
+          artifacts: [artifact],
+          browserActions: [],
+          verificationReport: null,
+          usage: {
+            model: { provider: "ui-tars", id: "ui-tars-1.5" },
+            modelCalls: 1,
+            loopCount: 1,
+            actionsProposed: 0,
+            actionsExecuted: 0,
+            costUsd: 0,
+            durationMs: 5,
+          },
+        };
+      },
+    };
+
     await new Orchestrator({
       clock: () => new Date("2026-08-04T08:00:00.000Z"),
     }).executeHybridRun({
@@ -170,6 +211,11 @@ describe("Orchestrator", () => {
       prompt: "Make the Save button visibly rounded and prove the rendered control.",
       journal,
       codingRuntime,
+      browserRuntime,
+      browserConfig: {
+        route: "/settings/profile",
+        target: { kind: "semantic", role: "button", name: "Save", exact: true },
+      },
     });
 
     expect(revisions.map((revision) => revision.revision)).toEqual([1, 2, 3, 4]);
@@ -209,6 +255,24 @@ describe("Orchestrator", () => {
         nodeType: "workspace.patch",
         authority: { workspaceOperations: ["inspect", "patch", "test"] },
         inputArtifacts: [artifact],
+      }),
+    ]);
+    expect(browserEnvelopes).toEqual([
+      expect.objectContaining({
+        schemaVersion: "prism.browser-task-envelope/v1",
+        nodeType: "browser.observe",
+        authority: expect.objectContaining({
+          route: "/settings/profile",
+          intent: null,
+        }),
+      }),
+      expect.objectContaining({
+        nodeType: "browser.verify",
+        authority: expect.objectContaining({
+          route: "/settings/profile",
+          intent:
+            "Make the Save button visibly rounded and prove the rendered control.",
+        }),
       }),
     ]);
   });

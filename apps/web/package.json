@@ -16,6 +16,7 @@
     "@prism/action-broker": "workspace:^",
     "@prism/orchestrator": "workspace:*",
     "@prism/runtime-pi": "workspace:*",
+    "@prism/runtime-ui-tars": "workspace:*",
     "@prism/contracts": "workspace:*",
     "@prism/trajectory-store": "workspace:^",
     "@prism/workspace-executor": "workspace:^",

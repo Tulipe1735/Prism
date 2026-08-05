@@ -1,0 +1,28 @@
+{
+  "name": "@prism/runtime-ui-tars",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "node ../../scripts/run-vitest.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prism/action-broker": "workspace:*",
+    "@prism/contracts": "workspace:*",
+    "@ui-tars/sdk": "1.2.3",
+    "playwright-core": "1.61.1",
+    "uuid": "11.1.0"
+  },
+  "devDependencies": {
+    "@prism/tooling-config": "workspace:*",
+    "@types/node": "22.20.1",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

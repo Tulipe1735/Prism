@@ -42,6 +42,14 @@ import {
   type PiSessionFactory,
 } from "@prism/runtime-pi";
 import {
+  createConfiguredUiTarsSdkSessionFactory,
+  PlaywrightBrowserPortFactory,
+  type UiTarsBrowserPortFactory,
+  UiTarsBrowserRuntime,
+  type UiTarsSessionFactory,
+  type UiTarsVerifier,
+} from "@prism/runtime-ui-tars";
+import {
   type DurableRun,
   FileTrajectoryStore,
   RunIntegrityError,
@@ -114,6 +122,7 @@ function dossierFromRun(run: DurableRun): RunDossier {
     workspaceEvidence: run.snapshot.workspaceEvidence,
     browserBaselines: run.snapshot.browserBaselines,
     browserActions: run.snapshot.browserActions,
+    browserVerificationReports: run.snapshot.browserVerificationReports,
     dagRevisions: run.snapshot.dagRevisions,
     nodeProgress: run.snapshot.nodeProgress,
     effectLease: run.snapshot.effectLease,
@@ -161,6 +170,7 @@ async function failedDossier(runId: string, error: unknown): Promise<RunDossier>
     workspaceEvidence: [],
     browserBaselines: [],
     browserActions: [],
+    browserVerificationReports: [],
     terminalError,
   });
 }
@@ -199,7 +209,16 @@ export async function createRun(request: RepairRequest): Promise<RunCreation> {
  */
 export async function startHybridRun(
   runIdInput: string,
-  options: { piSessionFactory?: PiSessionFactory } = {},
+  options: {
+    piSessionFactory?: PiSessionFactory;
+    uiTarsSessionFactory?: UiTarsSessionFactory;
+    browserPortFactory?: UiTarsBrowserPortFactory;
+    browserConfig?: {
+      route: string;
+      target: BrowserBaselineRequest["target"];
+    };
+    verifier?: UiTarsVerifier;
+  } = {},
 ): Promise<boolean> {
   const parsedRunId = runIdSchema.safeParse(runIdInput);
   if (!parsedRunId.success) return false;
@@ -244,6 +263,25 @@ export async function startHybridRun(
     },
   });
 
+  const browserConfig = browserRunConfig(options.browserConfig);
+  const uiTarsSessionFactory =
+    options.uiTarsSessionFactory ??
+    (await createConfiguredUiTarsSdkSessionFactory({}));
+  const browserRuntime = new UiTarsBrowserRuntime({
+    baseUrl: browserBaseUrl(),
+    viewport: run.manifest.request.viewport,
+    browserPortFactory:
+      options.browserPortFactory ??
+      new PlaywrightBrowserPortFactory({
+        executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
+      }),
+    sessionFactory: uiTarsSessionFactory,
+    verifier: options.verifier,
+    artifacts: {
+      commit: (content, mediaType) => store.writeArtifact(content, mediaType),
+    },
+  });
+
   // 门闩：首个 DAG 修订（revision 1）写入日志时放行启动请求
   let resolveInitialRevision: (() => void) | undefined;
   let rejectInitialRevision: ((reason?: unknown) => void) | undefined;
@@ -267,8 +305,12 @@ export async function startHybridRun(
     appendEffectLease: async (lease) => {
       await store.recordEffectLease(parsedRunId.data, lease);
     },
-    writeRuntimeArtifact: (content, mediaType) =>
-      store.writeArtifact(content, mediaType),
+    appendBrowserAction: async (record) => {
+      await store.recordBrowserAction(parsedRunId.data, async () => record);
+    },
+    appendVerificationReport: async (report) => {
+      await store.recordBrowserVerification(parsedRunId.data, async () => report);
+    },
   };
   const completion = new Orchestrator()
     .executeHybridRun({
@@ -276,6 +318,11 @@ export async function startHybridRun(
       prompt: run.manifest.request.prompt,
       journal,
       codingRuntime,
+      browserRuntime,
+      browserConfig: {
+        route: browserConfig.route,
+        target: browserConfig.target,
+      },
     })
     .then(() => undefined)
     .catch((error) => {
@@ -426,11 +473,23 @@ function browserBaseUrl(): string {
   const configured = process.env.PRISM_BROWSER_BASE_URL?.trim();
   if (!configured) {
     throw new BrowserBaselineConfigurationError(
-      "Set PRISM_BROWSER_BASE_URL to an allowlisted local HTTP origin before capturing a Browser Baseline.",
+      "Set PRISM_BROWSER_BASE_URL to an allowlisted local HTTP origin.",
     );
   }
 
   return configured;
+}
+
+/** 浏览器运行的路由与采集目标配置（优先显式注入，否则用环境变量默认值）。 */
+function browserRunConfig(
+  configured?: { route: string; target: BrowserBaselineRequest["target"] },
+): { route: string; target: BrowserBaselineRequest["target"] } {
+  if (configured) return configured;
+
+  return {
+    route: "/",
+    target: { kind: "semantic", role: "main", name: "main", exact: false },
+  };
 }
 
 /** 构建身份标识，默认 "development"。 */

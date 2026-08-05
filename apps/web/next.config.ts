@@ -10,7 +10,11 @@ import type { NextConfig } from "next";
  *   避免服务端重复打包该重量级依赖。
  */
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@prism/action-broker", "playwright-core"],
+  serverExternalPackages: [
+    "@prism/action-broker",
+    "@prism/runtime-ui-tars",
+    "playwright-core",
+  ],
   transpilePackages: [
     "@prism/contracts",
     "@prism/orchestrator",

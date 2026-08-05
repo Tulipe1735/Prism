@@ -349,6 +349,82 @@ export function RunDossierView({
         )}
       </section>
 
+      {/* 浏览器验证报告：意图链定谓词 + 补充性视觉判断 */}
+      <section className="mt-10 border-t-2 border-stone-900 pt-7">
+        <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-stone-500">
+          UI-TARS BROWSER VERIFICATION
+        </p>
+        <h2 className="mt-2 inline-flex items-center gap-2 font-serif text-3xl">
+          <CheckCircle2 aria-hidden size={22} /> What the browser proved after repair
+        </h2>
+        {dossier.browserVerificationReports.length === 0 ? (
+          <p className="mt-5 border border-dashed border-stone-500 p-5 text-sm text-stone-600">
+            No Browser Verification Report is committed. A passing report requires an
+            intent-linked deterministic predicate; UI-TARS visual judgment alone can
+            never pass.
+          </p>
+        ) : (
+          <ol className="mt-5 space-y-4">
+            {dossier.browserVerificationReports.map((report) => (
+              <li
+                className="border border-stone-500 bg-white/40 p-5"
+                key={report.reportId}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <strong className="font-mono text-[0.68rem] tracking-[0.1em]">
+                    {report.verdict.toUpperCase()} / {report.nodeId}
+                  </strong>
+                  <span className="font-mono text-[0.6rem] text-stone-500">
+                    attempt {report.attempt}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-6">{report.intent}</p>
+                <ul className="mt-4 space-y-2 text-xs">
+                  {report.assertions.map((assertion) => (
+                    <li
+                      className="flex flex-wrap items-center justify-between gap-2 border border-stone-300 p-3"
+                      key={`${assertion.kind}-${assertion.assertion}`}
+                    >
+                      <span className="break-all">
+                        <span className="font-mono">
+                          {assertion.kind === "deterministic" ? "DETERMINISTIC" : "SUPPLEMENTAL"}
+                          {assertion.intentLinked ? " / INTENT-LINKED" : ""}
+                        </span>
+                        {" · "}
+                        {assertion.assertion}
+                      </span>
+                      <span className="font-mono text-[0.6rem] text-stone-600">
+                        {assertion.status.toUpperCase()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {report.evidenceRefs.length > 0 && (
+                  <p className="mt-4 flex flex-wrap gap-2 text-xs">
+                    {report.evidenceRefs.map((evidence) => (
+                      <a
+                        className="border border-stone-400 px-2 py-1 font-mono text-[0.58rem] text-stone-700 hover:bg-stone-100"
+                        href={artifactUrl(runId, evidence.hash)}
+                        key={evidence.hash}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Open evidence · {evidence.hash.slice(0, 12)}
+                      </a>
+                    ))}
+                  </p>
+                )}
+                {report.limitations.length > 0 && (
+                  <p className="mt-3 text-xs text-stone-600">
+                    Limitations: {report.limitations.join("; ")}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
       {/* live 混合编排：Run DAG + 副作用租约 */}
       <section className="mt-10 border-t-2 border-stone-900 pt-7">
         <div className="flex flex-wrap items-end justify-between gap-4">
