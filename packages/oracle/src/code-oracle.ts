@@ -2,6 +2,8 @@ import type { WorkspaceCommand } from "@prism/contracts";
 
 import { execa } from "execa";
 
+import { gitRepoRoot, toWorkspaceRelativePath } from "./git";
+
 /**
  * Prism 编码 Oracle（code-oracle）
  *
@@ -130,10 +132,17 @@ export async function gitDiffChangedFiles(
       `Unable to diff the workspace against ${knownBadRevision} (git exit ${result.exitCode}).`,
     );
   }
-  return result.stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+  const repoRoot = await gitRepoRoot(workspaceRoot);
+  return (
+    result.stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      // git 输出仓库相对路径；换算成工作区相对路径供作用域判定
+      .map((repoRelative) =>
+        toWorkspaceRelativePath(workspaceRoot, repoRoot, repoRelative),
+      )
+  );
 }
 
 /**

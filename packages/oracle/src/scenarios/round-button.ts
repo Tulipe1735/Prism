@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import { execa } from "execa";
 
+import { gitRepoRoot, toRepoRelativePath } from "../git";
 import { sha256 } from "../hash";
 import {
   SCENARIO_MANIFEST_SCHEMA_VERSION,
@@ -56,11 +57,15 @@ async function committedSha256(
   revision: string,
   relativePath: string,
 ): Promise<string> {
-  const result = await execa("git", ["show", `${revision}:${relativePath}`], {
+  const repoRoot = await gitRepoRoot(workspaceRoot);
+  // git show <rev>:<path> 需要仓库相对路径；工作区通常嵌套在仓库内
+  const repoRelative = toRepoRelativePath(workspaceRoot, repoRoot, relativePath);
+  const result = await execa("git", ["show", `${revision}:${repoRelative}`], {
     cwd: workspaceRoot,
     reject: false,
     shell: false,
     encoding: "buffer",
+    stripFinalNewline: false,
   });
   if (result.exitCode !== 0) {
     throw new Error(`Known-bad file ${relativePath} is not committed at ${revision}.`);
