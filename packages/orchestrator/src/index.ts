@@ -6,17 +6,19 @@
  *    并生成首个 DAG 修订；
  *  - DagScheduler：调度 DAG 中的就绪节点，只读节点并发执行，
  *    副作用节点通过单调递增的 fencing token 串行持锁执行；
- *  - Orchestrator：把上述两部分串起来，在模拟（mock）运行中推进 DAG，
- *    并把每个节点的进度 / 修订 / 副作用租约写入事件日志。
+ *  - Orchestrator：把上述两部分串起来，调用真实 Coding Runtime、临时
+ *    Browser Runtime，并把节点进度 / 修订 / 副作用租约写入事件日志。
  *
- * 当前版本是"mock 混合运行"形态 —— 运行时执行体用确定性 mock 结果代替，
- * 后续接入真实 Coding Runtime / Browser Runtime 时替换执行回调即可。
+ * Coding Runtime 通过 RuntimeTaskEnvelope / PiRuntimeResult port 接入；
+ * Browser Runtime 仍由其后续 ticket 替换当前确定性占位执行体。
  */
 import {
   type ArtifactRef,
   type EffectLease,
   type NodeOutcome,
   nodeOutcomeSchema,
+  type PiRuntimeResult,
+  piRuntimeResultSchema,
   ROUTER_DECISION_SCHEMA_VERSION,
   type RouterClassification,
   type RouterDecision,
@@ -27,6 +29,9 @@ import {
   type RunDagRevision,
   runDagRevisionSchema,
   type RunNodeProgress,
+  RUNTIME_TASK_ENVELOPE_SCHEMA_VERSION,
+  type RuntimeBudget,
+  type RuntimeTaskEnvelope,
 } from "@prism/contracts";
 
 /** 路由输入：一个待分类的修复请求，携带 Run 标识与请求文案。 */
@@ -274,11 +279,22 @@ export interface OrchestrationJournal {
   ) => Promise<ArtifactRef>;
 }
 
-/** 模拟混合运行的输入：Run 标识 + 请求文案 + 日志写入器。 */
-export interface ExecuteMockHybridRunInput {
+/** Pi Coding Runtime 的进程中立调用边界。 */
+export interface CodingRuntime {
+  execute: (
+    envelope: RuntimeTaskEnvelope,
+    options?: { signal?: AbortSignal },
+  ) => Promise<PiRuntimeResult>;
+}
+
+/** 混合运行输入：Run 标识、请求、日志与真实 Coding Runtime。 */
+export interface ExecuteHybridRunInput {
   runId: string;
   prompt: string;
   journal: OrchestrationJournal;
+  codingRuntime: CodingRuntime;
+  budget?: RuntimeBudget;
+  signal?: AbortSignal;
 }
 
 /** Orchestrator 构造选项，全部可注入以便测试。 */
@@ -286,7 +302,7 @@ export interface OrchestratorOptions {
   clock?: () => Date;
   router?: Router;
   scheduler?: DagScheduler;
-  mockRuntimeDelayMs?: number;
+  placeholderRuntimeDelayMs?: number;
 }
 
 /** 为指定修订/节点类型/尝试生成稳定的节点 ID。 */
@@ -304,37 +320,45 @@ function attemptsFor(nodeType: RunDagNodeType): number {
 }
 
 /**
- * 生成确定性的 mock 节点结果。
+ * 生成确定性的临时 Browser / Orchestrator 节点结果。
  *
- * 按节点类型模拟"请求合法后继"：inspect→patch→verify→task.complete，
- * 其余类型请求 none。后续接入真实运行时后此函数会被实际执行替换。
+ * Coding 节点不会经过这里；browser.verify 请求 task.complete，其他占位节点
+ * 请求 none。UI-TARS ticket 会删除 Browser 分支的占位实现。
  */
-function mockOutcome(node: RunDagNode, attempt: number): NodeOutcome {
+function placeholderOutcome(node: RunDagNode, attempt: number): NodeOutcome {
   const request =
-    node.nodeType === "workspace.inspect"
-      ? { kind: "successor" as const, nodeType: "workspace.patch" as const }
-      : node.nodeType === "workspace.patch"
-        ? { kind: "successor" as const, nodeType: "browser.verify" as const }
-        : node.nodeType === "browser.verify"
-          ? { kind: "successor" as const, nodeType: "task.complete" as const }
-          : { kind: "none" as const };
+    node.nodeType === "browser.verify"
+      ? { kind: "successor" as const, nodeType: "task.complete" as const }
+      : { kind: "none" as const };
 
   return nodeOutcomeSchema.parse({
     nodeId: node.nodeId,
     attempt,
     state: "succeeded",
-    summary: `Mock ${node.runtime} runtime completed ${node.nodeType}.`,
-    evidence: {
-      mediaType: "application/vnd.prism.runtime-evidence+json",
-      content: JSON.stringify({
-        runtime: node.runtime,
-        nodeId: node.nodeId,
-        attempt,
-        nodeType: node.nodeType,
-      }),
-    },
+    summary: `Placeholder ${node.runtime} runtime completed ${node.nodeType}.`,
     request,
+    failure: null,
   });
+}
+
+const DEFAULT_RUNTIME_BUDGET: RuntimeBudget = {
+  maxModelCalls: 12,
+  maxInputTokens: 100_000,
+  maxOutputTokens: 20_000,
+  maxTotalTokens: 120_000,
+  maxCostUsd: 5,
+  maxDurationMs: 300_000,
+};
+
+function attemptFor(node: RunDagNode): number {
+  const match = /-attempt-(\d+)$/u.exec(node.nodeId);
+  return match ? Number(match[1]) : 1;
+}
+
+function uniqueArtifacts(artifacts: readonly ArtifactRef[]): ArtifactRef[] {
+  return Array.from(
+    new Map(artifacts.map((artifact) => [artifact.hash, artifact])).values(),
+  );
 }
 
 /**
@@ -344,13 +368,16 @@ export class Orchestrator {
   private readonly clock: () => Date;
   private readonly router: Router;
   private readonly scheduler: DagScheduler;
-  private readonly mockRuntimeDelayMs: number;
+  private readonly placeholderRuntimeDelayMs: number;
 
   constructor(options: OrchestratorOptions = {}) {
     this.clock = options.clock ?? (() => new Date());
     this.router = options.router ?? new Router(this.clock);
     this.scheduler = options.scheduler ?? new DagScheduler({ clock: this.clock });
-    this.mockRuntimeDelayMs = Math.max(0, options.mockRuntimeDelayMs ?? 75);
+    this.placeholderRuntimeDelayMs = Math.max(
+      0,
+      options.placeholderRuntimeDelayMs ?? 75,
+    );
   }
 
   /**
@@ -463,21 +490,21 @@ export class Orchestrator {
   }
 
   /**
-   * 执行一次完整的 mock 混合运行，返回最终 DAG 修订。
+   * 执行一次混合运行，返回最终 DAG 修订。
    *
    * 流程：路由分类 → 写入初始修订 → 循环取就绪节点 → 调度执行（写进度、
-   * 模拟延时、写证据产物、写结果进度）→ 依据结果扩展 DAG → 直至无就绪节点。
+   * 调用真实 Pi Coding Runtime / 临时 Browser Runtime、写结果进度）→
+   * 依据结果扩展 DAG → 直至无就绪节点。
    *
    * @param input Run 标识、请求文案与日志写入器
    * @returns 无更多就绪节点时的最终修订（通常含 task.complete）
    */
-  async executeMockHybridRun(
-    input: ExecuteMockHybridRunInput,
-  ): Promise<RunDagRevision> {
+  async executeHybridRun(input: ExecuteHybridRunInput): Promise<RunDagRevision> {
     const decision = this.router.route({ runId: input.runId, prompt: input.prompt });
     let revision = decision.initialRevision;
     const completedNodeIds = new Set<string>();
-    const attempts = new Map<string, number>();
+    const artifacts: ArtifactRef[] = [];
+    const budget = input.budget ?? DEFAULT_RUNTIME_BUDGET;
 
     await input.journal.appendDagRevision(revision);
 
@@ -495,8 +522,7 @@ export class Orchestrator {
       const outcomes = await this.scheduler.run(
         ready,
         async (node) => {
-          const attempt = attempts.get(node.nodeId) ?? 1;
-          attempts.set(node.nodeId, attempt);
+          const attempt = attemptFor(node);
           await input.journal.appendNodeProgress({
             revision: revision.revision,
             nodeId: node.nodeId,
@@ -505,20 +531,63 @@ export class Orchestrator {
             runtime: node.runtime,
             effectClass: node.effectClass,
             state: "running",
-            summary: `Mock ${node.runtime} runtime started ${node.nodeType}.`,
+            summary: `${node.runtime} runtime started ${node.nodeType}.`,
             artifacts: [],
             correlationId: input.runId,
           });
-          if (this.mockRuntimeDelayMs > 0) {
-            await new Promise<void>((resolve) => {
-              setTimeout(resolve, this.mockRuntimeDelayMs);
-            });
+
+          let result: { outcome: NodeOutcome; artifacts: ArtifactRef[] };
+          if (node.runtime === "coding") {
+            const authority =
+              node.nodeType === "workspace.inspect"
+                ? (["inspect"] as const)
+                : (["inspect", "patch", "test"] as const);
+            const idempotencyKey = `${input.runId}:${revision.revision}:${node.nodeId}:${attempt}`;
+            const envelope: RuntimeTaskEnvelope = {
+              schemaVersion: RUNTIME_TASK_ENVELOPE_SCHEMA_VERSION,
+              runId: input.runId,
+              dagRevision: revision.revision,
+              nodeId: node.nodeId,
+              nodeType: node.nodeType as "workspace.inspect" | "workspace.patch",
+              attempt,
+              maxAttempts: node.maxAttempts,
+              runtime: "coding",
+              prompt: input.prompt,
+              inputArtifacts: uniqueArtifacts(artifacts),
+              authority: { workspaceOperations: [...authority] },
+              budget,
+              deadline: new Date(
+                this.clock().getTime() + budget.maxDurationMs,
+              ).toISOString(),
+              cancellationId: `cancel:${idempotencyKey}`,
+              correlationId: input.runId,
+              causationEventId: null,
+              idempotencyKey,
+            };
+            const runtimeResult = piRuntimeResultSchema.parse(
+              await input.codingRuntime.execute(envelope, { signal: input.signal }),
+            );
+            result = runtimeResult;
+          } else {
+            if (this.placeholderRuntimeDelayMs > 0) {
+              await new Promise<void>((resolve) => {
+                setTimeout(resolve, this.placeholderRuntimeDelayMs);
+              });
+            }
+            const outcome = placeholderOutcome(node, attempt);
+            const artifact = await input.journal.writeRuntimeArtifact(
+              JSON.stringify({
+                runtime: node.runtime,
+                nodeId: node.nodeId,
+                attempt,
+                nodeType: node.nodeType,
+                placeholder: true,
+              }),
+              "application/vnd.prism.runtime-evidence+json",
+            );
+            result = { outcome, artifacts: [artifact] };
           }
-          const outcome = mockOutcome(node, attempt);
-          const artifact = await input.journal.writeRuntimeArtifact(
-            outcome.evidence.content,
-            outcome.evidence.mediaType,
-          );
+          artifacts.push(...result.artifacts);
           await input.journal.appendNodeProgress({
             revision: revision.revision,
             nodeId: node.nodeId,
@@ -526,12 +595,12 @@ export class Orchestrator {
             attempt,
             runtime: node.runtime,
             effectClass: node.effectClass,
-            state: outcome.state,
-            summary: outcome.summary,
-            artifacts: [artifact],
+            state: result.outcome.state,
+            summary: result.outcome.summary,
+            artifacts: result.artifacts,
             correlationId: input.runId,
           });
-          return outcome;
+          return result.outcome;
         },
         { onLease: input.journal.appendEffectLease },
       );
@@ -542,7 +611,7 @@ export class Orchestrator {
         const nextRevision = this.appendOutcomeRevision({
           revision,
           nodeId,
-          attempt: attempts.get(nodeId) ?? 1,
+          attempt: outcome.attempt,
           outcome,
           completedNodeIds: [...completedNodeIds],
         });

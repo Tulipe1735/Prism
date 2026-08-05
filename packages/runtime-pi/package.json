@@ -1,5 +1,5 @@
 {
-  "name": "@prism/workspace-executor",
+  "name": "@prism/runtime-pi",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,14 +12,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@prism/contracts": "workspace:*",
-    "diff": "8.0.4",
-    "execa": "9.6.1",
-    "fast-glob": "3.3.3",
-    "ignore": "7.0.6"
+    "@earendil-works/pi-ai": "0.82.1",
+    "@earendil-works/pi-coding-agent": "0.82.1",
+    "@prism/contracts": "workspace:*"
   },
   "devDependencies": {
     "@prism/tooling-config": "workspace:*",
+    "@prism/workspace-executor": "workspace:*",
     "@types/node": "22.20.1",
     "eslint": "9.39.5",
     "typescript": "5.9.3",

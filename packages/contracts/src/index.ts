@@ -454,6 +454,9 @@ export const RUN_DAG_REVISION_SCHEMA_VERSION = "prism.run-dag-revision/v1" as co
 export const ROUTER_DECISION_SCHEMA_VERSION = "prism.router-decision/v1" as const;
 export const RUN_NODE_PROGRESS_SCHEMA_VERSION = "prism.run-node-progress/v1" as const;
 export const EFFECT_LEASE_SCHEMA_VERSION = "prism.effect-lease/v1" as const;
+export const RUNTIME_TASK_ENVELOPE_SCHEMA_VERSION =
+  "prism.runtime-task-envelope/v1" as const;
+export const PI_RUNTIME_RESULT_SCHEMA_VERSION = "prism.pi-runtime-result/v1" as const;
 
 /**
  * 运行体归属：节点由哪类运行时执行 —— 编码（coding）/ 浏览器（browser）/ 编排器（orchestrator）。
@@ -746,13 +749,162 @@ export const nodeOutcomeSchema = z
     attempt: z.number().int().positive(),
     state: z.enum(["succeeded", "failed", "blocked"]),
     summary: z.string().trim().min(1).max(500),
-    evidence: z
+    request: nodeOutcomeRequestSchema,
+    failure: z
       .object({
-        mediaType: z.literal("application/vnd.prism.runtime-evidence+json"),
-        content: z.string().max(32_000),
+        code: z.enum([
+          "cancelled",
+          "timed_out",
+          "budget_exhausted",
+          "malformed_sdk_output",
+          "process_cleanup_failed",
+          "workspace_execution_failed",
+        ]),
+        retryable: z.boolean(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+/**
+ * Pi 编码运行时的资源预算。所有模型、时间与费用上限都由 Orchestrator
+ * 放入信封，运行时只能收窄或消耗，不能自行扩大。
+ */
+export const runtimeBudgetSchema = z
+  .object({
+    maxModelCalls: z.number().int().min(1).max(64),
+    maxInputTokens: z.number().int().positive().max(2_000_000),
+    maxOutputTokens: z.number().int().positive().max(500_000),
+    maxTotalTokens: z.number().int().positive().max(2_500_000),
+    maxCostUsd: z.number().finite().nonnegative().max(1_000),
+    maxDurationMs: z.number().int().min(50).max(3_600_000),
+  })
+  .strict()
+  .superRefine((budget, context) => {
+    if (
+      budget.maxTotalTokens < budget.maxInputTokens ||
+      budget.maxTotalTokens < budget.maxOutputTokens
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["maxTotalTokens"],
+        message: "The total token budget must cover each directional token cap.",
+      });
+    }
+  });
+
+/**
+ * 交给同进程 Pi SDK 会话的完整、版本化任务边界。
+ *
+ * v1 只允许 Coding Runtime 的两个已注册节点。具体路径、命令和补丁仍需
+ * 通过 WorkspaceExecutor 二次校验；workspaceOperations 只决定本次会话
+ * 暴露哪些能力，不能赋予执行器没有的权限。
+ */
+export const runtimeTaskEnvelopeSchema = z
+  .object({
+    schemaVersion: z.literal(RUNTIME_TASK_ENVELOPE_SCHEMA_VERSION),
+    runId: runIdSchema,
+    dagRevision: z.number().int().positive(),
+    nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    nodeType: z.enum(["workspace.inspect", "workspace.patch"]),
+    attempt: z.number().int().positive(),
+    maxAttempts: z.number().int().min(1).max(3),
+    runtime: z.literal("coding"),
+    prompt: z.string().min(1).max(2_000),
+    inputArtifacts: z.array(artifactRefSchema).max(24),
+    authority: z
+      .object({
+        workspaceOperations: z
+          .array(z.enum(["inspect", "patch", "test"]))
+          .min(1)
+          .max(3),
       })
       .strict(),
-    request: nodeOutcomeRequestSchema,
+    budget: runtimeBudgetSchema,
+    deadline: isoDateTimeSchema,
+    cancellationId: z.string().min(1).max(200),
+    correlationId: z.string().min(1).max(200),
+    causationEventId: z.string().uuid().nullable(),
+    idempotencyKey: z.string().min(1).max(300),
+  })
+  .strict()
+  .superRefine((envelope, context) => {
+    const operations = new Set(envelope.authority.workspaceOperations);
+    if (operations.size !== envelope.authority.workspaceOperations.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["authority", "workspaceOperations"],
+        message: "Runtime authority operations must be unique.",
+      });
+    }
+    if (envelope.nodeType === "workspace.inspect" && operations.size !== 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["authority", "workspaceOperations"],
+        message: "Read-only inspection nodes may expose only inspect authority.",
+      });
+    }
+    if (envelope.nodeType === "workspace.inspect" && !operations.has("inspect")) {
+      context.addIssue({
+        code: "custom",
+        path: ["authority", "workspaceOperations"],
+        message: "Inspection nodes require inspect authority.",
+      });
+    }
+    if (envelope.attempt > envelope.maxAttempts) {
+      context.addIssue({
+        code: "custom",
+        path: ["attempt"],
+        message: "The runtime attempt cannot exceed the DAG node retry bound.",
+      });
+    }
+  });
+
+/** Pi 会话实际消耗的模型、token、费用与墙钟资源。 */
+export const runtimeResourceUsageSchema = z
+  .object({
+    model: z
+      .object({
+        provider: z.string().trim().min(1).max(120),
+        id: z.string().trim().min(1).max(200),
+      })
+      .strict(),
+    modelCalls: z.number().int().nonnegative(),
+    inputTokens: z.number().int().nonnegative(),
+    outputTokens: z.number().int().nonnegative(),
+    cacheReadTokens: z.number().int().nonnegative(),
+    cacheWriteTokens: z.number().int().nonnegative(),
+    totalTokens: z.number().int().nonnegative(),
+    costUsd: z.number().finite().nonnegative(),
+    durationMs: z.number().nonnegative(),
+  })
+  .strict()
+  .superRefine((usage, context) => {
+    const total =
+      usage.inputTokens +
+      usage.outputTokens +
+      usage.cacheReadTokens +
+      usage.cacheWriteTokens;
+    if (usage.totalTokens !== total) {
+      context.addIssue({
+        code: "custom",
+        path: ["totalTokens"],
+        message: "Runtime total tokens must equal the directional token totals.",
+      });
+    }
+  });
+
+/**
+ * Pi Runtime 的唯一返回形态：已校验的节点结果、已提交的产物引用与资源用量。
+ * strict() 明确拒绝原始模型文本、未提交 diff 或其他旁路数据。
+ */
+export const piRuntimeResultSchema = z
+  .object({
+    schemaVersion: z.literal(PI_RUNTIME_RESULT_SCHEMA_VERSION),
+    outcome: nodeOutcomeSchema,
+    artifacts: z.array(artifactRefSchema).max(24),
+    usage: runtimeResourceUsageSchema,
   })
   .strict();
 
@@ -982,6 +1134,9 @@ const workspacePatchDetailsSchema = z
             .nullable(),
           afterSha256: z.string().regex(/^[0-9a-f]{64}$/),
           byteLength: z.number().int().nonnegative(),
+          diff: z.string().max(64_000),
+          diffTruncated: z.boolean(),
+          redactionCount: z.number().int().nonnegative(),
         })
         .strict(),
     ),
@@ -1011,6 +1166,7 @@ export const workspaceEvidenceSchema = z
         "working_directory_not_allowlisted",
         "patch_conflict",
         "output_limit",
+        "process_cleanup_failed",
         "execution_failed",
       ])
       .nullable(),
@@ -1323,6 +1479,7 @@ export type ArtifactRef = z.infer<typeof artifactRefSchema>;
 export type EffectLease = z.infer<typeof effectLeaseSchema>;
 export type EffectClass = z.infer<typeof effectClassSchema>;
 export type NodeOutcome = z.infer<typeof nodeOutcomeSchema>;
+export type PiRuntimeResult = z.infer<typeof piRuntimeResultSchema>;
 export type RouterClassification = z.infer<typeof routerClassificationSchema>;
 export type RouterDecision = z.infer<typeof routerDecisionSchema>;
 export type RunDagNode = z.infer<typeof runDagNodeSchema>;
@@ -1331,6 +1488,9 @@ export type RunDagRevision = z.infer<typeof runDagRevisionSchema>;
 export type RunNodeProgress = z.infer<typeof runNodeProgressSchema>;
 export type RunNodeState = z.infer<typeof runNodeStateSchema>;
 export type RuntimeOwner = z.infer<typeof runtimeOwnerSchema>;
+export type RuntimeBudget = z.infer<typeof runtimeBudgetSchema>;
+export type RuntimeResourceUsage = z.infer<typeof runtimeResourceUsageSchema>;
+export type RuntimeTaskEnvelope = z.infer<typeof runtimeTaskEnvelopeSchema>;
 
 export type BrowserActionProposal = z.infer<typeof browserActionProposalSchema>;
 export type BrowserActionRecord = z.infer<typeof browserActionRecordSchema>;

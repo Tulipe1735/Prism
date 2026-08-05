@@ -107,8 +107,8 @@ export async function fetchRunDossier(runId: string): Promise<RunDossier> {
   return parsed.data.dossier;
 }
 
-/** 启动一次 mock 混合编排（异步执行，立即返回"已启动"响应）。 */
-export async function startMockOrchestration(
+/** 启动一次 live 混合编排（异步执行，立即返回"已启动"响应）。 */
+export async function startOrchestration(
   runId: string,
 ): Promise<OrchestrationStartResponse> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/orchestration`, {

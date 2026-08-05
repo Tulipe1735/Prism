@@ -4,7 +4,7 @@
  * 位于 API 路由层与底层包之间，负责把 HTTP 语义组装成领域操作：
  *  - 惰性单例的 FileTrajectoryStore（按 PRISM_DATA_DIR 解析数据目录）；
  *  - Run 创建 / 列表 / 卷宗读取，损坏时降级为 failed 卷宗而非抛错；
- *  - mock 混合编排的启动与等待（进程内单例，带初始修订门闩）；
+ *  - live 混合编排的启动与等待（进程内单例，带初始修订门闩）；
  *  - 工作区请求执行（用 WorkspaceExecutor 受限执行并落证据）；
  *  - 浏览器基线采集（用 BrowserExecutor 采集并把产物写入存储）；
  *  - 内容寻址产物读取。
@@ -37,6 +37,11 @@ import {
 } from "@prism/contracts";
 import { type OrchestrationJournal, Orchestrator } from "@prism/orchestrator";
 import {
+  createConfiguredPiSdkSessionFactory,
+  PiCodingRuntime,
+  type PiSessionFactory,
+} from "@prism/runtime-pi";
+import {
   type DurableRun,
   FileTrajectoryStore,
   RunIntegrityError,
@@ -57,19 +62,19 @@ export type { RunDossier };
 
 /** 惰性初始化的全局轨迹存储单例。 */
 let activeStore: { dataDirectory: string; store: FileTrajectoryStore } | undefined;
-/** 进程内一次 mock 混合运行的活动句柄。 */
-interface ActiveMockHybridRun {
+/** 进程内一次 live 混合运行的活动句柄。 */
+interface ActiveHybridRun {
   /** 首个 DAG 修订已写入日志的门闩（写入成功前启动请求不返回）。 */
   initialRevisionCommitted: Promise<void>;
-  /** 整个 mock 运行完成的 promise。 */
+  /** 整个 live 运行完成的 promise。 */
   completion: Promise<void>;
 }
 
-/** 进程内活动 mock 运行表，键为 dataDirectory:runId。 */
-const activeMockHybridRuns = new Map<string, ActiveMockHybridRun>();
+/** 进程内活动运行表，键为 dataDirectory:runId。 */
+const activeHybridRuns = new Map<string, ActiveHybridRun>();
 
-/** 生成活动 mock 运行的 Map 键。 */
-function mockRunKey(dataDirectory: string, runId: string): string {
+/** 生成活动运行的 Map 键。 */
+function hybridRunKey(dataDirectory: string, runId: string): string {
   return `${dataDirectory}:${runId}`;
 }
 
@@ -183,15 +188,19 @@ export async function createRun(request: RepairRequest): Promise<RunCreation> {
 }
 
 /**
- * 启动一次 mock 混合编排运行。
+ * 启动一次 live 混合编排运行。
  *
  * 幂等：同一 Run 已在运行则等其初始修订写入后直接返回 true。
  * 首次启动时构造 OrchestrationJournal（把编排写入转发到轨迹存储），
- * 用门闩等待首个 DAG 修订落盘后再返回，保证调用方看到的 Run 已可继续。
+ * 并创建受 WorkspaceExecutor 约束的 Pi Coding Runtime；用门闩等待首个
+ * DAG 修订落盘后再返回，保证调用方看到的 Run 已可继续。
  *
  * @returns true 表示编排已在运行或已启动；false 表示 Run 不存在/ID 非法
  */
-export async function startMockHybridRun(runIdInput: string): Promise<boolean> {
+export async function startHybridRun(
+  runIdInput: string,
+  options: { piSessionFactory?: PiSessionFactory } = {},
+): Promise<boolean> {
   const parsedRunId = runIdSchema.safeParse(runIdInput);
   if (!parsedRunId.success) return false;
 
@@ -199,14 +208,41 @@ export async function startMockHybridRun(runIdInput: string): Promise<boolean> {
   const runIds = await store.listRunIds();
   if (!runIds.includes(parsedRunId.data)) return false;
 
-  const key = mockRunKey(store.dataDirectory, parsedRunId.data);
-  const activeRun = activeMockHybridRuns.get(key);
+  const key = hybridRunKey(store.dataDirectory, parsedRunId.data);
+  const activeRun = activeHybridRuns.get(key);
   if (activeRun) {
     await activeRun.initialRevisionCommitted;
     return true;
   }
 
   const run = await store.loadRun(parsedRunId.data);
+  const piSessionFactory =
+    options.piSessionFactory ??
+    (await createConfiguredPiSdkSessionFactory({
+      cwd: run.manifest.request.workspace.path,
+      provider: process.env.PRISM_PI_PROVIDER?.trim() || undefined,
+      modelId: process.env.PRISM_PI_MODEL?.trim() || undefined,
+    }));
+  const workspaceExecutor = await createRunWorkspaceExecutor(
+    run.manifest.request.workspace.path,
+  );
+  const codingRuntime = new PiCodingRuntime({
+    sessionFactory: piSessionFactory,
+    artifacts: {
+      commit: (content, mediaType) => store.writeArtifact(content, mediaType),
+    },
+    workspace: {
+      execute: (request, signal) =>
+        store.recordWorkspaceEffect(parsedRunId.data, async () => {
+          const evidence = await workspaceExecutor.execute(request, { signal });
+          const artifact = await store.writeArtifact(
+            `${JSON.stringify(evidence)}\n`,
+            WORKSPACE_EVIDENCE_MEDIA_TYPE,
+          );
+          return workspaceEvidenceRecordSchema.parse({ evidence, artifact });
+        }),
+    },
+  });
 
   // 门闩：首个 DAG 修订（revision 1）写入日志时放行启动请求
   let resolveInitialRevision: (() => void) | undefined;
@@ -235,10 +271,11 @@ export async function startMockHybridRun(runIdInput: string): Promise<boolean> {
       store.writeArtifact(content, mediaType),
   };
   const completion = new Orchestrator()
-    .executeMockHybridRun({
+    .executeHybridRun({
       runId: parsedRunId.data,
       prompt: run.manifest.request.prompt,
       journal,
+      codingRuntime,
     })
     .then(() => undefined)
     .catch((error) => {
@@ -249,9 +286,9 @@ export async function startMockHybridRun(runIdInput: string): Promise<boolean> {
       return undefined;
     })
     .finally(() => {
-      activeMockHybridRuns.delete(key);
+      activeHybridRuns.delete(key);
     });
-  activeMockHybridRuns.set(key, {
+  activeHybridRuns.set(key, {
     initialRevisionCommitted: initialRevisionReady,
     completion,
   });
@@ -260,19 +297,17 @@ export async function startMockHybridRun(runIdInput: string): Promise<boolean> {
 }
 
 /**
- * 等待一次 mock 混合运行完成，返回最终卷宗。
+ * 等待一次 live 混合运行完成，返回最终卷宗。
  *
  * @returns 运行结束后的卷宗；Run 不存在/ID 非法返回 null
  */
-export async function waitForMockHybridRun(
-  runIdInput: string,
-): Promise<RunDossier | null> {
+export async function waitForHybridRun(runIdInput: string): Promise<RunDossier | null> {
   const parsedRunId = runIdSchema.safeParse(runIdInput);
   if (!parsedRunId.success) return null;
 
   const store = getStore();
-  const key = mockRunKey(store.dataDirectory, parsedRunId.data);
-  await activeMockHybridRuns.get(key)?.completion;
+  const key = hybridRunKey(store.dataDirectory, parsedRunId.data);
+  await activeHybridRuns.get(key)?.completion;
   return getRunDossier(parsedRunId.data);
 }
 
@@ -319,6 +354,33 @@ export async function getRunDossier(runIdInput: string): Promise<RunDossier | nu
   return loadDossier(parsedRunId.data);
 }
 
+/** 为一个 Run 创建唯一的受限 WorkspaceExecutor 配置。 */
+async function createRunWorkspaceExecutor(workspaceRoot: string) {
+  return WorkspaceExecutor.create({
+    workspaceRoot,
+    allowedReadPatterns: [
+      "package.json",
+      "README.md",
+      "apps/**/*.{ts,tsx,json,mjs}",
+      "packages/**/*.{ts,tsx,json,mjs}",
+      "src/**/*.{ts,tsx,json,mjs}",
+      "tests/**/*.{ts,tsx,json,mjs}",
+    ],
+    allowedDiscoveryPatterns: [
+      "apps/**/*.{ts,tsx}",
+      "packages/**/*.ts",
+      "src/**/*.{ts,tsx}",
+      "**/*.{test,spec}.{ts,tsx}",
+    ],
+    allowedCommands: [
+      {
+        command: { executable: "pnpm", arguments: ["test"] },
+        workingDirectories: ["."],
+      },
+    ],
+  });
+}
+
 /**
  * 对某 Run 执行一次工作区请求，并把证据落盘为一条工作区证据事件。
  *
@@ -347,26 +409,9 @@ export async function executeWorkspaceRequest(
   }
 
   return store.recordWorkspaceEffect(parsedRunId.data, async (run) => {
-    const executor = await WorkspaceExecutor.create({
-      workspaceRoot: run.manifest.request.workspace.path,
-      allowedReadPatterns: [
-        "package.json",
-        "README.md",
-        "apps/**/*.{ts,tsx,json,mjs}",
-        "packages/**/*.{ts,tsx,json,mjs}",
-      ],
-      allowedDiscoveryPatterns: [
-        "apps/**/*.{ts,tsx}",
-        "packages/**/*.ts",
-        "**/*.{test,spec}.{ts,tsx}",
-      ],
-      allowedCommands: [
-        {
-          command: { executable: "pnpm", arguments: ["test"] },
-          workingDirectories: ["."],
-        },
-      ],
-    });
+    const executor = await createRunWorkspaceExecutor(
+      run.manifest.request.workspace.path,
+    );
     const evidence = await executor.execute(request, { signal });
     const artifact = await store.writeArtifact(
       `${JSON.stringify(evidence)}\n`,

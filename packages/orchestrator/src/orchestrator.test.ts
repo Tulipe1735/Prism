@@ -1,4 +1,4 @@
-import type { RunDagNode } from "@prism/contracts";
+import type { RunDagNode, RuntimeTaskEnvelope } from "@prism/contracts";
 import { describe, expect, it } from "vitest";
 
 import { DagScheduler, Orchestrator, Router } from "./index";
@@ -104,12 +104,13 @@ describe("DagScheduler", () => {
 });
 
 describe("Orchestrator", () => {
-  it("durably appends immutable revisions from typed runtime outcomes and fences effects", async () => {
+  it("durably appends Pi Coding Runtime outcomes and fences effects", async () => {
     const revisions: Array<{ revision: number; nodes: Array<{ nodeType: string }> }> =
       [];
     const progress: Array<{ nodeType: string; state: string; artifacts: unknown[] }> =
       [];
     const leases: string[] = [];
+    const codingEnvelopes: RuntimeTaskEnvelope[] = [];
     const artifact = {
       schemaVersion: "prism.artifact-ref/v1" as const,
       algorithm: "sha256" as const,
@@ -130,12 +131,45 @@ describe("Orchestrator", () => {
       writeRuntimeArtifact: async () => artifact,
     };
 
+    const codingRuntime = {
+      execute: async (envelope: RuntimeTaskEnvelope) => {
+        codingEnvelopes.push(envelope);
+        return {
+          schemaVersion: "prism.pi-runtime-result/v1" as const,
+          outcome: {
+            nodeId: envelope.nodeId,
+            attempt: envelope.attempt,
+            state: "succeeded" as const,
+            summary: `Pi completed ${envelope.nodeType}.`,
+            request:
+              envelope.nodeType === "workspace.inspect"
+                ? ({ kind: "successor", nodeType: "workspace.patch" } as const)
+                : ({ kind: "successor", nodeType: "browser.verify" } as const),
+            failure: null,
+          },
+          artifacts: [artifact],
+          usage: {
+            model: { provider: "faux", id: "faux-1" },
+            modelCalls: 1,
+            inputTokens: 10,
+            outputTokens: 2,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+            totalTokens: 12,
+            costUsd: 0,
+            durationMs: 5,
+          },
+        };
+      },
+    };
+
     await new Orchestrator({
       clock: () => new Date("2026-08-04T08:00:00.000Z"),
-    }).executeMockHybridRun({
+    }).executeHybridRun({
       runId: "run_6dbf6f33-69c4-4e5f-9898-3f693735f5f0",
       prompt: "Make the Save button visibly rounded and prove the rendered control.",
       journal,
+      codingRuntime,
     });
 
     expect(revisions.map((revision) => revision.revision)).toEqual([1, 2, 3, 4]);
@@ -165,6 +199,18 @@ describe("Orchestrator", () => {
       ]),
     );
     expect(leases).toEqual(["active:1", "released:1", "active:2", "released:2"]);
+    expect(codingEnvelopes).toEqual([
+      expect.objectContaining({
+        schemaVersion: "prism.runtime-task-envelope/v1",
+        nodeType: "workspace.inspect",
+        authority: { workspaceOperations: ["inspect"] },
+      }),
+      expect.objectContaining({
+        nodeType: "workspace.patch",
+        authority: { workspaceOperations: ["inspect", "patch", "test"] },
+        inputArtifacts: [artifact],
+      }),
+    ]);
   });
 });
 
@@ -187,11 +233,8 @@ it("adds a bounded retry attempt without creating a DAG cycle and blocks effects
       attempt: 1,
       state: "failed",
       summary: "Mock inspection timed out.",
-      evidence: {
-        mediaType: "application/vnd.prism.runtime-evidence+json",
-        content: "{}",
-      },
       request: { kind: "retry", reason: "The read-only attempt timed out." },
+      failure: { code: "timed_out", retryable: true },
     },
   });
 
@@ -217,11 +260,8 @@ it("adds a bounded retry attempt without creating a DAG cycle and blocks effects
         attempt: 1,
         state: "succeeded",
         summary: "Mock evidence is available.",
-        evidence: {
-          mediaType: "application/vnd.prism.runtime-evidence+json",
-          content: "{}",
-        },
         request: { kind: "successor", nodeType: "workspace.patch" },
+        failure: null,
       },
     }),
   ).toThrow(

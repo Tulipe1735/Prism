@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WorkspaceExecutor } from "./index";
 
@@ -41,6 +41,19 @@ async function heartbeatStops(filePath: string) {
   const second = await stat(filePath);
   expect(second.size).toBe(first.size);
   expect(second.mtimeMs).toBe(first.mtimeMs);
+}
+
+async function waitForHeartbeat(filePath: string) {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    try {
+      await stat(filePath);
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+  throw new Error(`Heartbeat ${filePath} did not start.`);
 }
 
 beforeEach(async () => {
@@ -101,6 +114,10 @@ beforeEach(async () => {
       },
       {
         command: { executable: "node", arguments: ["tree.mjs", "cancel-heartbeat"] },
+        workingDirectories: ["."],
+      },
+      {
+        command: { executable: "node", arguments: ["tree.mjs", "cleanup-heartbeat"] },
         workingDirectories: ["."],
       },
     ],
@@ -247,6 +264,12 @@ describe("WorkspaceExecutor", () => {
       ],
     });
     expect(patched).toMatchObject({ status: "succeeded", operation: "patch" });
+    expect(
+      patched.details.operation === "patch" && patched.details.files[0]?.diff,
+    ).toContain("-export const visible = true;");
+    expect(
+      patched.details.operation === "patch" && patched.details.files[0]?.diff,
+    ).toContain("+export const visible = false;");
     expect(await readFile(path.join(root, "src", "visible.ts"), "utf8")).toContain(
       "false",
     );
@@ -273,7 +296,7 @@ describe("WorkspaceExecutor", () => {
   it("times out and terminates the complete spawned process tree", async () => {
     const heartbeat = path.join(root, "timeout-heartbeat");
     const evidence = await executor.execute({
-      ...testRequest("tree.mjs", 120),
+      ...testRequest("tree.mjs", 500),
       command: {
         executable: "node",
         arguments: ["tree.mjs", "timeout-heartbeat"],
@@ -287,7 +310,9 @@ describe("WorkspaceExecutor", () => {
   it("cancels and terminates the complete spawned process tree", async () => {
     const heartbeat = path.join(root, "cancel-heartbeat");
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 120);
+    const cancelWhenStarted = waitForHeartbeat(heartbeat).then(() => {
+      controller.abort();
+    });
     const evidence = await executor.execute(
       {
         ...testRequest("tree.mjs", 2_000),
@@ -299,7 +324,35 @@ describe("WorkspaceExecutor", () => {
       { signal: controller.signal },
     );
 
+    await cancelWhenStarted;
     expect(evidence.status).toBe("cancelled");
     await heartbeatStops(heartbeat);
+  });
+
+  it("reports process-tree cleanup failures with a dedicated reason", async () => {
+    const heartbeat = path.join(root, "cleanup-heartbeat");
+    const originalKill = process.kill.bind(process);
+    const kill = vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+      originalKill(pid, signal);
+      throw Object.assign(new Error("simulated cleanup failure"), { code: "EPERM" });
+    });
+
+    try {
+      const evidence = await executor.execute({
+        ...testRequest("tree.mjs", 500),
+        command: {
+          executable: "node",
+          arguments: ["tree.mjs", "cleanup-heartbeat"],
+        },
+      });
+
+      expect(evidence).toMatchObject({
+        status: "failed",
+        reasonCode: "process_cleanup_failed",
+      });
+      await heartbeatStops(heartbeat);
+    } finally {
+      kill.mockRestore();
+    }
   });
 });

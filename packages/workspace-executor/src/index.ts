@@ -40,6 +40,7 @@ import {
   type WorkspaceRequest,
   workspaceRequestSchema,
 } from "@prism/contracts";
+import { createPatch } from "diff";
 import { execa } from "execa";
 import fg from "fast-glob";
 import createIgnore from "ignore";
@@ -161,6 +162,14 @@ class WorkspaceDeniedError extends Error {
     super(message);
     this.name = "WorkspaceDeniedError";
     this.reasonCode = reasonCode;
+  }
+}
+
+/** 子进程树无法确认终止时的内部异常。 */
+class ProcessCleanupError extends Error {
+  constructor(cause: unknown) {
+    super("The spawned process tree could not be cleaned up.", { cause });
+    this.name = "ProcessCleanupError";
   }
 }
 
@@ -322,6 +331,16 @@ export class WorkspaceExecutor {
       }
       return await this.test(request, startedAt, executionOptions.signal);
     } catch (error) {
+      if (error instanceof ProcessCleanupError) {
+        return this.finish(
+          request,
+          "failed",
+          "process_cleanup_failed",
+          error.message,
+          emptyDetails(request.operation, request),
+          startedAt,
+        );
+      }
       if (error instanceof WorkspaceDeniedError) {
         return this.finish(
           request,
@@ -595,7 +614,7 @@ export class WorkspaceExecutor {
           `Patch target ${change.path} changed after it was inspected.`,
         );
       }
-      prepared.push({ change, candidate, beforeSha256 });
+      prepared.push({ change, candidate, before, beforeSha256 });
     }
 
     // 全部校验通过后才落盘：先写临时文件，成功后逐个 rename
@@ -618,12 +637,27 @@ export class WorkspaceExecutor {
       );
     }
 
-    const files = prepared.map(({ change, beforeSha256 }) => ({
-      path: change.path,
-      beforeSha256,
-      afterSha256: sha256(change.content),
-      byteLength: Buffer.byteLength(change.content),
-    }));
+    const files = prepared.map(({ change, before, beforeSha256 }) => {
+      const redactedBefore = this.redact(before?.toString("utf8") ?? "");
+      const redactedAfter = this.redact(change.content);
+      const rawDiff = createPatch(
+        change.path,
+        redactedBefore.text,
+        redactedAfter.text,
+        "before",
+        "after",
+      );
+      const boundedDiff = this.boundText(rawDiff, 64_000);
+      return {
+        path: change.path,
+        beforeSha256,
+        afterSha256: sha256(change.content),
+        byteLength: Buffer.byteLength(change.content),
+        diff: boundedDiff.text,
+        diffTruncated: boundedDiff.truncated,
+        redactionCount: redactedBefore.count + redactedAfter.count,
+      };
+    });
     return this.finish(
       request,
       "succeeded",
@@ -686,10 +720,17 @@ export class WorkspaceExecutor {
     // 超时与取消共用一次性的终止逻辑；先触发者生效
     let termination: "timed_out" | "cancelled" | null = null;
     let terminationPromise = Promise.resolve();
+    let rejectCleanupFailure: ((reason?: unknown) => void) | undefined;
+    const cleanupFailure = new Promise<never>((_resolve, reject) => {
+      rejectCleanupFailure = reject;
+    });
     const terminate = (kind: "timed_out" | "cancelled"): void => {
       if (termination !== null) return;
       termination = kind;
       terminationPromise = this.terminateProcessTree(child.pid);
+      void terminationPromise.catch((error: unknown) => {
+        rejectCleanupFailure?.(error);
+      });
     };
     const timer = setTimeout(() => terminate("timed_out"), request.timeoutMs);
     const cancel = (): void => terminate("cancelled");
@@ -697,7 +738,7 @@ export class WorkspaceExecutor {
 
     let result;
     try {
-      result = await child;
+      result = await Promise.race([child, cleanupFailure]);
       if (result.isMaxBuffer) {
         await this.terminateProcessTree(child.pid);
       }
@@ -862,24 +903,31 @@ export class WorkspaceExecutor {
    */
   private async terminateProcessTree(pid: number | undefined): Promise<void> {
     if (pid === undefined) return;
-    if (process.platform === "win32") {
-      await execa("taskkill.exe", ["/pid", String(pid), "/t", "/f"], {
-        reject: false,
-        windowsHide: true,
-      });
-      return;
-    }
+    try {
+      if (process.platform === "win32") {
+        const result = await execa("taskkill.exe", ["/pid", String(pid), "/t", "/f"], {
+          reject: false,
+          windowsHide: true,
+        });
+        if (result.exitCode !== 0) {
+          throw new Error(`taskkill.exe exited with code ${result.exitCode}.`);
+        }
+        return;
+      }
 
-    try {
-      process.kill(-pid, "SIGTERM");
+      try {
+        process.kill(-pid, "SIGTERM");
+      } catch (error) {
+        if (!this.isNoSuchProcess(error)) throw error;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 75));
+      try {
+        process.kill(-pid, "SIGKILL");
+      } catch (error) {
+        if (!this.isNoSuchProcess(error)) throw error;
+      }
     } catch (error) {
-      if (!this.isNoSuchProcess(error)) throw error;
-    }
-    await new Promise<void>((resolve) => setTimeout(resolve, 75));
-    try {
-      process.kill(-pid, "SIGKILL");
-    } catch (error) {
-      if (!this.isNoSuchProcess(error)) throw error;
+      throw new ProcessCleanupError(error);
     }
   }
 

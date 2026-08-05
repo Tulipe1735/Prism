@@ -1,5 +1,5 @@
 /**
- * POST /api/runs/[runId]/orchestration —— 启动一次 mock 混合编排。
+ * POST /api/runs/[runId]/orchestration —— 启动一次 live 混合编排。
  *
  * Run 不存在返回 404；启动成功返回 202 + orchestration-start 响应
  * （编排在后台异步推进，首个 DAG 修订落盘后本次请求即返回）。
@@ -9,7 +9,7 @@ import {
   orchestrationStartResponseSchema,
 } from "@prism/contracts";
 
-import { startMockHybridRun } from "../../../../../lib/server/run-repository";
+import { startHybridRun } from "../../../../../lib/server/run-repository";
 import {
   contractErrorResponse,
   JSON_RESPONSE_HEADERS,
@@ -22,7 +22,7 @@ export async function POST(
   const { runId } = await params;
 
   try {
-    const started = await startMockHybridRun(runId);
+    const started = await startHybridRun(runId);
     if (!started) {
       return contractErrorResponse(
         404,
@@ -43,7 +43,7 @@ export async function POST(
     return contractErrorResponse(
       500,
       "run_storage_error",
-      "Prism could not start the durable mock Run.",
+      "Prism could not start the durable live Run.",
     );
   }
 }

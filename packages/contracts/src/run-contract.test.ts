@@ -4,6 +4,7 @@ import {
   artifactRefSchema,
   browserActionProposalSchema,
   browserBaselineRecordSchema,
+  piRuntimeResultSchema,
   runCreationSchema,
   runDagRevisionSchema,
   runDossierResponseSchema,
@@ -11,6 +12,7 @@ import {
   runListSchema,
   runManifestSchema,
   runSnapshotSchema,
+  runtimeTaskEnvelopeSchema,
   workspaceEvidenceRecordSchema,
   workspaceRequestSchema,
 } from "./index";
@@ -148,6 +150,75 @@ describe("Durable Run contracts", () => {
     expect(
       runDagRevisionSchema.safeParse({ ...revision, classification: "uncertain" })
         .success,
+    ).toBe(false);
+  });
+
+  it("bounds a coding runtime with a versioned task envelope and committed-only result", () => {
+    const envelope = {
+      schemaVersion: "prism.runtime-task-envelope/v1",
+      runId: manifest.runId,
+      dagRevision: 2,
+      nodeId: "node-2-workspace-patch-attempt-1",
+      nodeType: "workspace.patch",
+      attempt: 1,
+      maxAttempts: 2,
+      runtime: "coding",
+      prompt: request.prompt,
+      inputArtifacts: [artifact],
+      authority: { workspaceOperations: ["inspect", "patch", "test"] },
+      budget: {
+        maxModelCalls: 8,
+        maxInputTokens: 32_000,
+        maxOutputTokens: 8_000,
+        maxTotalTokens: 40_000,
+        maxCostUsd: 2,
+        maxDurationMs: 300_000,
+      },
+      deadline: "2026-08-05T09:05:00.000Z",
+      cancellationId: "cancel-6dbf6f33-69c4-4e5f-9898-3f693735f5f0",
+      correlationId: manifest.runId,
+      causationEventId: createdEvent.eventId,
+      idempotencyKey: `${manifest.runId}:2:node-2-workspace-patch-attempt-1:1`,
+    } as const;
+
+    expect(runtimeTaskEnvelopeSchema.parse(envelope)).toEqual(envelope);
+    expect(
+      runtimeTaskEnvelopeSchema.safeParse({
+        ...envelope,
+        nodeType: "browser.verify",
+      }).success,
+    ).toBe(false);
+
+    const result = {
+      schemaVersion: "prism.pi-runtime-result/v1",
+      outcome: {
+        nodeId: envelope.nodeId,
+        attempt: 1,
+        state: "succeeded",
+        summary: "The scoped source repair passed its final test.",
+        request: { kind: "successor", nodeType: "browser.verify" },
+        failure: null,
+      },
+      artifacts: [artifact],
+      usage: {
+        model: { provider: "faux", id: "faux-1" },
+        modelCalls: 5,
+        inputTokens: 2_000,
+        outputTokens: 500,
+        cacheReadTokens: 100,
+        cacheWriteTokens: 50,
+        totalTokens: 2_650,
+        costUsd: 0,
+        durationMs: 250,
+      },
+    } as const;
+
+    expect(piRuntimeResultSchema.parse(result)).toEqual(result);
+    expect(
+      piRuntimeResultSchema.safeParse({
+        ...result,
+        rawModelOutput: "uncommitted assistant prose",
+      }).success,
     ).toBe(false);
   });
 

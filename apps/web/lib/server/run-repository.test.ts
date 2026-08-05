@@ -1,3 +1,5 @@
+import type { PiSessionFactory } from "@prism/runtime-pi";
+
 import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -12,8 +14,8 @@ import {
   executeWorkspaceRequest,
   getRunDossier,
   listRecentRuns,
-  startMockHybridRun,
-  waitForMockHybridRun,
+  startHybridRun,
+  waitForHybridRun,
 } from "./run-repository";
 
 const request: RepairRequest = {
@@ -213,30 +215,139 @@ describe("Run repository", () => {
     }
   });
 
-  it("starts a mocked hybrid Run and exposes its durable DAG, progress, artifacts, and fence", async () => {
-    const creation = await createRun(request);
-
-    expect(await startMockHybridRun(creation.runId)).toBe(true);
-
-    const dossier = await waitForMockHybridRun(creation.runId);
-    expect(dossier).toMatchObject({
-      id: creation.runId,
-      dagRevisions: expect.arrayContaining([
-        expect.objectContaining({ revision: 1 }),
-        expect.objectContaining({ revision: 4 }),
-      ]),
-      effectLease: { token: 2, state: "released" },
+  it("starts a live hybrid Run and exposes Pi trajectory evidence in the durable dossier", async () => {
+    const workspaceDirectory = await mkdtemp(join(tmpdir(), "prism-live-run-"));
+    const initialPackage = JSON.stringify({
+      name: "prism-live-fixture",
+      private: true,
+      packageManager: "pnpm@9.15.9",
+      scripts: { test: 'node -e "process.exit(0)"' },
     });
-    expect(dossier?.nodeProgress).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          nodeType: "workspace.inspect",
-          state: "succeeded",
-          artifacts: [expect.objectContaining({ algorithm: "sha256" })],
-        }),
-        expect.objectContaining({ nodeType: "browser.verify", state: "succeeded" }),
-      ]),
+    const repairedPackage = JSON.stringify({
+      name: "prism-live-fixture",
+      description: "repaired by the Pi runtime",
+      private: true,
+      packageManager: "pnpm@9.15.9",
+      scripts: { test: 'node -e "process.exit(0)"' },
+    });
+    await writeFile(join(workspaceDirectory, "package.json"), initialPackage);
+    const creation = await createRun({
+      ...request,
+      workspace: {
+        kind: "local",
+        path: workspaceDirectory,
+        displayName: "prism-live-fixture",
+      },
+    });
+    const piSessionFactory = scriptedSuccessfulPiSessionFactory(
+      initialPackage,
+      repairedPackage,
     );
-    expect(dossier?.artifacts.length).toBeGreaterThan(1);
+
+    try {
+      expect(await startHybridRun(creation.runId, { piSessionFactory })).toBe(true);
+
+      const dossier = await waitForHybridRun(creation.runId);
+      expect(dossier).toMatchObject({
+        id: creation.runId,
+        dagRevisions: expect.arrayContaining([
+          expect.objectContaining({ revision: 1 }),
+          expect.objectContaining({ revision: 4 }),
+        ]),
+        effectLease: { token: 2, state: "released" },
+      });
+      expect(dossier?.nodeProgress).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            nodeType: "workspace.inspect",
+            state: "succeeded",
+            artifacts: expect.arrayContaining([
+              expect.objectContaining({
+                mediaType: "application/vnd.prism.pi-trajectory+json",
+              }),
+            ]),
+          }),
+          expect.objectContaining({
+            nodeType: "workspace.patch",
+            state: "succeeded",
+          }),
+          expect.objectContaining({ nodeType: "browser.verify", state: "succeeded" }),
+        ]),
+      );
+      expect(dossier?.workspaceEvidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            evidence: expect.objectContaining({ operation: "inspect" }),
+          }),
+          expect.objectContaining({
+            evidence: expect.objectContaining({
+              operation: "test",
+              status: "succeeded",
+            }),
+          }),
+        ]),
+      );
+    } finally {
+      await rm(workspaceDirectory, { recursive: true, force: true });
+    }
   });
 });
+
+function scriptedSuccessfulPiSessionFactory(
+  initialPackage: string,
+  repairedPackage: string,
+): PiSessionFactory {
+  const usage = {
+    model: { provider: "scripted", id: "scripted-1" },
+    modelCalls: 1,
+    inputTokens: 10,
+    outputTokens: 2,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    totalTokens: 12,
+    costUsd: 0,
+    durationMs: 1,
+  };
+  return {
+    model: usage.model,
+    create: async ({ handlers }) => ({
+      prompt: async () => {
+        if (handlers.patch && handlers.test) {
+          await handlers.inspect?.({ paths: ["package.json"], patterns: [] });
+          await handlers.patch({
+            files: [
+              {
+                path: "package.json",
+                expectedSha256: createHash("sha256")
+                  .update(initialPackage)
+                  .digest("hex"),
+                content: repairedPackage,
+              },
+            ],
+          });
+          await handlers.test({
+            command: { executable: "pnpm", arguments: ["test"] },
+            workingDirectory: ".",
+            timeoutMs: 30_000,
+          });
+          await handlers.submit({
+            state: "succeeded",
+            summary: "The scoped repair passed the final test.",
+            request: { kind: "successor", nodeType: "browser.verify" },
+          });
+          return;
+        }
+
+        await handlers.inspect?.({ paths: ["package.json"], patterns: [] });
+        await handlers.submit({
+          state: "succeeded",
+          summary: "The scoped workspace was inspected.",
+          request: { kind: "successor", nodeType: "workspace.patch" },
+        });
+      },
+      abort: async () => undefined,
+      dispose: () => undefined,
+      getUsage: () => usage,
+    }),
+  };
+}

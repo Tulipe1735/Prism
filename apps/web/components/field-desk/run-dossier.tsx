@@ -14,7 +14,7 @@ import {
 import {
   fetchRunDossier,
   runWorkspaceRequest,
-  startMockOrchestration,
+  startOrchestration,
 } from "@/lib/client/run-api";
 
 /**
@@ -49,7 +49,7 @@ function artifactUrl(runId: string, artifactHash: string): string {
  *  - 原始修复请求 + 持久化边界（清单创建时间/工作区/视口）；
  *  - 哈希产物清单（内容寻址存储的引用）；
  *  - 浏览器基线（观测前后的事实证据，含截图/trace/DOM 等产物链接）；
- *  - mock 混合编排（Run DAG 节点进度 + 副作用租约），可启动 mock Run；
+ *  - live 混合编排（Run DAG 节点进度 + 副作用租约），可启动 Run；
  *  - 受限工作区证据（inspect/test/patch 结果），可发起检查与测试。
  *
  * 数据通过 react-query 以 initialDossier 为初始值，Run 未结束时
@@ -77,9 +77,9 @@ export function RunDossierView({
       await queryClient.invalidateQueries({ queryKey: ["runs", runId] });
     },
   });
-  // 启动 mock 编排的变更
+  // 启动 live 编排的变更
   const orchestrationMutation = useMutation({
-    mutationFn: () => startMockOrchestration(runId),
+    mutationFn: () => startOrchestration(runId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["runs", runId] });
     },
@@ -349,16 +349,16 @@ export function RunDossierView({
         )}
       </section>
 
-      {/* mock 混合编排：Run DAG + 副作用租约 */}
+      {/* live 混合编排：Run DAG + 副作用租约 */}
       <section className="mt-10 border-t-2 border-stone-900 pt-7">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-stone-500">
-              MOCK HYBRID ORCHESTRATION / CANONICAL JOURNAL
+              LIVE HYBRID ORCHESTRATION / CANONICAL JOURNAL
             </p>
             <h2 className="mt-2 font-serif text-3xl">Dual-runtime Run DAG</h2>
           </div>
-          {/* 仅当尚无 DAG 修订时允许启动 mock Run */}
+          {/* 仅当尚无 DAG 修订时允许启动 Run */}
           <button
             className="border border-stone-900 px-3 py-2 font-mono text-[0.62rem] font-bold disabled:cursor-not-allowed disabled:opacity-50"
             disabled={orchestrationMutation.isPending || Boolean(latestRevision)}
@@ -368,22 +368,21 @@ export function RunDossierView({
             {orchestrationMutation.isPending
               ? "Starting durable Run…"
               : latestRevision
-                ? "Mock Run committed"
-                : "Start mock hybrid Run"}
+                ? "Run committed"
+                : "Start hybrid Run"}
           </button>
         </div>
 
         {orchestrationMutation.isError && (
           <p className="mt-5 border border-red-800 bg-red-50 p-4 text-sm text-red-900">
-            Prism could not start the mock Run. No source or browser effect was
+            Prism could not start the live Run. No source or browser effect was
             attempted.
           </p>
         )}
 
         {!latestRevision ? (
           <p className="mt-5 border border-dashed border-stone-500 p-5 text-sm text-stone-600">
-            Start the bounded mock Run to observe durable node progress and effect
-            fences.
+            Start the bounded Run to observe durable node progress and effect fences.
           </p>
         ) : (
           /* 最新修订的节点列表：类型/状态/前驱/DAG 修订/运行时/进度 */

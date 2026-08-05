@@ -1,56 +1,43 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-import {
-  createRun,
-  getRunDossier,
-  waitForMockHybridRun,
-} from "../../../../../lib/server/run-repository";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "./route";
 
-let dataDirectory: string;
-let previousDataDirectory: string | undefined;
+const startHybridRun = vi.hoisted(() => vi.fn());
 
-beforeEach(async () => {
-  previousDataDirectory = process.env.PRISM_DATA_DIR;
-  dataDirectory = await mkdtemp(join(tmpdir(), "prism-orchestration-route-"));
-  process.env.PRISM_DATA_DIR = dataDirectory;
-});
+vi.mock("../../../../../lib/server/run-repository", () => ({
+  startHybridRun,
+}));
 
-afterEach(async () => {
-  if (previousDataDirectory === undefined) delete process.env.PRISM_DATA_DIR;
-  else process.env.PRISM_DATA_DIR = previousDataDirectory;
-  await rm(dataDirectory, { recursive: true, force: true });
+const runId = "run_6dbf6f33-69c4-4e5f-9898-3f693735f5f0";
+
+beforeEach(() => {
+  startHybridRun.mockReset();
 });
 
 describe("POST /api/runs/:runId/orchestration", () => {
-  it("starts a mock hybrid Run and leaves its durable progress available to the dossier", async () => {
-    const creation = await createRun({
-      schemaVersion: "prism.repair-request/v1",
-      prompt: "Make the Save button visibly rounded and prove the rendered control.",
-      workspace: { kind: "local", path: "/tmp/prism-fixture", displayName: "fixture" },
-      viewport: { width: 1280, height: 720, deviceScaleFactor: 1 },
-    });
+  it("starts the live hybrid Run and returns its durable Run identity", async () => {
+    startHybridRun.mockResolvedValue(true);
 
     const response = await POST(new Request("http://localhost", { method: "POST" }), {
-      params: Promise.resolve({ runId: creation.runId }),
+      params: Promise.resolve({ runId }),
     });
 
     expect(response.status).toBe(202);
-    await expect(response.json()).resolves.toMatchObject({
+    await expect(response.json()).resolves.toEqual({
       schemaVersion: "prism.orchestration-start-response/v1",
       status: "started",
-      runId: creation.runId,
+      runId,
     });
-    await expect(getRunDossier(creation.runId)).resolves.toMatchObject({
-      dagRevisions: expect.arrayContaining([expect.objectContaining({ revision: 1 })]),
+    expect(startHybridRun).toHaveBeenCalledWith(runId);
+  });
+
+  it("returns not found when the Run does not exist", async () => {
+    startHybridRun.mockResolvedValue(false);
+
+    const response = await POST(new Request("http://localhost", { method: "POST" }), {
+      params: Promise.resolve({ runId }),
     });
-    await expect(waitForMockHybridRun(creation.runId)).resolves.toMatchObject({
-      dagRevisions: expect.arrayContaining([expect.objectContaining({ revision: 4 })]),
-    });
+
+    expect(response.status).toBe(404);
   });
 });
