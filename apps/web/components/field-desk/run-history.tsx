@@ -13,6 +13,7 @@ const filters: Array<{ label: string; value: RunStatusFilter }> = [
   { label: "All statuses", value: "all" },
   { label: "Created", value: "created" },
   { label: "Queued", value: "queued" },
+  { label: "Completed", value: "completed" },
   { label: "Terminal error", value: "terminal_error" },
 ];
 

@@ -22,6 +22,11 @@ export const REPAIR_REQUEST_VALIDATION_SCHEMA_VERSION =
   "prism.repair-request-validation/v1" as const;
 export const FRONTEND_REPAIR_SPEC_SCHEMA_VERSION =
   "prism.frontend-repair-spec/v1" as const;
+export const FRONTEND_REPAIR_SPEC_MEDIA_TYPE =
+  "application/vnd.prism.frontend-repair-spec+json" as const;
+export const CODE_ORACLE_REPORT_MEDIA_TYPE =
+  "application/vnd.prism.code-oracle-report+json" as const;
+export const RUN_COMPLETION_SCHEMA_VERSION = "prism.run-completion/v1" as const;
 export const CONTRACT_ERROR_SCHEMA_VERSION = "prism.contract-error/v1" as const;
 export const ARTIFACT_REF_SCHEMA_VERSION = "prism.artifact-ref/v1" as const;
 export const RUN_MANIFEST_SCHEMA_VERSION = "prism.run-manifest/v1" as const;
@@ -409,6 +414,23 @@ export const frontendRepairSpecSchema = z
     predicates: z.array(frontendRepairPredicateSchema).min(1).max(16),
   })
   .strict();
+
+/** 已提交的归一化规范及其内容寻址引用。 */
+export const frontendRepairSpecRecordSchema = z
+  .object({
+    spec: frontendRepairSpecSchema,
+    artifact: artifactRefSchema,
+  })
+  .strict()
+  .superRefine((record, context) => {
+    if (record.artifact.mediaType !== FRONTEND_REPAIR_SPEC_MEDIA_TYPE) {
+      context.addIssue({
+        code: "custom",
+        path: ["artifact", "mediaType"],
+        message: "The repair spec must cite its committed repair-spec artifact.",
+      });
+    }
+  });
 
 /**
  * 浏览器基线请求：请求为某 Run 在指定路由上对某个目标建立可复现基线。
@@ -1019,6 +1041,42 @@ export const runtimeBudgetSchema = z
     }
   });
 
+/** task.complete 的可重放终态证据。 */
+export const runCompletionSchema = z
+  .object({
+    schemaVersion: z.literal(RUN_COMPLETION_SCHEMA_VERSION),
+    terminalDagRevision: z.number().int().positive(),
+    budgets: z
+      .object({ code: runtimeBudgetSchema, browser: browserRuntimeBudgetSchema })
+      .strict(),
+    approvals: z.array(z.enum(["source_effect", "browser_effect"])).max(2),
+    codeOracle: artifactRefSchema,
+    browserVerificationReportId: z.string().uuid(),
+    verificationRefs: z.array(artifactRefSchema).min(2).max(24),
+    completedAt: isoDateTimeSchema,
+  })
+  .strict()
+  .superRefine((completion, context) => {
+    if (completion.codeOracle.mediaType !== CODE_ORACLE_REPORT_MEDIA_TYPE) {
+      context.addIssue({
+        code: "custom",
+        path: ["codeOracle", "mediaType"],
+        message: "Completion requires a committed passing code-Oracle report.",
+      });
+    }
+    if (
+      !completion.verificationRefs.some(
+        (artifact) => artifact.hash === completion.codeOracle.hash,
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["verificationRefs"],
+        message: "Completion verification references must include the code Oracle.",
+      });
+    }
+  });
+
 /**
  * 交给同进程 Pi SDK 会话的完整、版本化任务边界。
  *
@@ -1490,6 +1548,24 @@ export const runQueuedEventSchema = z
   })
   .strict();
 
+/** Run 在任何源码副作用前提交归一化修复规范。 */
+export const runRepairSpecEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("run.repair-spec"),
+    payload: frontendRepairSpecRecordSchema,
+  })
+  .strict();
+
+/** 双 Oracle 通过后提交不可变完成记录。 */
+export const runCompletedEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("run.completed"),
+    payload: runCompletionSchema,
+  })
+  .strict();
+
 /**
  * Run 终止错误事件：写入不可恢复的存储/日志错误。
  */
@@ -1584,6 +1660,8 @@ export const effectLeaseEventSchema = z
 export const runEventSchema = z.discriminatedUnion("type", [
   runCreatedEventSchema,
   runQueuedEventSchema,
+  runRepairSpecEventSchema,
+  runCompletedEventSchema,
   runTerminalErrorEventSchema,
   workspaceEvidenceEventSchema,
   browserBaselineEventSchema,
@@ -1597,7 +1675,12 @@ export const runEventSchema = z.discriminatedUnion("type", [
 /**
  * Run 生命周期状态：已创建 / 排队中 / 终止错误。
  */
-export const runStatusSchema = z.enum(["created", "queued", "terminal_error"]);
+export const runStatusSchema = z.enum([
+  "created",
+  "queued",
+  "completed",
+  "terminal_error",
+]);
 
 /**
  * Run 快照：由事件日志重放聚合出的当前状态。
@@ -1618,9 +1701,9 @@ export const runSnapshotSchema = z
     workspaceEvidence: z.array(workspaceEvidenceRecordSchema).default([]),
     browserBaselines: z.array(browserBaselineRecordSchema).default([]),
     browserActions: z.array(browserActionRecordSchema).default([]),
-    browserVerificationReports: z
-      .array(browserVerificationReportSchema)
-      .default([]),
+    browserVerificationReports: z.array(browserVerificationReportSchema).default([]),
+    repairSpec: frontendRepairSpecRecordSchema.nullable().default(null),
+    completion: runCompletionSchema.nullable().default(null),
     dagRevisions: z.array(runDagRevisionSchema).default([]),
     nodeProgress: z.array(runNodeProgressSchema).default([]),
     effectLease: effectLeaseSchema.nullable().default(null),
@@ -1670,9 +1753,9 @@ export const runDossierSchema = runSummarySchema
     workspaceEvidence: z.array(workspaceEvidenceRecordSchema).default([]),
     browserBaselines: z.array(browserBaselineRecordSchema).default([]),
     browserActions: z.array(browserActionRecordSchema).default([]),
-    browserVerificationReports: z
-      .array(browserVerificationReportSchema)
-      .default([]),
+    browserVerificationReports: z.array(browserVerificationReportSchema).default([]),
+    repairSpec: frontendRepairSpecRecordSchema.nullable().default(null),
+    completion: runCompletionSchema.nullable().default(null),
     dagRevisions: z.array(runDagRevisionSchema).default([]),
     nodeProgress: z.array(runNodeProgressSchema).default([]),
     effectLease: effectLeaseSchema.nullable().default(null),
@@ -1754,10 +1837,9 @@ export type BrowserTarget = z.infer<typeof browserTargetSchema>;
 export type BrowserVerificationAssertion = z.infer<
   typeof browserVerificationAssertionSchema
 >;
-export type BrowserVerificationReport = z.infer<
-  typeof browserVerificationReportSchema
->;
+export type BrowserVerificationReport = z.infer<typeof browserVerificationReportSchema>;
 export type RunCreation = z.infer<typeof runCreationSchema>;
+export type RunCompletion = z.infer<typeof runCompletionSchema>;
 export type RunDossier = z.infer<typeof runDossierSchema>;
 export type RunEvent = z.infer<typeof runEventSchema>;
 export type RunList = z.infer<typeof runListSchema>;
@@ -1780,6 +1862,7 @@ export type ValidationIssue = z.infer<typeof validationIssueSchema>;
 export type Viewport = z.infer<typeof viewportSchema>;
 export type FrontendRepairPredicate = z.infer<typeof frontendRepairPredicateSchema>;
 export type FrontendRepairSpec = z.infer<typeof frontendRepairSpecSchema>;
+export type FrontendRepairSpecRecord = z.infer<typeof frontendRepairSpecRecordSchema>;
 export type SemanticBrowserTarget = z.infer<typeof semanticBrowserTargetSchema>;
 
 /**

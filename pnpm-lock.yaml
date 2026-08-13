@@ -38,6 +38,9 @@ importers:
       '@prism/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@prism/oracle':
+        specifier: workspace:*
+        version: link:../../packages/oracle
       '@prism/orchestrator':
         specifier: workspace:*
         version: link:../../packages/orchestrator

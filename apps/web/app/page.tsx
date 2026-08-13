@@ -80,8 +80,8 @@ export default async function FieldDeskPage() {
           </h1>
           <p className="mt-6 max-w-md font-serif text-sm leading-7 text-stone-600">
             Describe the visible problem. Prism validates both boundaries and commits a
-            durable Run now. Later runtime slices will inspect, repair, and return
-            rendered proof.
+            durable Run now. The round-button Tracer Bullet inspects, repairs, and
+            returns rendered proof through the live dual-runtime seam.
           </p>
         </div>
 
@@ -90,7 +90,7 @@ export default async function FieldDeskPage() {
         {/* 规划中的运行流程：Understand → Reproduce → Repair & prove */}
         <aside className="rotate-[0.35deg] bg-blue-600 p-6 text-blue-50 shadow-[-7px_7px_0_rgba(41,37,36,0.14)]">
           <div className="flex items-center justify-between border-b border-blue-100/50 pb-4 font-mono text-[0.63rem] font-bold tracking-[0.13em]">
-            <span>PLANNED RUN FLOW</span>
+            <span>LIVE RUN FLOW</span>
             <Waypoints aria-hidden size={19} />
           </div>
           <ol className="divide-y divide-blue-100/25">

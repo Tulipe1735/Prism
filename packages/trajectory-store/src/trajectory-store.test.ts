@@ -461,6 +461,14 @@ describe("FileTrajectoryStore", () => {
       token: 1,
       holderNodeId: "node-1-workspace-inspect",
       effectClass: "source_effect",
+      state: "active",
+      recordedAt,
+    });
+    await store.recordEffectLease(runId, {
+      schemaVersion: "prism.effect-lease/v1",
+      token: 1,
+      holderNodeId: "node-1-workspace-inspect",
+      effectClass: "source_effect",
       state: "released",
       recordedAt,
     });

@@ -41,10 +41,14 @@ import {
   browserVerificationReportSchema,
   type EffectLease,
   effectLeaseSchema,
+  type FrontendRepairSpecRecord,
+  frontendRepairSpecRecordSchema,
   repairRequestSchema,
   RUN_EVENT_SCHEMA_VERSION,
   RUN_MANIFEST_SCHEMA_VERSION,
   RUN_SNAPSHOT_SCHEMA_VERSION,
+  type RunCompletion,
+  runCompletionSchema,
   type RunDagRevision,
   runDagRevisionSchema,
   type RunEvent,
@@ -246,6 +250,8 @@ export function projectRunEvents(
         browserBaselines: [],
         browserActions: [],
         browserVerificationReports: [],
+        repairSpec: null,
+        completion: null,
         dagRevisions: [],
         nodeProgress: [],
         effectLease: null,
@@ -255,7 +261,11 @@ export function projectRunEvents(
     }
 
     // 创建事件之后，终止状态后不允许再追加事件
-    if (snapshot === null || snapshot.status === "terminal_error") {
+    if (
+      snapshot === null ||
+      snapshot.status === "terminal_error" ||
+      snapshot.status === "completed"
+    ) {
       throw new RunIntegrityError(
         "corrupt_event",
         "The Run journal contains an event after an invalid or terminal state.",
@@ -268,6 +278,23 @@ export function projectRunEvents(
         status: "queued",
         updatedAt: event.recordedAt,
         lastSequence: event.sequence,
+      });
+      return;
+    }
+
+    if (event.type === "run.repair-spec") {
+      if (snapshot.repairSpec !== null) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "A Run may commit its normalized repair spec only once.",
+        );
+      }
+      snapshot = runSnapshotSchema.parse({
+        ...snapshot,
+        updatedAt: event.recordedAt,
+        lastSequence: event.sequence,
+        artifacts: uniqueArtifacts(snapshot.artifacts, [event.payload.artifact]),
+        repairSpec: event.payload,
       });
       return;
     }
@@ -340,11 +367,11 @@ export function projectRunEvents(
         ...snapshot,
         updatedAt: event.recordedAt,
         lastSequence: event.sequence,
-        artifacts: uniqueArtifacts(
-          snapshot.artifacts,
-          event.payload.evidenceRefs,
-        ),
-        browserVerificationReports: [...snapshot.browserVerificationReports, event.payload],
+        artifacts: uniqueArtifacts(snapshot.artifacts, event.payload.evidenceRefs),
+        browserVerificationReports: [
+          ...snapshot.browserVerificationReports,
+          event.payload,
+        ],
       });
       return;
     }
@@ -397,11 +424,55 @@ export function projectRunEvents(
     }
 
     if (event.type === "run.effect-lease") {
+      const previous = snapshot.effectLease;
+      const validAcquisition =
+        event.payload.state === "active" &&
+        (previous === null || previous.state === "released") &&
+        event.payload.token > (previous?.token ?? 0);
+      const validRelease =
+        event.payload.state === "released" &&
+        previous?.state === "active" &&
+        event.payload.token === previous.token &&
+        event.payload.holderNodeId === previous.holderNodeId &&
+        event.payload.effectClass === previous.effectClass;
+      if (!validAcquisition && !validRelease) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Effect leases must acquire a newer fencing token and release that exact active lease.",
+        );
+      }
       snapshot = runSnapshotSchema.parse({
         ...snapshot,
         updatedAt: event.recordedAt,
         lastSequence: event.sequence,
         effectLease: event.payload,
+      });
+      return;
+    }
+
+    if (event.type === "run.completed") {
+      const report = snapshot.browserVerificationReports.find(
+        ({ reportId }) => reportId === event.payload.browserVerificationReportId,
+      );
+      const committedHashes = new Set(snapshot.artifacts.map(({ hash }) => hash));
+      if (
+        snapshot.repairSpec === null ||
+        snapshot.dagRevisions.at(-1)?.revision !== event.payload.terminalDagRevision ||
+        report?.verdict !== "passed" ||
+        snapshot.effectLease?.state !== "released" ||
+        event.payload.verificationRefs.some(({ hash }) => !committedHashes.has(hash))
+      ) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Run completion requires the committed spec, terminal DAG, released lease, and passing dual-Oracle evidence.",
+        );
+      }
+      snapshot = runSnapshotSchema.parse({
+        ...snapshot,
+        status: "completed",
+        updatedAt: event.recordedAt,
+        lastSequence: event.sequence,
+        completion: event.payload,
       });
       return;
     }
@@ -679,6 +750,60 @@ export class FileTrajectoryStore {
       });
       await this.commitEvent(current, event);
       return report;
+    });
+  }
+
+  /** 在任何源码副作用前提交一次归一化修复规范。 */
+  async recordFrontendRepairSpec(
+    runIdInput: string,
+    recordInput: unknown,
+  ): Promise<FrontendRepairSpecRecord> {
+    const runId = runIdSchema.parse(runIdInput);
+
+    return this.withRunWrite(runId, async () => {
+      const current = await this.loadRun(runId);
+      const record = frontendRepairSpecRecordSchema.parse(recordInput);
+      const previousEvent = current.events.at(-1);
+      const event = asEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: this.eventIdFactory(),
+        runId,
+        sequence: current.events.length + 1,
+        recordedAt: this.clock().toISOString(),
+        correlationId: runId,
+        causationEventId: previousEvent?.eventId ?? null,
+        type: "run.repair-spec",
+        payload: record,
+      });
+      await this.commitEvent(current, event);
+      return record;
+    });
+  }
+
+  /** 双 Oracle 通过后提交 Run 的终态。 */
+  async recordRunCompletion(
+    runIdInput: string,
+    completionInput: unknown,
+  ): Promise<RunCompletion> {
+    const runId = runIdSchema.parse(runIdInput);
+
+    return this.withRunWrite(runId, async () => {
+      const current = await this.loadRun(runId);
+      const completion = runCompletionSchema.parse(completionInput);
+      const previousEvent = current.events.at(-1);
+      const event = asEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: this.eventIdFactory(),
+        runId,
+        sequence: current.events.length + 1,
+        recordedAt: this.clock().toISOString(),
+        correlationId: runId,
+        causationEventId: previousEvent?.eventId ?? null,
+        type: "run.completed",
+        payload: completion,
+      });
+      await this.commitEvent(current, event);
+      return completion;
     });
   }
 

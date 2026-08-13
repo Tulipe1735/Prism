@@ -64,8 +64,7 @@ import {
   type Page,
 } from "playwright-core";
 
-const UI_TARS_TRAJECTORY_MEDIA_TYPE =
-  "application/vnd.prism.ui-tars-trajectory+json";
+const UI_TARS_TRAJECTORY_MEDIA_TYPE = "application/vnd.prism.ui-tars-trajectory+json";
 
 /** 浏览器端口：运行时所需的浏览器原语集合（只读观测 + 坐标/语义点击）。 */
 export interface UiTarsBrowserPort {
@@ -120,6 +119,7 @@ export interface UiTarsVerifier {
   }) => Promise<{
     assertion: string;
     status: "passed" | "failed" | "inconclusive";
+    evidenceRefs?: ArtifactRef[];
   }>;
 }
 
@@ -146,7 +146,7 @@ export class PrismBrowserOperator extends Operator {
   static MANUAL = {
     ACTION_SPACES: [
       'click(start_box="[x1, y1, x2, y2]") # click the element inside the given box',
-      'finished() # the repair is verified; finish the browser task',
+      "finished() # the repair is verified; finish the browser task",
     ],
   };
 
@@ -335,10 +335,8 @@ export async function createConfiguredUiTarsSdkSessionFactory(options: {
   model?: string;
   maxLoopCount?: number;
 }): Promise<UiTarsSdkSessionFactory> {
-  const baseURL =
-    options.baseURL?.trim() || process.env.PRISM_UI_TARS_BASE_URL?.trim();
-  const apiKey =
-    options.apiKey?.trim() || process.env.PRISM_UI_TARS_API_KEY?.trim();
+  const baseURL = options.baseURL?.trim() || process.env.PRISM_UI_TARS_BASE_URL?.trim();
+  const apiKey = options.apiKey?.trim() || process.env.PRISM_UI_TARS_API_KEY?.trim();
   const model = options.model?.trim() || process.env.PRISM_UI_TARS_MODEL?.trim();
   if (!baseURL || !apiKey || !model) {
     throw new UiTarsConfigurationError(
@@ -366,7 +364,10 @@ export class PlaywrightBrowserPortFactory implements UiTarsBrowserPortFactory {
   private readonly browserType: Pick<BrowserType<Browser>, "launch">;
 
   constructor(
-    private readonly options: { executablePath?: string; browserType?: Pick<BrowserType<Browser>, "launch"> } = {},
+    private readonly options: {
+      executablePath?: string;
+      browserType?: Pick<BrowserType<Browser>, "launch">;
+    } = {},
   ) {
     this.browserType = options.browserType ?? chromium;
   }
@@ -673,7 +674,8 @@ export class UiTarsBrowserRuntime {
       abortReason,
       cleanupFailed,
       operator,
-    );    const usage = session?.getUsage() ?? {
+    );
+    const usage = session?.getUsage() ?? {
       model: this.options.sessionFactory.model,
       modelCalls: 0,
       loopCount: 0,
@@ -735,7 +737,7 @@ export class UiTarsBrowserRuntime {
         intentLinked: true,
         kind: "deterministic",
         status: result.status,
-        evidenceRefs: [screenshotArtifact],
+        evidenceRefs: [screenshotArtifact, ...(result.evidenceRefs ?? [])],
       };
     } else {
       deterministic = {
@@ -773,7 +775,7 @@ export class UiTarsBrowserRuntime {
       intent,
       verdict,
       assertions: [deterministic, supplemental],
-      evidenceRefs: [screenshotArtifact],
+      evidenceRefs: deterministic.evidenceRefs,
       limitations: [],
       redactions: [],
       recordedAt: this.clock().toISOString(),
@@ -790,16 +792,15 @@ export class UiTarsBrowserRuntime {
   ): NodeOutcome {
     const failureCode: UiTarsFailureCode | undefined = cleanupFailed
       ? "process_cleanup_failed"
-      : abortReason ??
+      : (abortReason ??
         (envelope.nodeType === "browser.verify" &&
         verificationReport?.verdict !== "passed"
           ? "verification_failed"
-          : undefined);
+          : undefined));
 
     if (failureCode) {
       const retryable =
-        (failureCode === "timed_out" ||
-          failureCode === "verification_failed") &&
+        (failureCode === "timed_out" || failureCode === "verification_failed") &&
         envelope.attempt < envelope.maxAttempts;
       return nodeOutcomeSchema.parse({
         nodeId: envelope.nodeId,

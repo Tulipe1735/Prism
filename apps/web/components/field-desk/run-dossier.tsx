@@ -198,6 +198,28 @@ export function RunDossierView({
           </pre>
         </article>
 
+        {dossier.repairSpec && (
+          <article className="border border-stone-500 bg-white/40 p-5 lg:col-span-2">
+            <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em]">
+              COMMITTED FRONTEND REPAIR SPEC
+            </p>
+            <p className="mt-3 text-sm">
+              {dossier.repairSpec.spec.target.role} /{" "}
+              {dossier.repairSpec.spec.target.name}
+              {" · "}
+              {dossier.repairSpec.spec.predicates.map(({ kind }) => kind).join(" · ")}
+            </p>
+            <a
+              className="mt-3 inline-block break-all font-mono text-[0.58rem] underline underline-offset-4"
+              href={artifactUrl(runId, dossier.repairSpec.artifact.hash)}
+              rel="noreferrer"
+              target="_blank"
+            >
+              SPEC SHA-256 / {dossier.repairSpec.artifact.hash}
+            </a>
+          </article>
+        )}
+
         <aside className="border border-stone-500 bg-white/40 p-5">
           <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em]">
             DURABLE BOUNDARIES
@@ -224,6 +246,28 @@ export function RunDossierView({
           </dl>
         </aside>
       </div>
+
+      {dossier.completion && (
+        <section className="mt-10 border-2 border-emerald-800 bg-emerald-50 p-5 text-emerald-950">
+          <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em]">
+            TASK COMPLETE / DUAL ORACLES PASSED
+          </p>
+          <p className="mt-3 text-sm leading-6">
+            Terminal DAG revision {dossier.completion.terminalDagRevision}; code Oracle
+            and Browser Verification report{" "}
+            {dossier.completion.browserVerificationReportId} cite{" "}
+            {dossier.completion.verificationRefs.length} committed artifacts.
+          </p>
+          <a
+            className="mt-3 inline-block font-mono text-[0.58rem] underline underline-offset-4"
+            href={artifactUrl(runId, dossier.completion.codeOracle.hash)}
+            rel="noreferrer"
+            target="_blank"
+          >
+            OPEN CODE ORACLE / {dossier.completion.codeOracle.hash.slice(0, 12)}
+          </a>
+        </section>
+      )}
 
       {/* 哈希产物清单 */}
       <section className="mt-10 border-t border-stone-400 pt-7">
@@ -387,7 +431,9 @@ export function RunDossierView({
                     >
                       <span className="break-all">
                         <span className="font-mono">
-                          {assertion.kind === "deterministic" ? "DETERMINISTIC" : "SUPPLEMENTAL"}
+                          {assertion.kind === "deterministic"
+                            ? "DETERMINISTIC"
+                            : "SUPPLEMENTAL"}
                           {assertion.intentLinked ? " / INTENT-LINKED" : ""}
                         </span>
                         {" · "}
@@ -434,18 +480,20 @@ export function RunDossierView({
             </p>
             <h2 className="mt-2 font-serif text-3xl">Dual-runtime Run DAG</h2>
           </div>
-          {/* 仅当尚无 DAG 修订时允许启动 Run */}
+          {/* 启动是幂等的；未完成 Run 可在进程重启后从节点边界恢复。 */}
           <button
             className="border border-stone-900 px-3 py-2 font-mono text-[0.62rem] font-bold disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={orchestrationMutation.isPending || Boolean(latestRevision)}
+            disabled={orchestrationMutation.isPending || dossier.status === "completed"}
             onClick={() => orchestrationMutation.mutate()}
             type="button"
           >
             {orchestrationMutation.isPending
               ? "Starting durable Run…"
-              : latestRevision
-                ? "Run committed"
-                : "Start hybrid Run"}
+              : dossier.status === "completed"
+                ? "Run completed"
+                : latestRevision
+                  ? "Resume hybrid Run"
+                  : "Start hybrid Run"}
           </button>
         </div>
 

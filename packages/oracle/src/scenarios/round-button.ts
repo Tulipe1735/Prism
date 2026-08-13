@@ -10,7 +10,8 @@
  * fixtures/react-repair 与当前 HEAD —— 调用方必须确保 fixture 已以缺陷态
  * 提交。
  */
-import { fileURLToPath } from "node:url";
+import path from "node:path";
+import process from "node:process";
 
 import { execa } from "execa";
 
@@ -22,9 +23,7 @@ import {
   scenarioManifestSchema,
 } from "../scenario-manifest";
 
-const DEFAULT_FIXTURE_ROOT = fileURLToPath(
-  new URL("../../../../fixtures/react-repair", import.meta.url),
-);
+const DEFAULT_FIXTURE_ROOT = path.resolve(process.cwd(), "../../fixtures/react-repair");
 
 const KNOWN_BAD_SOURCE_FILES = [
   "src/routes/round-button.tsx",

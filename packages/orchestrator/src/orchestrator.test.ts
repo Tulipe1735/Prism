@@ -133,6 +133,7 @@ describe("Orchestrator", () => {
       },
       appendBrowserAction: async () => undefined,
       appendVerificationReport: async () => undefined,
+      appendRunCompletion: async () => undefined,
     };
 
     const codingRuntime = {

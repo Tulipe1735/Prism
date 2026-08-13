@@ -22,6 +22,7 @@ import {
   browserRuntimeResultSchema,
   type BrowserRuntimeTaskEnvelope,
   type BrowserVerificationReport,
+  CODE_ORACLE_REPORT_MEDIA_TYPE,
   type EffectLease,
   type NodeOutcome,
   nodeOutcomeSchema,
@@ -31,6 +32,7 @@ import {
   type RouterClassification,
   type RouterDecision,
   routerDecisionSchema,
+  type RunCompletion,
   type RunDagNode,
   runDagNodeRegistry,
   type RunDagNodeType,
@@ -195,6 +197,11 @@ export class DagScheduler {
     this.maxReadOnlyConcurrency = Math.max(1, options.maxReadOnlyConcurrency ?? 2);
   }
 
+  /** 恢复时把下一租约推进到持久化 token 之后。 */
+  advanceFencingTokenTo(token: number): void {
+    this.nextFencingToken = Math.max(this.nextFencingToken, token);
+  }
+
   /**
    * 运行一组节点，返回 nodeId → 执行结果的映射。
    *
@@ -283,6 +290,7 @@ export interface OrchestrationJournal {
   appendEffectLease: (lease: EffectLease) => Promise<void>;
   appendBrowserAction: (record: BrowserActionRecord) => Promise<void>;
   appendVerificationReport: (report: BrowserVerificationReport) => Promise<void>;
+  appendRunCompletion: (completion: RunCompletion) => Promise<void>;
 }
 
 /** Pi Coding Runtime 的进程中立调用边界。 */
@@ -318,6 +326,14 @@ export interface ExecuteHybridRunInput {
   budget?: RuntimeBudget;
   browserBudget?: BrowserRuntimeBudget;
   signal?: AbortSignal;
+  resume?: {
+    revision: RunDagRevision;
+    completedNodeIds: readonly string[];
+    artifacts: readonly ArtifactRef[];
+    latestVerificationReport: BrowserVerificationReport | null;
+    fencingTokenFloor: number;
+  };
+  stopAfterNodeType?: RunDagNodeType;
 }
 
 /** Orchestrator 构造选项，全部可注入以便测试。 */
@@ -521,14 +537,19 @@ export class Orchestrator {
    * @returns 无更多就绪节点时的最终修订（通常含 task.complete）
    */
   async executeHybridRun(input: ExecuteHybridRunInput): Promise<RunDagRevision> {
-    const decision = this.router.route({ runId: input.runId, prompt: input.prompt });
-    let revision = decision.initialRevision;
-    const completedNodeIds = new Set<string>();
-    const artifacts: ArtifactRef[] = [];
+    const decision = input.resume
+      ? null
+      : this.router.route({ runId: input.runId, prompt: input.prompt });
+    let revision = input.resume?.revision ?? decision!.initialRevision;
+    const completedNodeIds = new Set(input.resume?.completedNodeIds ?? []);
+    const artifacts: ArtifactRef[] = [...(input.resume?.artifacts ?? [])];
+    let latestVerificationReport: BrowserVerificationReport | null =
+      input.resume?.latestVerificationReport ?? null;
     const budget = input.budget ?? DEFAULT_RUNTIME_BUDGET;
     const browserBudget = input.browserBudget ?? DEFAULT_BROWSER_BUDGET;
 
-    await input.journal.appendDagRevision(revision);
+    this.scheduler.advanceFencingTokenTo(input.resume?.fencingTokenFloor ?? 0);
+    if (!input.resume) await input.journal.appendDagRevision(revision);
 
     while (true) {
       // 就绪节点 = 未完成 且 所有前驱已完成
@@ -607,7 +628,9 @@ export class Orchestrator {
                 route: input.browserConfig.route,
                 target: input.browserConfig.target,
                 intent:
-                  node.nodeType === "browser.verify" ? input.prompt.slice(0, 500) : null,
+                  node.nodeType === "browser.verify"
+                    ? input.prompt.slice(0, 500)
+                    : null,
                 maxActions: browserBudget.maxActions,
               },
               budget: browserBudget,
@@ -628,16 +651,46 @@ export class Orchestrator {
               ),
             );
             if (runtimeResult.verificationReport) {
+              latestVerificationReport = runtimeResult.verificationReport;
               await input.journal.appendVerificationReport(
                 runtimeResult.verificationReport,
               );
             }
             result = runtimeResult;
           } else {
-            result = {
-              outcome: orchestratorOutcome(node, attempt),
-              artifacts: [],
-            };
+            const codeOracle = artifacts.find(
+              ({ mediaType }) => mediaType === CODE_ORACLE_REPORT_MEDIA_TYPE,
+            );
+            const completionEvidence =
+              node.nodeType === "task.complete" &&
+              codeOracle &&
+              latestVerificationReport?.verdict === "passed"
+                ? uniqueArtifacts([
+                    codeOracle,
+                    ...latestVerificationReport.evidenceRefs,
+                  ])
+                : null;
+            result =
+              node.nodeType !== "task.complete" || completionEvidence
+                ? {
+                    outcome: orchestratorOutcome(node, attempt),
+                    artifacts: completionEvidence ?? [],
+                  }
+                : {
+                    outcome: nodeOutcomeSchema.parse({
+                      nodeId: node.nodeId,
+                      attempt,
+                      state: "blocked",
+                      summary:
+                        "Task completion requires passing code and browser Oracle evidence.",
+                      request: { kind: "none" },
+                      failure: {
+                        code: "verification_failed",
+                        retryable: false,
+                      },
+                    }),
+                    artifacts: [],
+                  };
           }
           artifacts.push(...result.artifacts);
           await input.journal.appendNodeProgress({
@@ -652,6 +705,27 @@ export class Orchestrator {
             artifacts: result.artifacts,
             correlationId: input.runId,
           });
+          if (
+            node.nodeType === "task.complete" &&
+            result.outcome.state === "succeeded"
+          ) {
+            const codeOracle = result.artifacts.find(
+              ({ mediaType }) => mediaType === CODE_ORACLE_REPORT_MEDIA_TYPE,
+            );
+            if (!codeOracle || !latestVerificationReport) {
+              throw new TypeError("Completion evidence disappeared before commit.");
+            }
+            await input.journal.appendRunCompletion({
+              schemaVersion: "prism.run-completion/v1",
+              terminalDagRevision: revision.revision,
+              budgets: { code: budget, browser: browserBudget },
+              approvals: [],
+              codeOracle,
+              browserVerificationReportId: latestVerificationReport.reportId,
+              verificationRefs: result.artifacts,
+              completedAt: this.clock().toISOString(),
+            });
+          }
           return result.outcome;
         },
         { onLease: input.journal.appendEffectLease },
@@ -671,6 +745,16 @@ export class Orchestrator {
           revision = nextRevision;
           await input.journal.appendDagRevision(revision);
         }
+      }
+      if (
+        input.stopAfterNodeType &&
+        [...outcomes.keys()].some(
+          (nodeId) =>
+            revision.nodes.find((node) => node.nodeId === nodeId)?.nodeType ===
+            input.stopAfterNodeType,
+        )
+      ) {
+        return revision;
       }
     }
   }

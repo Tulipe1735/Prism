@@ -1,3 +1,6 @@
+import { Buffer } from "node:buffer";
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 /**
  * Field Desk 服务端 Run 仓库（repository）
  *
@@ -21,10 +24,16 @@ import {
   type BrowserBaselineRecord,
   type BrowserBaselineRequest,
   browserBaselineRequestSchema,
+  type BrowserRuntimeResult,
+  type BrowserRuntimeTaskEnvelope,
+  CODE_ORACLE_REPORT_MEDIA_TYPE,
+  FRONTEND_REPAIR_SPEC_MEDIA_TYPE,
+  piRuntimeResultSchema,
   type RepairRequest,
   RUN_CREATION_SCHEMA_VERSION,
   type RunCreation,
   runCreationSchema,
+  type RunDagNodeType,
   type RunDossier,
   runDossierSchema,
   runIdSchema,
@@ -35,6 +44,13 @@ import {
   workspaceEvidenceRecordSchema,
   workspaceRequestSchema,
 } from "@prism/contracts";
+import {
+  BrowserOracle,
+  CodeOracle,
+  createRoundButtonScenario,
+  type RenderedTargetObservation,
+  type ScenarioManifest,
+} from "@prism/oracle";
 import { type OrchestrationJournal, Orchestrator } from "@prism/orchestrator";
 import {
   createConfiguredPiSdkSessionFactory,
@@ -61,6 +77,8 @@ import { WorkspaceExecutor } from "@prism/workspace-executor";
 const WORKSPACE_EVIDENCE_MEDIA_TYPE = "application/vnd.prism.workspace-evidence+json";
 /** 浏览器证据产物的媒体类型。 */
 const BROWSER_EVIDENCE_MEDIA_TYPE = "application/vnd.prism.browser-evidence+json";
+const BROWSER_ORACLE_OBSERVATION_MEDIA_TYPE =
+  "application/vnd.prism.browser-oracle-observation+json";
 
 /** 浏览器基线未配置（缺少 PRISM_BROWSER_BASE_URL）时抛出的错误。 */
 export class BrowserBaselineConfigurationError extends Error {}
@@ -123,6 +141,8 @@ function dossierFromRun(run: DurableRun): RunDossier {
     browserBaselines: run.snapshot.browserBaselines,
     browserActions: run.snapshot.browserActions,
     browserVerificationReports: run.snapshot.browserVerificationReports,
+    repairSpec: run.snapshot.repairSpec,
+    completion: run.snapshot.completion,
     dagRevisions: run.snapshot.dagRevisions,
     nodeProgress: run.snapshot.nodeProgress,
     effectLease: run.snapshot.effectLease,
@@ -171,6 +191,8 @@ async function failedDossier(runId: string, error: unknown): Promise<RunDossier>
     browserBaselines: [],
     browserActions: [],
     browserVerificationReports: [],
+    repairSpec: null,
+    completion: null,
     terminalError,
   });
 }
@@ -197,6 +219,96 @@ export async function createRun(request: RepairRequest): Promise<RunCreation> {
   });
 }
 
+/** R9 当前唯一可执行场景；其它请求继续走通用运行时而不伪造规范。 */
+async function roundButtonScenarioFor(
+  run: DurableRun,
+): Promise<ScenarioManifest | null> {
+  if (
+    run.manifest.request.prompt.trim() !==
+    "Make the primary Save button clearly rounded instead of square."
+  ) {
+    return null;
+  }
+  const packageJson = JSON.parse(
+    await readFile(
+      path.join(run.manifest.request.workspace.path, "package.json"),
+      "utf8",
+    ),
+  ) as { name?: string };
+  if (packageJson.name !== "@prism/fixture-react-repair") return null;
+  return createRoundButtonScenario({
+    fixtureRoot: run.manifest.request.workspace.path,
+  });
+}
+
+/** 在任何源码副作用前把规范与内容哈希一起写入 Journal。 */
+async function commitRepairSpec(
+  store: FileTrajectoryStore,
+  run: DurableRun,
+  scenario: ScenarioManifest,
+): Promise<void> {
+  if (run.snapshot.repairSpec) return;
+  const artifact = await store.writeArtifact(
+    `${JSON.stringify(scenario.spec)}\n`,
+    FRONTEND_REPAIR_SPEC_MEDIA_TYPE,
+  );
+  await store.recordFrontendRepairSpec(run.manifest.runId, {
+    spec: scenario.spec,
+    artifact,
+  });
+}
+
+/** 通过同一个 WorkspaceExecutor 运行权威 build/test，并提交一份 code Oracle。 */
+async function runCodeOracle(
+  store: FileTrajectoryStore,
+  runId: string,
+  executor: WorkspaceExecutor,
+  scenario: ScenarioManifest,
+) {
+  const evidenceRefs: ArtifactRef[] = [];
+  const result = await new CodeOracle({
+    workspaceRoot: scenario.fixturePath,
+    scopedPaths: scenario.codeOracle.scopedPaths,
+    buildCommand: scenario.codeOracle.buildCommand,
+    testCommand: scenario.codeOracle.testCommand,
+    knownBadRevision: scenario.knownBad.revision,
+    runner: {
+      run: async (command, _cwd, timeoutMs) => {
+        const record = await store.recordWorkspaceEffect(runId, async () => {
+          const evidence = await executor.execute({
+            schemaVersion: "prism.workspace-request/v1",
+            requestId: randomUUID(),
+            runId,
+            operation: "test",
+            command,
+            workingDirectory: ".",
+            timeoutMs: timeoutMs ?? 120_000,
+          });
+          const artifact = await store.writeArtifact(
+            `${JSON.stringify(evidence)}\n`,
+            WORKSPACE_EVIDENCE_MEDIA_TYPE,
+          );
+          return workspaceEvidenceRecordSchema.parse({ evidence, artifact });
+        });
+        evidenceRefs.push(record.artifact);
+        const details = record.evidence.details;
+        return details.operation === "test"
+          ? {
+              exitCode: details.exitCode,
+              stdout: details.stdout,
+              stderr: details.stderr,
+            }
+          : { exitCode: null, stdout: "", stderr: "Invalid command evidence." };
+      },
+    },
+  }).verify();
+  const artifact = await store.writeArtifact(
+    `${JSON.stringify({ ...result, evidenceRefs })}\n`,
+    CODE_ORACLE_REPORT_MEDIA_TYPE,
+  );
+  return { result, artifact };
+}
+
 /**
  * 启动一次 live 混合编排运行。
  *
@@ -218,6 +330,7 @@ export async function startHybridRun(
       target: BrowserBaselineRequest["target"];
     };
     verifier?: UiTarsVerifier;
+    stopAfterNodeType?: RunDagNodeType;
   } = {},
 ): Promise<boolean> {
   const parsedRunId = runIdSchema.safeParse(runIdInput);
@@ -235,6 +348,27 @@ export async function startHybridRun(
   }
 
   const run = await store.loadRun(parsedRunId.data);
+  if (run.snapshot.status === "completed") return true;
+  const scenario = await roundButtonScenarioFor(run);
+  if (scenario) await commitRepairSpec(store, run, scenario);
+  const resumedRun = await store.loadRun(parsedRunId.data);
+  const latestRevision = resumedRun.snapshot.dagRevisions.at(-1);
+  const resume = latestRevision
+    ? {
+        revision: latestRevision,
+        completedNodeIds: Array.from(
+          new Set(
+            resumedRun.snapshot.nodeProgress
+              .filter(({ state }) => state === "succeeded")
+              .map(({ nodeId }) => nodeId),
+          ),
+        ),
+        artifacts: resumedRun.snapshot.artifacts,
+        latestVerificationReport:
+          resumedRun.snapshot.browserVerificationReports.at(-1) ?? null,
+        fencingTokenFloor: resumedRun.snapshot.effectLease?.token ?? 0,
+      }
+    : undefined;
   const piSessionFactory =
     options.piSessionFactory ??
     (await createConfiguredPiSdkSessionFactory({
@@ -262,13 +396,71 @@ export async function startHybridRun(
         }),
     },
   });
+  const gatedCodingRuntime = scenario
+    ? {
+        execute: async (
+          envelope: Parameters<PiCodingRuntime["execute"]>[0],
+          executionOptions?: Parameters<PiCodingRuntime["execute"]>[1],
+        ) => {
+          const runtimeResult = await codingRuntime.execute(envelope, executionOptions);
+          if (
+            envelope.nodeType !== "workspace.patch" ||
+            runtimeResult.outcome.state !== "succeeded"
+          ) {
+            return runtimeResult;
+          }
+
+          const oracle = await runCodeOracle(
+            store,
+            parsedRunId.data,
+            workspaceExecutor,
+            scenario,
+          );
+          return piRuntimeResultSchema.parse({
+            ...runtimeResult,
+            outcome: oracle.result.passed
+              ? runtimeResult.outcome
+              : {
+                  nodeId: envelope.nodeId,
+                  attempt: envelope.attempt,
+                  state: "failed",
+                  summary: "The scoped code Oracle failed.",
+                  request: { kind: "none" },
+                  failure: { code: "verification_failed", retryable: false },
+                },
+            artifacts: oracle.result.passed
+              ? [...runtimeResult.artifacts, oracle.artifact]
+              : runtimeResult.artifacts,
+          });
+        },
+      }
+    : codingRuntime;
 
   const browserConfig = browserRunConfig(options.browserConfig);
+  const baseUrl = browserBaseUrl();
+  const storedBaselineObservation = resumedRun.snapshot.artifacts.find(
+    ({ mediaType }) => mediaType === BROWSER_ORACLE_OBSERVATION_MEDIA_TYPE,
+  );
+  let baselineObservation: RenderedTargetObservation | null = storedBaselineObservation
+    ? (JSON.parse(
+        Buffer.from(await store.readArtifact(storedBaselineObservation)).toString(
+          "utf8",
+        ),
+      ) as RenderedTargetObservation)
+    : null;
+  const browserOracle = scenario
+    ? new BrowserOracle({
+        baseUrl,
+        route: scenario.route,
+        viewport: scenario.viewport,
+        target: scenario.browserOracle.target,
+        executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
+      })
+    : null;
   const uiTarsSessionFactory =
-    options.uiTarsSessionFactory ??
-    (await createConfiguredUiTarsSdkSessionFactory({}));
+    options.uiTarsSessionFactory ?? (await createConfiguredUiTarsSdkSessionFactory({}));
   const browserRuntime = new UiTarsBrowserRuntime({
-    baseUrl: browserBaseUrl(),
+    baseUrl,
     viewport: run.manifest.request.viewport,
     browserPortFactory:
       options.browserPortFactory ??
@@ -276,11 +468,77 @@ export async function startHybridRun(
         executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
       }),
     sessionFactory: uiTarsSessionFactory,
-    verifier: options.verifier,
+    verifier:
+      scenario && browserOracle
+        ? {
+            verify: async () => {
+              if (!baselineObservation) {
+                return {
+                  assertion: "The committed rendered baseline is unavailable.",
+                  status: "inconclusive" as const,
+                };
+              }
+              const after = await browserOracle.observe();
+              const evaluation = BrowserOracle.evaluateSpec(
+                scenario.spec,
+                baselineObservation,
+                after,
+              );
+              const evidence = await store.writeArtifact(
+                `${JSON.stringify({
+                  schemaVersion: "prism.browser-oracle-evaluation/v1",
+                  before: baselineObservation,
+                  after,
+                  evaluation,
+                })}\n`,
+                "application/vnd.prism.browser-oracle-evaluation+json",
+              );
+              return {
+                assertion: evaluation.assertions
+                  .map(({ assertion }) => assertion)
+                  .join(" "),
+                status: evaluation.verdict,
+                evidenceRefs: [evidence],
+              };
+            },
+          }
+        : options.verifier,
     artifacts: {
       commit: (content, mediaType) => store.writeArtifact(content, mediaType),
     },
   });
+  const browserRuntimeWithBaseline =
+    scenario && browserOracle
+      ? {
+          execute: async (
+            envelope: BrowserRuntimeTaskEnvelope,
+            executionOptions?: Parameters<UiTarsBrowserRuntime["execute"]>[1],
+          ) => {
+            let observationArtifact: ArtifactRef | null = null;
+            if (envelope.nodeType === "browser.observe" && !baselineObservation) {
+              await captureBrowserBaseline(parsedRunId.data, {
+                schemaVersion: "prism.browser-baseline-request/v1",
+                requestId: randomUUID(),
+                runId: parsedRunId.data,
+                route: scenario.route,
+                target: scenario.browserOracle.target,
+              });
+              baselineObservation = await browserOracle.observe();
+              observationArtifact = await store.writeArtifact(
+                `${JSON.stringify(baselineObservation)}\n`,
+                BROWSER_ORACLE_OBSERVATION_MEDIA_TYPE,
+              );
+            }
+            const result = await browserRuntime.execute(envelope, executionOptions);
+            return {
+              ...result,
+              artifacts: observationArtifact
+                ? [...result.artifacts, observationArtifact]
+                : result.artifacts,
+            } satisfies BrowserRuntimeResult;
+          },
+        }
+      : browserRuntime;
 
   // 门闩：首个 DAG 修订（revision 1）写入日志时放行启动请求
   let resolveInitialRevision: (() => void) | undefined;
@@ -290,6 +548,10 @@ export async function startHybridRun(
     resolveInitialRevision = resolve;
     rejectInitialRevision = reject;
   });
+  if (resume) {
+    initialRevisionCommitted = true;
+    resolveInitialRevision?.();
+  }
 
   const journal: OrchestrationJournal = {
     appendDagRevision: async (revision) => {
@@ -311,18 +573,23 @@ export async function startHybridRun(
     appendVerificationReport: async (report) => {
       await store.recordBrowserVerification(parsedRunId.data, async () => report);
     },
+    appendRunCompletion: async (completionRecord) => {
+      await store.recordRunCompletion(parsedRunId.data, completionRecord);
+    },
   };
   const completion = new Orchestrator()
     .executeHybridRun({
       runId: parsedRunId.data,
       prompt: run.manifest.request.prompt,
       journal,
-      codingRuntime,
-      browserRuntime,
+      codingRuntime: gatedCodingRuntime,
+      browserRuntime: browserRuntimeWithBaseline,
       browserConfig: {
         route: browserConfig.route,
         target: browserConfig.target,
       },
+      resume,
+      stopAfterNodeType: options.stopAfterNodeType,
     })
     .then(() => undefined)
     .catch((error) => {
@@ -408,10 +675,10 @@ async function createRunWorkspaceExecutor(workspaceRoot: string) {
     allowedReadPatterns: [
       "package.json",
       "README.md",
-      "apps/**/*.{ts,tsx,json,mjs}",
-      "packages/**/*.{ts,tsx,json,mjs}",
-      "src/**/*.{ts,tsx,json,mjs}",
-      "tests/**/*.{ts,tsx,json,mjs}",
+      "apps/**/*.{ts,tsx,css,json,mjs}",
+      "packages/**/*.{ts,tsx,css,json,mjs}",
+      "src/**/*.{ts,tsx,css,json,mjs}",
+      "tests/**/*.{ts,tsx,css,json,mjs}",
     ],
     allowedDiscoveryPatterns: [
       "apps/**/*.{ts,tsx}",
@@ -422,6 +689,10 @@ async function createRunWorkspaceExecutor(workspaceRoot: string) {
     allowedCommands: [
       {
         command: { executable: "pnpm", arguments: ["test"] },
+        workingDirectories: ["."],
+      },
+      {
+        command: { executable: "pnpm", arguments: ["build"] },
         workingDirectories: ["."],
       },
     ],
@@ -481,9 +752,10 @@ function browserBaseUrl(): string {
 }
 
 /** 浏览器运行的路由与采集目标配置（优先显式注入，否则用环境变量默认值）。 */
-function browserRunConfig(
-  configured?: { route: string; target: BrowserBaselineRequest["target"] },
-): { route: string; target: BrowserBaselineRequest["target"] } {
+function browserRunConfig(configured?: {
+  route: string;
+  target: BrowserBaselineRequest["target"];
+}): { route: string; target: BrowserBaselineRequest["target"] } {
   if (configured) return configured;
 
   return {
