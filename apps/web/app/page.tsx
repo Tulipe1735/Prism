@@ -100,7 +100,7 @@ export default async function FieldDeskPage() {
               [
                 "03",
                 "Repair & prove",
-                "Patch through Pi, then verify through UI-TARS.",
+                "Patch through Pi, then verify through Agent Plan.",
               ],
             ].map(([number, title, detail]) => (
               <li className="grid grid-cols-[2rem_1fr] gap-2 py-4" key={number}>

@@ -28,6 +28,10 @@ import {
 const PI_TRAJECTORY_MEDIA_TYPE = "application/vnd.prism.pi-trajectory+json";
 
 export interface PiWorkspaceGateway {
+  guidance?: {
+    allowedReadPatterns: readonly string[];
+    allowedDiscoveryPatterns: readonly string[];
+  };
   execute: (
     request: WorkspaceRequest,
     signal?: AbortSignal,
@@ -422,12 +426,22 @@ function isWithinBudget(
   );
 }
 
-function systemPrompt(envelope: RuntimeTaskEnvelope): string {
+function systemPrompt(
+  envelope: RuntimeTaskEnvelope,
+  guidance: PiWorkspaceGateway["guidance"],
+): string {
   return [
     "You are the embedded Pi Coding Runtime inside Prism.",
     "Use only the available Prism tools. They are the complete authority for this attempt.",
     "Never claim a file, command, patch, test, artifact, approval, or DAG change that a tool did not confirm.",
     "Call prism_submit_outcome exactly once. Prism supplies identity, committed artifacts, resource usage, and failure typing.",
+    ...(guidance
+      ? [
+          `Exact reads must match one of: ${guidance.allowedReadPatterns.join(", ")}.`,
+          `Discovery patterns must be copied exactly from: ${guidance.allowedDiscoveryPatterns.join(", ")}.`,
+          "Discover with a registered pattern, then read returned paths. Do not guess directory paths or unregistered globs.",
+        ]
+      : []),
     `Run: ${envelope.runId}`,
     `DAG revision: ${envelope.dagRevision}`,
     `Node: ${envelope.nodeId} (${envelope.nodeType}), attempt ${envelope.attempt}/${envelope.maxAttempts}`,
@@ -640,7 +654,7 @@ export class PiCodingRuntime {
       );
       try {
         session = await this.options.sessionFactory.create({
-          systemPrompt: systemPrompt(envelope),
+          systemPrompt: systemPrompt(envelope, this.options.workspace.guidance),
           handlers,
           signal: executionController.signal,
         });

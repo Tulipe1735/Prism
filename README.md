@@ -1,6 +1,6 @@
 # Prism
 
-Prism is a standalone TypeScript Visual SWE harness. It accepts a natural-language frontend repair request, coordinates an embedded Pi Agent SDK Coding Runtime with an embedded UI-TARS Browser Runtime, applies source changes through a confined WorkspaceExecutor, and verifies the rendered result through a brokered browser path.
+Prism is a standalone TypeScript Visual SWE harness. It accepts a natural-language frontend repair request, coordinates an embedded Pi Agent SDK Coding Runtime with an Agent Plan Browser Runtime, applies source changes through a confined WorkspaceExecutor, and verifies the rendered result through a brokered browser path.
 
 ## Current status
 
@@ -10,7 +10,7 @@ contracts, durable and reopenable Runs, and a confined WorkspaceExecutor. A Run
 can inspect allowlisted repository files, apply a hash-guarded scoped patch, or
 run one exact allowlisted test command; bounded and redacted outcomes become
 content-addressed evidence in the Run dossier. Orchestration, the browser
-executor, Pi, UI-TARS, browser evidence, and end-to-end repair replay remain
+executor, Pi, Agent Plan browser grounding, browser evidence, and end-to-end repair replay remain
 planned work rather than implemented capability.
 
 - [Read the canonical Prism roadmap](docs/prism-roadmap.md)

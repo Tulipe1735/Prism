@@ -1,6 +1,6 @@
 # Prism technical baseline
 
-Status: `Field Desk, durable Runs, confined workspace execution, embedded Pi Coding Runtime, and embedded UI-TARS Browser Runtime implemented`
+Status: `Field Desk, durable Runs, confined workspace execution, embedded Pi Coding Runtime, and embedded Agent Plan Browser Runtime implemented`
 
 This document describes the current Prism technology boundary. The Field Desk,
 durable Run seam, confined workspace execution, and both embedded runtimes are
@@ -22,7 +22,7 @@ implementation tickets.
 | Execa 9.6.1 | Shell-free execution, bounded output, and cross-platform subprocess lifecycle |
 | fast-glob 3.3.3 + ignore 7.0.6 | Repository discovery without following symlinks, filtered through repository ignore rules |
 | Pi Agent SDK | Embedded Coding Runtime session and coding trajectory events |
-| UI-TARS SDK | Embedded Browser Runtime visual grounding and typed action proposals |
+| Doubao Seed 2.0 Pro Agent Plan Responses API | Embedded Browser Runtime visual grounding and typed action proposals |
 
 Next.js, React, and React DOM are exact pins verified together by the production
 build and prototype regression. The repository reuses the selected Tailwind,
@@ -35,10 +35,10 @@ MVP. This is a deployment choice, not an authority shortcut: source, shell,
 test, and browser effects still cross controlled executors.
 
 Do not inherit the former ConsoleOps package name or version pins by default.
-The owning runtime tickets pin the actual Pi and UI-TARS packages against the
-interfaces approved in the roadmap. `runtime-pi` pins the Pi Agent SDK
-(`@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai` 0.82.1);
-`runtime-ui-tars` pins the UI-TARS SDK (`@ui-tars/sdk` 1.2.3).
+The owning runtime tickets pin the actual Pi packages against the interfaces
+approved in the roadmap. `runtime-pi` pins the Pi Agent SDK
+(`@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai` 0.82.1).
+`runtime-browser` uses native `fetch` for the fixed Agent Plan endpoint and Doubao Seed 2.0 Pro model.
 
 ## Current workspace
 
@@ -52,7 +52,7 @@ packages/
   workspace-executor/
   orchestrator/
   runtime-pi/
-  runtime-ui-tars/
+  runtime-browser/
   action-broker/
 ```
 
@@ -69,7 +69,7 @@ packages/
   registration, deadlines, cancellation, and complete process-tree cleanup.
 - `orchestrator` owns routing, DAG revisions, scheduling, budgets, cancellation, and the fenced exclusive effect lease.
 - `runtime-pi` embeds the Pi Agent SDK session with an explicit tool allowlist; it translates SDK events into Prism contracts and may not execute unrestricted effects or mutate the DAG.
-- `runtime-ui-tars` embeds the UI-TARS SDK `GUIAgent` whose custom Prism Operator turns every parsed prediction into a Zod-validated ActionBroker proposal; it may not execute browser input directly, expose source/shell/file capability, or mutate the DAG.
+- `runtime-browser` turns each validated browser-model tool call into an ActionBroker proposal; it may not execute browser input directly, expose source/shell/file capability, or mutate the DAG.
 - `action-broker` validates browser proposals and owns BrowserExecutor access.
 - `tooling-config` shares TypeScript, Antfu ESLint, Prettier, and Vitest
   configuration.
@@ -89,11 +89,11 @@ fixtures/
 
 ## Browser and verification boundary
 
-The UI-TARS SDK is a planner and grounder, not the security boundary. A custom Prism operator maps each prediction to a typed browser proposal. The ActionBroker checks target freshness, origin, effect class, authority, approval, and lease before BrowserExecutor input.
+The Agent Plan browser model is a planner and grounder, not the security boundary. A custom Prism operator maps each validated tool call to a typed browser proposal. The ActionBroker checks target freshness, origin, effect class, authority, approval, and lease before BrowserExecutor input.
 
 Use semantic or hybrid targets where possible. A coordinate target must be bound to the screenshot hash, viewport, device-pixel ratio, tab, and page state that produced it. Stale targets fail closed.
 
-Deterministic browser predicates and fixture oracles are authoritative. Screenshots, UI-TARS judgment, Playwright traces, console data, and network data are evidence artifacts, not substitutes for the oracle.
+Deterministic browser predicates and fixture oracles are authoritative. Screenshots, model judgment, Playwright traces, console data, and network data are evidence artifacts, not substitutes for the oracle.
 
 ## Testing and observability requirements
 

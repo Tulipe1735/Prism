@@ -13,6 +13,9 @@ const filters: Array<{ label: string; value: RunStatusFilter }> = [
   { label: "All statuses", value: "all" },
   { label: "Created", value: "created" },
   { label: "Queued", value: "queued" },
+  { label: "Awaiting approval", value: "awaiting_approval" },
+  { label: "Blocked", value: "blocked" },
+  { label: "Cancelled", value: "cancelled" },
   { label: "Completed", value: "completed" },
   { label: "Terminal error", value: "terminal_error" },
 ];

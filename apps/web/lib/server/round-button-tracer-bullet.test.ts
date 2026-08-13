@@ -1,8 +1,8 @@
+import type { BrowserSessionFactory } from "@prism/runtime-browser";
 import type { PiSessionFactory } from "@prism/runtime-pi";
-import type { UiTarsSessionFactory } from "@prism/runtime-ui-tars";
 import type { AddressInfo } from "node:net";
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { cp, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
@@ -16,7 +16,12 @@ import { FileTrajectoryStore } from "@prism/trajectory-store";
 
 import { afterEach, beforeEach, expect, it } from "vitest";
 
-import { createRun, startHybridRun, waitForHybridRun } from "./run-repository";
+import {
+  createRun,
+  decideRunEffect,
+  startHybridRun,
+  waitForHybridRun,
+} from "./run-repository";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = path.resolve(import.meta.dirname, "../../../..");
@@ -93,57 +98,107 @@ it("completes the round-button request with replayable dual-Oracle evidence", as
 
   await startHybridRun(creation.runId, {
     piSessionFactory: roundButtonPiSessionFactory(),
-    uiTarsSessionFactory: successfulUiTarsSessionFactory(),
+    browserSessionFactory: successfulBrowserSessionFactory(),
     browserConfig: {
       route: "/round-button",
       target: { kind: "semantic", role: "button", name: "Save", exact: true },
     },
-    stopAfterNodeType: "browser.observe",
   });
   const paused = await waitForHybridRun(creation.runId);
   expect(paused).toMatchObject({
-    status: "queued",
+    status: "awaiting_approval",
     browserBaselines: [expect.objectContaining({ route: "/round-button" })],
+    effectControls: [
+      expect.objectContaining({
+        kind: "proposal",
+        runId: creation.runId,
+        origin: "pi",
+        effectClass: "source_effect",
+        preconditions: expect.objectContaining({ fencingToken: 1 }),
+      }),
+    ],
   });
   expect(
     paused?.nodeProgress.some(
       ({ nodeType, state }) => nodeType === "workspace.patch" && state === "succeeded",
     ),
   ).toBe(false);
-  const pausedPatchNode = paused?.dagRevisions
-    .at(-1)
-    ?.nodes.find(({ nodeType }) => nodeType === "workspace.patch");
+  const proposal = paused?.effectControls.find(
+    (control) => control.kind === "proposal",
+  );
+  if (!proposal || proposal.kind !== "proposal") throw new Error("Missing proposal");
+  await decideRunEffect(creation.runId, {
+    schemaVersion: "prism.effect-decision-request/v1",
+    proposalId: proposal.proposalId,
+    proposalDigest: proposal.proposalDigest,
+    decision: "approved",
+  });
+  await expect(
+    decideRunEffect(creation.runId, {
+      schemaVersion: "prism.effect-decision-request/v1",
+      proposalId: proposal.proposalId,
+      proposalDigest: proposal.proposalDigest,
+      decision: "approved",
+    }),
+  ).rejects.toThrow("does not match the pending proposal");
+
   const recoveryStore = new FileTrajectoryStore({ dataDirectory });
   await recoveryStore.recordEffectLease(creation.runId, {
     schemaVersion: "prism.effect-lease/v1",
-    token: 1,
-    holderNodeId: pausedPatchNode?.nodeId,
+    token: proposal.preconditions.fencingToken,
+    holderNodeId: proposal.nodeId,
     effectClass: "source_effect",
     state: "active",
     recordedAt: new Date().toISOString(),
   });
-  await recoveryStore.recordEffectLease(creation.runId, {
-    schemaVersion: "prism.effect-lease/v1",
-    token: 1,
-    holderNodeId: pausedPatchNode?.nodeId,
-    effectClass: "source_effect",
-    state: "released",
+  await recoveryStore.recordEffectControl(creation.runId, {
+    schemaVersion: "prism.effect-control/v1",
+    kind: "consumption",
+    controlId: randomUUID(),
+    proposalId: proposal.proposalId,
+    proposalDigest: proposal.proposalDigest,
+    nodeId: proposal.nodeId,
+    fencingToken: proposal.preconditions.fencingToken,
     recordedAt: new Date().toISOString(),
   });
-  await expect(
-    recoveryStore.recordEffectLease(creation.runId, {
-      schemaVersion: "prism.effect-lease/v1",
-      token: 1,
-      holderNodeId: pausedPatchNode?.nodeId,
-      effectClass: "source_effect",
-      state: "active",
-      recordedAt: new Date().toISOString(),
-    }),
-  ).rejects.toThrow("newer fencing token");
+
+  // Simulate a process loss after authority consumption but before any source mutation.
+  await startHybridRun(creation.runId, {
+    piSessionFactory: roundButtonPiSessionFactory(),
+    browserSessionFactory: successfulBrowserSessionFactory(),
+  });
+  const recovered = await waitForHybridRun(creation.runId);
+  expect(recovered).toMatchObject({
+    status: "awaiting_approval",
+    effectLease: { token: 1, state: "released" },
+    effectControls: expect.arrayContaining([
+      expect.objectContaining({
+        kind: "reconciliation",
+        outcome: "no_effect",
+        action: "repropose",
+      }),
+      expect.objectContaining({
+        kind: "proposal",
+        preconditions: expect.objectContaining({ fencingToken: 2 }),
+      }),
+    ]),
+  });
+  const recoveredProposal = [...(recovered?.effectControls ?? [])]
+    .reverse()
+    .find((control) => control.kind === "proposal");
+  if (!recoveredProposal || recoveredProposal.kind !== "proposal") {
+    throw new Error("Missing recovered proposal");
+  }
+  await decideRunEffect(creation.runId, {
+    schemaVersion: "prism.effect-decision-request/v1",
+    proposalId: recoveredProposal.proposalId,
+    proposalDigest: recoveredProposal.proposalDigest,
+    decision: "approved",
+  });
 
   await startHybridRun(creation.runId, {
     piSessionFactory: roundButtonPiSessionFactory(),
-    uiTarsSessionFactory: successfulUiTarsSessionFactory(),
+    browserSessionFactory: successfulBrowserSessionFactory(),
     browserConfig: {
       route: "/round-button",
       target: { kind: "semantic", role: "button", name: "Save", exact: true },
@@ -196,7 +251,7 @@ it("completes the round-button request with replayable dual-Oracle evidence", as
     ]),
     effectLease: expect.objectContaining({ state: "released" }),
     completion: {
-      approvals: [],
+      approvals: ["source_effect"],
       codeOracle: expect.objectContaining({
         mediaType: "application/vnd.prism.code-oracle-report+json",
       }),
@@ -220,6 +275,7 @@ it("completes the round-button request with replayable dual-Oracle evidence", as
     status: dossier?.status,
     dagRevisions: dossier?.dagRevisions,
     effectLease: dossier?.effectLease,
+    effectControls: dossier?.effectControls,
     completion: dossier?.completion,
   });
 }, 60_000);
@@ -288,9 +344,9 @@ function roundButtonPiSessionFactory(): PiSessionFactory {
   };
 }
 
-function successfulUiTarsSessionFactory(): UiTarsSessionFactory {
+function successfulBrowserSessionFactory(): BrowserSessionFactory {
   const usage: BrowserResourceUsage = {
-    model: { provider: "scripted-ui-tars", id: "round-button" },
+    model: { provider: "scripted-browser-model", id: "round-button" },
     modelCalls: 1,
     loopCount: 1,
     actionsProposed: 0,
@@ -304,17 +360,8 @@ function successfulUiTarsSessionFactory(): UiTarsSessionFactory {
       run: async () => {
         await operator.screenshot();
         await operator.execute({
-          prediction: "finished()",
-          parsedPrediction: {
-            action_type: "finished",
-            action_inputs: {},
-            reflection: "The rendered Save button is visibly rounded.",
-            thought: "The deterministic Oracle owns the verdict.",
-          },
-          screenWidth: 1280,
-          screenHeight: 720,
-          scaleFactor: 1,
-          factors: [1, 1],
+          action: "finished",
+          judgment: "The rendered Save button is visibly rounded.",
         });
       },
       abort: async () => undefined,

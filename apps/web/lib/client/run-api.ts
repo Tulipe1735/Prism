@@ -11,6 +11,7 @@
  */
 import {
   contractErrorSchema,
+  type EffectDecisionRequest,
   type OrchestrationStartResponse,
   orchestrationStartResponseSchema,
   type RepairRequest,
@@ -122,6 +123,24 @@ export async function startOrchestration(
   }
 
   return parsed.data;
+}
+
+/** 对当前待审批副作用做一次绑定摘要的人类裁决。 */
+export async function decideEffect(
+  runId: string,
+  request: EffectDecisionRequest,
+): Promise<RunDossier> {
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/effects`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const parsed = runDossierResponseSchema.safeParse(await trustedBody(response));
+  if (!parsed.success) {
+    throw new RunApiError("Prism returned an invalid effect-decision contract.");
+  }
+  if (request.decision === "approved") await startOrchestration(runId);
+  return parsed.data.dossier;
 }
 
 /** 对某 Run 执行一次工作区请求（检查/测试/补丁），返回证据记录。 */

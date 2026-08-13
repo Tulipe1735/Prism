@@ -14,7 +14,7 @@ coordinates two embedded sibling runtimes:
 
 - a Pi Agent SDK Coding Runtime that inspects the repository, applies scoped
   source changes through a WorkspaceExecutor, and runs tests;
-- a UI-TARS SDK Browser Runtime that reproduces and localizes frontend defects,
+- an Agent Plan Browser Runtime that reproduces and localizes frontend defects,
   proposes typed actions through an ActionBroker, and verifies the rendered or
   interactive result.
 
@@ -32,7 +32,7 @@ flowchart TD
     R --> D["Immutable Run DAG revisions"]
     D --> S["DagScheduler"]
     S --> C["Pi Coding Runtime"]
-    S --> B["UI-TARS Browser Runtime"]
+    S --> B["Agent Plan Browser Runtime"]
     C --> W["WorkspaceExecutor"]
     B --> A["ActionBroker"]
     A --> X["BrowserExecutor"]
@@ -60,7 +60,7 @@ packages/
   contracts/
   orchestrator/
   runtime-pi/
-  runtime-ui-tars/
+  runtime-browser/
   workspace-executor/
   action-broker/
   trajectory-store/
@@ -128,7 +128,7 @@ require a pre-mutation baseline or reproduction and final browser verification.
 
 The immutable `RunManifest`, append-only sequenced `RunEvent` journal, and
 content-addressed artifact store are canonical. `RunSnapshot` is a rebuildable
-projection. Runtime-private Pi or UI-TARS checkpoints are optional caches.
+projection. Runtime-private Pi or browser-model checkpoints are optional caches.
 
 After a process restart, Prism restores the last committed node boundary. It
 does not continue from partial model output or browser input, undo the prior
@@ -151,7 +151,7 @@ change plan and human confirmation or return `inconclusive`.
 
 A passing browser report requires at least one intent-linked deterministic
 rendered or interaction predicate plus a localized after screenshot.
-Relational changes also require a matching before observation. UI-TARS
+Relational changes also require a matching before observation. Browser-model
 qualitative judgment and localized visual diff may support the result but
 cannot be the sole oracle.
 
@@ -235,7 +235,7 @@ published as executable work until separately authorized.
 | R4 | ActionBroker and BrowserExecutor | R1 | M1 |
 | R5 | Orchestrator, DagScheduler, and fenced effect lease | R1, R2 | M1 |
 | R6 | Pi Agent SDK Coding Runtime | R1, R3 | M1 |
-| R7 | UI-TARS Browser Runtime | R1, R4 | M1 |
+| R7 | Agent Plan Browser Runtime | R1, R4 | M1 |
 | R8 | Deterministic React fixture and browser oracles | R1 | M1 |
 | R9 | Round-button end-to-end vertical slice | R5, R6, R7, R8 | M1 |
 | R10 | Safety, cancellation, and recovery fault suite | R2, R5, R9 | M2 |

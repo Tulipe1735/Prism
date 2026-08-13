@@ -1,19 +1,17 @@
 /**
- * Prism UI-TARS Browser Runtime（runtime-ui-tars）包
+ * Prism Browser Runtime
  *
- * 用官方 @ui-tars/sdk 的 GUIAgent 嵌入同进程浏览器运行时，替换编排器里的
- * 占位 Browser Runtime。设计要点：
+ * 用 Agent Plan 多模态模型的 Responses API 驱动同进程浏览器运行时。设计要点：
  *
- *  - 自定义 Operator（PrismBrowserOperator）实现 SDK 要求的 screenshot()
- *    与 execute() 两个原语；execute() 把每条 parsed prediction 转成一个
+ *  - PrismBrowserOperator 实现 screenshot() 与 execute()
+ *    两个原语；execute() 把每条模型动作转成一个
  *    Zod 校验过的 BrowserActionProposal 交给 ActionBroker，绝不直接执行
  *    任何模型输入，也不暴露源码/文件/终端能力；
  *  - 截图缩放、视口、设备像素比、坐标空间、标签页、页面状态与截图哈希都
  *    在观测引用与坐标目标里绑定，ActionBroker 的新鲜度检查据此拒绝陈旧
  *    提案；
- *  - 模型每次只能提议一条动作（MANUAL.ACTION_SPACES 只开放 click 与
- *    finished），高层多动作输出也逐条穿过同一代理，无法绕过逐动作策略；
- *  - UI-TARS 的定性视觉判断标记为 supplemental，单独无法产生通过的
+ *  - 模型每次只能调用 click 或 finished 其中一个工具，无法绕过逐动作策略；
+ *  - 模型的定性视觉判断标记为 supplemental，单独无法产生通过的
  *    BrowserVerificationReport —— 必须配合意图链定的确定性谓词。
  *
  * 安全边界：BrowserPort 只有 observe/screenshot/click/dispose，没有仓库
@@ -47,15 +45,6 @@ import {
   nodeOutcomeSchema,
   type Viewport,
 } from "@prism/contracts";
-import { GUIAgent, StatusEnum } from "@ui-tars/sdk";
-import {
-  type ExecuteOutput,
-  type ExecuteParams,
-  Operator,
-  parseBoxToScreenCoords,
-  type ScreenshotOutput,
-  type UITarsModel,
-} from "@ui-tars/sdk/core";
 import {
   type Browser,
   type BrowserContext,
@@ -64,10 +53,22 @@ import {
   type Page,
 } from "playwright-core";
 
-const UI_TARS_TRAJECTORY_MEDIA_TYPE = "application/vnd.prism.ui-tars-trajectory+json";
+const BROWSER_TRAJECTORY_MEDIA_TYPE = "application/vnd.prism.browser-trajectory+json";
+const AGENT_PLAN_RESPONSES_URL =
+  "https://ark.cn-beijing.volces.com/api/plan/v3/responses";
+const AGENT_PLAN_BROWSER_MODEL = {
+  provider: "volcengine-agent-plan",
+  id: "doubao-seed-2.0-pro",
+} as const;
+
+export type BrowserModelAction =
+  | { action: "click"; x: number; y: number; judgment?: string }
+  | { action: "finished"; judgment: string };
+
+type BrowserOperatorStatus = "running" | "end" | "user_stopped";
 
 /** 浏览器端口：运行时所需的浏览器原语集合（只读观测 + 坐标/语义点击）。 */
-export interface UiTarsBrowserPort {
+export interface BrowserPort {
   /** 观测当前页面状态，返回观测引用（含截图/页面状态哈希与视口）。 */
   observe: () => Promise<BrowserObservationReference>;
   /** 采集当前页面截图，返回模型输入与绑定同一状态的观测引用。 */
@@ -83,35 +84,35 @@ export interface UiTarsBrowserPort {
 }
 
 /** 浏览器端口工厂：按本地基址与路由创建一次受限会话。 */
-export interface UiTarsBrowserPortFactory {
+export interface BrowserPortFactory {
   create: (options: {
     baseUrl: string;
     route: string;
     viewport: Viewport;
-  }) => Promise<UiTarsBrowserPort>;
+  }) => Promise<BrowserPort>;
 }
 
-/** UI-TARS 会话：GUIAgent 的进程内封装。 */
-export interface UiTarsSession {
+/** 浏览器模型会话。 */
+export interface BrowserSession {
   run: (instruction: string) => Promise<void>;
   abort: () => Promise<void>;
   dispose: () => void;
   getUsage: () => BrowserResourceUsage;
 }
 
-/** UI-TARS 会话工厂：由运行时注入，生产用 UiTarsSdkSessionFactory。 */
-export interface UiTarsSessionFactory {
+/** 浏览器模型会话工厂。 */
+export interface BrowserSessionFactory {
   readonly model: BrowserResourceUsage["model"];
   create: (options: {
     systemPrompt: string;
     operator: PrismBrowserOperator;
     signal: AbortSignal;
     maxLoopCount: number;
-  }) => Promise<UiTarsSession>;
+  }) => Promise<BrowserSession>;
 }
 
 /** 意图链定的确定性谓词验证器：由调用方注入（fixture oracle 由后续 ticket 提供）。 */
-export interface UiTarsVerifier {
+export interface BrowserVerifier {
   verify: (options: {
     intent: string;
     observation: BrowserObservationReference;
@@ -123,94 +124,73 @@ export interface UiTarsVerifier {
   }>;
 }
 
-/** UI-TARS 配置错误：模型或浏览器配置缺失/不完整时抛出。 */
-export class UiTarsConfigurationError extends Error {}
+/** 浏览器模型配置缺失时抛出。 */
+export class BrowserConfigurationError extends Error {}
 
 /** 浏览器会话清理失败：dispose 抛错时抛出。 */
-export class UiTarsSessionCleanupError extends Error {
+export class BrowserSessionCleanupError extends Error {
   constructor(cause: unknown) {
-    super("The UI-TARS browser session could not be cleaned up.", { cause });
-    this.name = "UiTarsSessionCleanupError";
+    super("The browser model session could not be cleaned up.", { cause });
+    this.name = "BrowserSessionCleanupError";
   }
 }
 
 /**
  * 自定义 Prism Operator。
  *
- * screenshot() 从浏览器端口采集截图并记录观测；execute() 把 parsed
- * prediction 转成 Zod 校验过的提案交给 ActionBroker，绝不直接发送浏览器
- * 输入。MANUAL.ACTION_SPACES 只开放 click 与 finished，从系统提示层
- * 约束模型一次只提议一条受控动作。
+ * screenshot() 从浏览器端口采集截图并记录观测；execute() 把已校验模型动作
+ * 转成 Zod 校验过的提案交给 ActionBroker，绝不直接发送浏览器输入。
  */
-export class PrismBrowserOperator extends Operator {
-  static MANUAL = {
-    ACTION_SPACES: [
-      'click(start_box="[x1, y1, x2, y2]") # click the element inside the given box',
-      "finished() # the repair is verified; finish the browser task",
-    ],
-  };
-
+export class PrismBrowserOperator {
   readonly records: BrowserActionRecord[] = [];
-  private currentObservation: BrowserObservationReference | null = null;
+  private currentCapture: Awaited<ReturnType<BrowserPort["screenshot"]>> | null = null;
   private finished = false;
   private refusal: string | null = null;
   private finalJudgment: string | null = null;
 
   constructor(
     private readonly options: {
-      port: UiTarsBrowserPort;
+      port: BrowserPort;
       broker: ActionBroker;
       runId: string;
       signal: AbortSignal;
     },
-  ) {
-    super();
+  ) {}
+
+  /** 采集当前页面截图并绑定后续坐标动作。 */
+  async screenshot(): Promise<Awaited<ReturnType<BrowserPort["screenshot"]>>> {
+    this.currentCapture = await this.options.port.screenshot();
+    return this.currentCapture;
   }
 
-  /** 采集当前页面截图并记录观测，返回 SDK 期望的 ScreenshotOutput。 */
-  async screenshot(): Promise<ScreenshotOutput> {
-    const capture = await this.options.port.screenshot();
-    this.currentObservation = capture.observation;
-    return { base64: capture.base64, scaleFactor: capture.scaleFactor };
-  }
+  /** 把一条已校验模型动作转成提案并交给 ActionBroker。 */
+  async execute(
+    action: BrowserModelAction,
+  ): Promise<{ status: BrowserOperatorStatus }> {
+    if (this.options.signal.aborted) return { status: "user_stopped" };
 
-  /** 把一条 parsed prediction 转成提案并交给 ActionBroker。 */
-  async execute(params: ExecuteParams): Promise<ExecuteOutput> {
-    if (this.options.signal.aborted) return { status: StatusEnum.USER_STOPPED };
-
-    const actionType = params.parsedPrediction.action_type;
-
-    if (actionType === "finished") {
+    if (action.action === "finished") {
       this.finished = true;
-      this.finalJudgment =
-        params.parsedPrediction.reflection ??
-        params.parsedPrediction.thought ??
-        "The browser task completed.";
-      return { status: StatusEnum.END };
+      this.finalJudgment = action.judgment;
+      return { status: "end" };
     }
 
-    if (actionType === "click") {
-      const target = this.coordinateTarget(params);
-      if (!target) {
-        this.refusal = "click-without-box";
-        return { status: StatusEnum.END };
-      }
-      const proposal = browserActionProposalSchema.parse({
-        schemaVersion: BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION,
-        proposalId: randomUUID(),
-        runId: this.options.runId,
-        origin: "ui-tars",
-        action: { kind: "click" },
-        target,
-      } satisfies BrowserActionProposal);
-      const record = await this.options.broker.execute(proposal);
-      this.records.push(record);
-      return { status: StatusEnum.RUNNING };
+    const target = this.coordinateTarget(action);
+    if (!target) {
+      this.refusal = "click-outside-current-observation";
+      return { status: "end" };
     }
-
-    // 其它任何动作类型（type/scroll/hotkey/未知动作）都不允许：绝不执行输入
-    this.refusal = actionType;
-    return { status: StatusEnum.END };
+    const proposal = browserActionProposalSchema.parse({
+      schemaVersion: BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION,
+      proposalId: randomUUID(),
+      runId: this.options.runId,
+      origin: "browser-model",
+      action: { kind: "click" },
+      target,
+    } satisfies BrowserActionProposal);
+    const record = await this.options.broker.execute(proposal);
+    this.records.push(record);
+    return { status: "running" };
   }
 
   /** 是否被模型显式标记完成（finished）。 */
@@ -229,30 +209,27 @@ export class PrismBrowserOperator extends Operator {
   }
 
   /**
-   * 把模型坐标盒子转成绑定当前观测的坐标目标。
-   *
-   * 模型输出的是模型空间归一化盒子 [x1,y1,x2,y2]；parseBoxToScreenCoords
-   * 用截图物理分辨率与模型 factors 换算成物理像素中心，再除以 scaleFactor
-   * （设备像素比）得到视口 CSS 像素坐标。目标绑定观测 ID、截图哈希、
-   * 页面状态哈希与视口，保证动作只能作用于其被观测时对应的页面。
+   * 把截图物理像素坐标转成绑定当前观测的 CSS 像素目标。
    */
-  private coordinateTarget(params: ExecuteParams): BrowserTarget | null {
-    const boxStr = params.parsedPrediction.action_inputs?.start_box;
-    if (!boxStr || !this.currentObservation) return null;
-    const physical = parseBoxToScreenCoords({
-      boxStr,
-      screenWidth: params.screenWidth,
-      screenHeight: params.screenHeight,
-      factors: params.factors,
-    });
-    if (physical.x === null || physical.y === null) return null;
-    const observation = this.currentObservation;
-    const cssX = physical.x / params.scaleFactor;
-    const cssY = physical.y / params.scaleFactor;
+  private coordinateTarget(
+    action: Extract<BrowserModelAction, { action: "click" }>,
+  ): BrowserTarget | null {
+    if (!this.currentCapture) return null;
+    const { observation, scaleFactor } = this.currentCapture;
+    const physicalWidth = observation.viewport.width * scaleFactor;
+    const physicalHeight = observation.viewport.height * scaleFactor;
+    if (
+      action.x < 0 ||
+      action.y < 0 ||
+      action.x >= physicalWidth ||
+      action.y >= physicalHeight
+    ) {
+      return null;
+    }
     return {
       kind: "coordinate",
-      x: cssX,
-      y: cssY,
+      x: action.x / scaleFactor,
+      y: action.y / scaleFactor,
       observationId: observation.observationId,
       screenshotHash: observation.screenshotHash,
       pageStateHash: observation.pageStateHash,
@@ -261,31 +238,24 @@ export class PrismBrowserOperator extends Operator {
   }
 }
 
-/** 生产 UI-TARS 会话工厂：用 OpenAI 兼容配置创建 GUIAgent。 */
-export interface UiTarsSdkSessionFactoryOptions {
-  baseURL: string;
+export interface AgentPlanBrowserSessionFactoryOptions {
   apiKey: string;
-  model: string;
-  maxLoopCount?: number;
-  /** 注入自定义 UITarsModel 实例（测试用确定性模型；默认用配置建真实模型）。 */
-  modelInstance?: UITarsModel;
+  fetchImpl?: typeof fetch;
 }
 
-/** 生产 UI-TARS 会话工厂：把运行时注入的 operator 包进官方 GUIAgent。 */
-export class UiTarsSdkSessionFactory implements UiTarsSessionFactory {
-  readonly model: BrowserResourceUsage["model"];
+/** 用 Agent Plan Responses API 驱动截图动作循环。 */
+export class AgentPlanBrowserSessionFactory implements BrowserSessionFactory {
+  readonly model = AGENT_PLAN_BROWSER_MODEL;
 
-  constructor(private readonly options: UiTarsSdkSessionFactoryOptions) {
-    this.model = { provider: "ui-tars", id: options.model };
-  }
+  constructor(private readonly options: AgentPlanBrowserSessionFactoryOptions) {}
 
   async create(options: {
     systemPrompt: string;
     operator: PrismBrowserOperator;
     signal: AbortSignal;
     maxLoopCount: number;
-  }): Promise<UiTarsSession> {
-    let gptTurns = 0;
+  }): Promise<BrowserSession> {
+    let stopped = false;
     const usage: BrowserResourceUsage = {
       model: this.model,
       modelCalls: 0,
@@ -295,60 +265,195 @@ export class UiTarsSdkSessionFactory implements UiTarsSessionFactory {
       costUsd: 0,
       durationMs: 0,
     };
-    const agent = new GUIAgent({
-      model: this.options.modelInstance ?? {
-        baseURL: this.options.baseURL,
-        apiKey: this.options.apiKey,
-        model: this.options.model,
-      },
-      operator: options.operator,
-      systemPrompt: options.systemPrompt,
-      signal: options.signal,
-      maxLoopCount: options.maxLoopCount,
-      onData: ({ data }) => {
-        for (const conversation of data.conversations) {
-          if (conversation.from === "gpt") gptTurns += 1;
-        }
-      },
-    });
     return {
       run: async (instruction) => {
-        await agent.run(instruction);
-        usage.modelCalls = gptTurns;
-        usage.loopCount = gptTurns;
-        usage.actionsProposed = options.operator.records.length;
-        usage.actionsExecuted = options.operator.records.filter(
-          (record) => record.execution.status === "executed",
-        ).length;
+        const history: string[] = [];
+        for (let index = 0; index < options.maxLoopCount; index += 1) {
+          if (stopped || options.signal.aborted) return;
+          const screenshot = await options.operator.screenshot();
+          const action = await requestAgentPlanBrowserAction({
+            apiKey: this.options.apiKey,
+            fetchImpl: this.options.fetchImpl ?? fetch,
+            signal: options.signal,
+            systemPrompt: options.systemPrompt,
+            instruction,
+            history,
+            screenshot: screenshot.base64,
+          });
+          usage.modelCalls += 1;
+          usage.loopCount += 1;
+          const result = await options.operator.execute(action);
+          usage.actionsProposed = options.operator.records.length;
+          usage.actionsExecuted = options.operator.records.filter(
+            (record) => record.execution.status === "executed",
+          ).length;
+          history.push(
+            action.action === "click"
+              ? `clicked screenshot pixel (${action.x}, ${action.y})`
+              : `finished: ${action.judgment}`,
+          );
+          if (result.status !== "running") return;
+        }
       },
-      abort: async () => agent.stop(),
+      abort: async () => {
+        stopped = true;
+      },
       dispose: () => undefined,
       getUsage: () => usage,
     };
   }
 }
 
-/** 从环境变量创建生产 UI-TARS 会话工厂（模型配置）。 */
-export async function createConfiguredUiTarsSdkSessionFactory(options: {
-  baseURL?: string;
-  apiKey?: string;
-  model?: string;
-  maxLoopCount?: number;
-}): Promise<UiTarsSdkSessionFactory> {
-  const baseURL = options.baseURL?.trim() || process.env.PRISM_UI_TARS_BASE_URL?.trim();
-  const apiKey = options.apiKey?.trim() || process.env.PRISM_UI_TARS_API_KEY?.trim();
-  const model = options.model?.trim() || process.env.PRISM_UI_TARS_MODEL?.trim();
-  if (!baseURL || !apiKey || !model) {
-    throw new UiTarsConfigurationError(
-      "Configure PRISM_UI_TARS_BASE_URL, PRISM_UI_TARS_API_KEY, and PRISM_UI_TARS_MODEL before starting a live browser Run.",
+/** 从 Agent Plan 专属 API Key 创建浏览器模型会话工厂。 */
+export async function createConfiguredAgentPlanBrowserSessionFactory(
+  options: {
+    apiKey?: string;
+    fetchImpl?: typeof fetch;
+  } = {},
+): Promise<AgentPlanBrowserSessionFactory> {
+  const apiKey = options.apiKey?.trim() || process.env.ARK_AGENT_PLAN_API_KEY?.trim();
+  if (!apiKey) {
+    throw new BrowserConfigurationError(
+      "Configure ARK_AGENT_PLAN_API_KEY before starting a live browser Run.",
     );
   }
-  return new UiTarsSdkSessionFactory({
-    baseURL,
-    apiKey,
-    model,
-    maxLoopCount: options.maxLoopCount,
+  return new AgentPlanBrowserSessionFactory({ apiKey, fetchImpl: options.fetchImpl });
+}
+
+async function requestAgentPlanBrowserAction(options: {
+  apiKey: string;
+  fetchImpl: typeof fetch;
+  signal: AbortSignal;
+  systemPrompt: string;
+  instruction: string;
+  history: string[];
+  screenshot: string;
+}): Promise<BrowserModelAction> {
+  const response = await options.fetchImpl(AGENT_PLAN_RESPONSES_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${options.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    signal: options.signal,
+    body: JSON.stringify({
+      model: AGENT_PLAN_BROWSER_MODEL.id,
+      store: false,
+      reasoning: { effort: "low" },
+      input: [
+        { role: "developer", content: options.systemPrompt },
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: [
+                options.instruction,
+                "Choose exactly one tool. Click coordinates are physical screenshot pixels measured from the top-left.",
+                options.history.length > 0
+                  ? `Previous actions:\n${options.history.join("\n")}`
+                  : "No previous actions.",
+              ].join("\n\n"),
+            },
+            {
+              type: "input_image",
+              detail: "auto",
+              image_url: `data:image/png;base64,${options.screenshot}`,
+            },
+          ],
+        },
+      ],
+      tools: [
+        {
+          type: "function",
+          name: "click",
+          description: "Click one point in the current screenshot.",
+          parameters: {
+            type: "object",
+            properties: {
+              x: { type: "number" },
+              y: { type: "number" },
+              judgment: { type: "string" },
+            },
+            required: ["x", "y"],
+            additionalProperties: false,
+          },
+        },
+        {
+          type: "function",
+          name: "finished",
+          description: "Finish when the browser task needs no more clicks.",
+          parameters: {
+            type: "object",
+            properties: { judgment: { type: "string" } },
+            required: ["judgment"],
+            additionalProperties: false,
+          },
+        },
+      ],
+      tool_choice: "required",
+      parallel_tool_calls: false,
+      max_output_tokens: 2_048,
+    }),
   });
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 500);
+    throw new Error(
+      `Agent Plan browser request failed (${response.status})${detail ? `: ${detail}` : "."}`,
+    );
+  }
+  return parseBrowserModelAction(await response.json());
+}
+
+function parseBrowserModelAction(payload: unknown): BrowserModelAction {
+  if (!isRecord(payload) || !Array.isArray(payload.output)) {
+    throw new TypeError("The browser model returned an invalid Responses payload.");
+  }
+  const calls = payload.output.filter(
+    (item): item is Record<string, unknown> =>
+      isRecord(item) && item.type === "function_call",
+  );
+  if (calls.length !== 1 || typeof calls[0]!.arguments !== "string") {
+    throw new TypeError("The browser model must return exactly one function call.");
+  }
+  let args: unknown;
+  try {
+    args = JSON.parse(calls[0]!.arguments);
+  } catch {
+    throw new TypeError("The browser model returned invalid function arguments.");
+  }
+  if (!isRecord(args)) {
+    throw new TypeError("The browser model returned invalid function arguments.");
+  }
+  if (calls[0]!.name === "click") {
+    if (
+      typeof args.x !== "number" ||
+      !Number.isFinite(args.x) ||
+      typeof args.y !== "number" ||
+      !Number.isFinite(args.y) ||
+      (args.judgment !== undefined && typeof args.judgment !== "string")
+    ) {
+      throw new TypeError("The browser model returned invalid click coordinates.");
+    }
+    return {
+      action: "click",
+      x: args.x,
+      y: args.y,
+      ...(typeof args.judgment === "string" ? { judgment: args.judgment } : {}),
+    };
+  }
+  if (
+    calls[0]!.name === "finished" &&
+    typeof args.judgment === "string" &&
+    args.judgment.trim().length > 0
+  ) {
+    return { action: "finished", judgment: args.judgment.trim() };
+  }
+  throw new TypeError("The browser model returned an unsupported function call.");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -360,7 +465,7 @@ export async function createConfiguredUiTarsSdkSessionFactory(options: {
  * 观测引用（同一 observationId），页面变化后生成新观测 —— 这正是
  * ActionBroker 新鲜度判定所需的语义。
  */
-export class PlaywrightBrowserPortFactory implements UiTarsBrowserPortFactory {
+export class PlaywrightBrowserPortFactory implements BrowserPortFactory {
   private readonly browserType: Pick<BrowserType<Browser>, "launch">;
 
   constructor(
@@ -376,7 +481,7 @@ export class PlaywrightBrowserPortFactory implements UiTarsBrowserPortFactory {
     baseUrl: string;
     route: string;
     viewport: Viewport;
-  }): Promise<UiTarsBrowserPort> {
+  }): Promise<BrowserPort> {
     const baseUrl = localBaseUrl(options.baseUrl);
     const targetUrl = localPageUrl(baseUrl, options.route);
     const browser = await this.browserType.launch({
@@ -452,7 +557,7 @@ function localBaseUrl(input: string): URL {
   );
   if (baseUrl.protocol !== "http:" || !isLocalHost) {
     throw new TypeError(
-      "Prism UI-TARS browser sessions only permit an explicit local HTTP base URL.",
+      "Prism browser sessions only permit an explicit local HTTP base URL.",
     );
   }
   return baseUrl;
@@ -463,7 +568,7 @@ function localPageUrl(baseUrl: URL, route: string): URL {
   const target = new URL(route, baseUrl);
   if (target.origin !== baseUrl.origin) {
     throw new TypeError(
-      "Prism UI-TARS refused a browser route outside the configured local origin.",
+      "Prism refused a browser route outside the configured local origin.",
     );
   }
   return target;
@@ -513,33 +618,33 @@ function sha256(value: Uint8Array): string {
 }
 
 /** 运行时选项：端口工厂、会话工厂、产物提交器、可选验证器与时钟。 */
-export interface UiTarsBrowserRuntimeOptions {
+export interface BrowserRuntimeOptions {
   baseUrl: string;
   viewport: Viewport;
-  browserPortFactory: UiTarsBrowserPortFactory;
-  sessionFactory: UiTarsSessionFactory;
+  browserPortFactory: BrowserPortFactory;
+  sessionFactory: BrowserSessionFactory;
   artifacts: {
     commit: (content: Uint8Array | string, mediaType: string) => Promise<ArtifactRef>;
   };
-  verifier?: UiTarsVerifier;
+  verifier?: BrowserVerifier;
   clock?: () => Date;
 }
 
 /** 运行时失败码（与 NodeOutcome.failure.code 对齐）。 */
-type UiTarsFailureCode = NonNullable<NodeOutcome["failure"]>["code"];
+type BrowserFailureCode = NonNullable<NodeOutcome["failure"]>["code"];
 
 /**
- * 嵌入式 UI-TARS Browser Runtime。
+ * 嵌入式 Browser Runtime。
  *
  * execute() 解析 BrowserRuntimeTaskEnvelope，启动受限浏览器端口、创建
- * PrismBrowserOperator + ActionBroker，运行 GUIAgent，收集浏览器动作记录
- * 与轨迹；browser.verify 节点额外用意图链定的确定性谓词 + UI-TARS 定性
+ * PrismBrowserOperator + ActionBroker，运行 Agent Plan 会话，收集浏览器动作记录
+ * 与轨迹；browser.verify 节点额外用意图链定的确定性谓词 + 模型定性
  * 判断构建 BrowserVerificationReport。
  */
-export class UiTarsBrowserRuntime {
+export class BrowserRuntime {
   private readonly clock: () => Date;
 
-  constructor(private readonly options: UiTarsBrowserRuntimeOptions) {
+  constructor(private readonly options: BrowserRuntimeOptions) {
     this.clock = options.clock ?? (() => new Date());
   }
 
@@ -550,10 +655,10 @@ export class UiTarsBrowserRuntime {
     const envelope = browserRuntimeTaskEnvelopeSchema.parse(envelopeInput);
     const startedAt = this.clock();
     const trajectory: Array<Record<string, unknown>> = [];
-    let port: UiTarsBrowserPort | null = null;
-    let session: UiTarsSession | null = null;
+    let port: BrowserPort | null = null;
+    let session: BrowserSession | null = null;
     let operator: PrismBrowserOperator | null = null;
-    let abortReason: UiTarsFailureCode | undefined;
+    let abortReason: BrowserFailureCode | undefined;
     let cleanupFailed = false;
     let verificationReport: BrowserVerificationReport | null = null;
     let browserActions: BrowserActionRecord[] = [];
@@ -566,7 +671,7 @@ export class UiTarsBrowserRuntime {
     const onExternalAbort = (): void => {
       executionController.abort("cancelled");
     };
-    const stopExecution = (reason: UiTarsFailureCode): void => {
+    const stopExecution = (reason: BrowserFailureCode): void => {
       if (!executionController.signal.aborted) {
         executionController.abort(reason);
       }
@@ -636,7 +741,7 @@ export class UiTarsBrowserRuntime {
         }
       }
     } catch (error) {
-      if (error instanceof UiTarsSessionCleanupError) {
+      if (error instanceof BrowserSessionCleanupError) {
         cleanupFailed = true;
       } else if (!abortReason) {
         abortReason =
@@ -686,7 +791,7 @@ export class UiTarsBrowserRuntime {
     };
     const trajectoryArtifact = await this.options.artifacts.commit(
       `${JSON.stringify({
-        schemaVersion: "prism.ui-tars-trajectory/v1",
+        schemaVersion: "prism.browser-trajectory/v1",
         runId: envelope.runId,
         dagRevision: envelope.dagRevision,
         nodeId: envelope.nodeId,
@@ -695,7 +800,7 @@ export class UiTarsBrowserRuntime {
         causationEventId: envelope.causationEventId,
         events: trajectory,
       })}\n`,
-      UI_TARS_TRAJECTORY_MEDIA_TYPE,
+      BROWSER_TRAJECTORY_MEDIA_TYPE,
     );
     const artifacts = [trajectoryArtifact];
 
@@ -712,10 +817,10 @@ export class UiTarsBrowserRuntime {
     });
   }
 
-  /** 用意图链定的确定性谓词 + UI-TARS 定性判断构建验证报告。 */
+  /** 用意图链定的确定性谓词 + 模型定性判断构建验证报告。 */
   private async verify(
     envelope: BrowserRuntimeTaskEnvelope,
-    port: UiTarsBrowserPort,
+    port: BrowserPort,
     operator: PrismBrowserOperator,
   ): Promise<BrowserVerificationReport> {
     const intent = envelope.authority.intent ?? "The repair intent.";
@@ -752,7 +857,7 @@ export class UiTarsBrowserRuntime {
     const supplemental: BrowserVerificationAssertion = {
       assertion:
         operator.getFinalJudgment() ??
-        "UI-TARS produced no explicit qualitative judgment.",
+        "The browser model produced no explicit qualitative judgment.",
       intentLinked: false,
       kind: "supplemental",
       status: "inconclusive",
@@ -786,11 +891,11 @@ export class UiTarsBrowserRuntime {
   private buildOutcome(
     envelope: BrowserRuntimeTaskEnvelope,
     verificationReport: BrowserVerificationReport | null,
-    abortReason: UiTarsFailureCode | undefined,
+    abortReason: BrowserFailureCode | undefined,
     cleanupFailed: boolean,
     _operator: PrismBrowserOperator | null,
   ): NodeOutcome {
-    const failureCode: UiTarsFailureCode | undefined = cleanupFailed
+    const failureCode: BrowserFailureCode | undefined = cleanupFailed
       ? "process_cleanup_failed"
       : (abortReason ??
         (envelope.nodeType === "browser.verify" &&
@@ -811,7 +916,7 @@ export class UiTarsBrowserRuntime {
           failureCode === "browser_execution_failed"
             ? "blocked"
             : "failed",
-        summary: `UI-TARS Browser Runtime ended with ${failureCode.replaceAll("_", " ")}.`,
+        summary: `Browser Runtime ended with ${failureCode.replaceAll("_", " ")}.`,
         request: retryable
           ? { kind: "retry", reason: `Retry after ${failureCode}.` }
           : { kind: "none" },
@@ -831,17 +936,17 @@ export class UiTarsBrowserRuntime {
       state: "succeeded",
       summary:
         envelope.nodeType === "browser.verify"
-          ? "The UI-TARS verification report passed its intent-linked predicate."
-          : "The UI-TARS browser observation completed.",
+          ? "The browser verification report passed its intent-linked predicate."
+          : "The browser observation completed.",
       request,
       failure: null,
     });
   }
 
-  /** 构造 GUIAgent 系统提示：约束动作空间并声明代理边界。 */
+  /** 构造浏览器模型系统提示：约束动作空间并声明代理边界。 */
   private systemPrompt(envelope: BrowserRuntimeTaskEnvelope): string {
     return [
-      "You are the embedded UI-TARS Browser Runtime inside Prism.",
+      "You are the embedded Agent Plan Browser Runtime inside Prism.",
       "All browser input must pass through the Prism ActionBroker. You never have source, shell, file, or arbitrary-script capability.",
       "Propose exactly one typed browser action at a time using only the action space below.",
       `Run: ${envelope.runId}`,

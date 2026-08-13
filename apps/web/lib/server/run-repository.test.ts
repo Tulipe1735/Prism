@@ -1,5 +1,5 @@
+import type { BrowserSessionFactory } from "@prism/runtime-browser";
 import type { PiSessionFactory } from "@prism/runtime-pi";
-import type { UiTarsSessionFactory } from "@prism/runtime-ui-tars";
 import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -256,14 +256,14 @@ describe("Run repository", () => {
       initialPackage,
       repairedPackage,
     );
-    const uiTarsSessionFactory = scriptedSuccessfulUiTarsSessionFactory();
+    const browserSessionFactory = scriptedSuccessfulBrowserSessionFactory();
     const browserPortFactory = scriptedBrowserPortFactory();
 
     try {
       expect(
         await startHybridRun(creation.runId, {
           piSessionFactory,
-          uiTarsSessionFactory,
+          browserSessionFactory,
           browserPortFactory,
           verifier: {
             verify: async () => ({
@@ -379,10 +379,10 @@ function scriptedSuccessfulPiSessionFactory(
   };
 }
 
-/** 脚本化 UI-TARS 会话工厂：直接驱动 operator 完成一次观测与验证。 */
-function scriptedSuccessfulUiTarsSessionFactory(): UiTarsSessionFactory {
+/** 脚本化浏览器模型会话工厂：直接驱动 operator 完成一次观测与验证。 */
+function scriptedSuccessfulBrowserSessionFactory(): BrowserSessionFactory {
   const usage: BrowserResourceUsage = {
-    model: { provider: "scripted-ui-tars", id: "scripted-1" },
+    model: { provider: "scripted-browser-model", id: "scripted-1" },
     modelCalls: 1,
     loopCount: 1,
     actionsProposed: 0,
@@ -396,17 +396,8 @@ function scriptedSuccessfulUiTarsSessionFactory(): UiTarsSessionFactory {
       run: async () => {
         await operator.screenshot();
         await operator.execute({
-          prediction: "finished()",
-          parsedPrediction: {
-            action_type: "finished",
-            action_inputs: {},
-            reflection: "The allowlisted page was observed.",
-            thought: "Task complete.",
-          },
-          screenWidth: 1280,
-          screenHeight: 720,
-          scaleFactor: 1,
-          factors: [1, 1],
+          action: "finished",
+          judgment: "The allowlisted page was observed.",
         });
       },
       abort: async () => undefined,

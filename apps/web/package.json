@@ -12,12 +12,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "0.82.1",
+    "@earendil-works/pi-coding-agent": "0.82.1",
     "@hookform/resolvers": "5.5.7",
     "@prism/action-broker": "workspace:^",
     "@prism/oracle": "workspace:*",
     "@prism/orchestrator": "workspace:*",
     "@prism/runtime-pi": "workspace:*",
-    "@prism/runtime-ui-tars": "workspace:*",
+    "@prism/runtime-browser": "workspace:*",
     "@prism/contracts": "workspace:*",
     "@prism/trajectory-store": "workspace:^",
     "@prism/workspace-executor": "workspace:^",

@@ -301,7 +301,7 @@ export interface CodingRuntime {
   ) => Promise<PiRuntimeResult>;
 }
 
-/** UI-TARS Browser Runtime 的进程中立调用边界。 */
+/** Browser Runtime 的进程中立调用边界。 */
 export interface BrowserRuntime {
   execute: (
     envelope: BrowserRuntimeTaskEnvelope,
@@ -326,6 +326,8 @@ export interface ExecuteHybridRunInput {
   budget?: RuntimeBudget;
   browserBudget?: BrowserRuntimeBudget;
   signal?: AbortSignal;
+  authorizeEffect?: (node: RunDagNode, fencingToken: number) => Promise<boolean>;
+  approvedEffectClasses?: readonly ("source_effect" | "browser_effect")[];
   resume?: {
     revision: RunDagRevision;
     completedNodeIds: readonly string[];
@@ -564,8 +566,36 @@ export class Orchestrator {
 
       const outcomes = await this.scheduler.run(
         ready,
-        async (node) => {
+        async (node, fencingToken) => {
           const attempt = attemptFor(node);
+          if (
+            fencingToken !== null &&
+            input.authorizeEffect &&
+            !(await input.authorizeEffect(node, fencingToken))
+          ) {
+            const outcome = nodeOutcomeSchema.parse({
+              nodeId: node.nodeId,
+              attempt,
+              state: "blocked",
+              summary:
+                "The effect was blocked because no matching authority was consumed.",
+              request: { kind: "none" },
+              failure: { code: "approval_required", retryable: false },
+            });
+            await input.journal.appendNodeProgress({
+              revision: revision.revision,
+              nodeId: node.nodeId,
+              nodeType: node.nodeType,
+              attempt,
+              runtime: node.runtime,
+              effectClass: node.effectClass,
+              state: outcome.state,
+              summary: outcome.summary,
+              artifacts: [],
+              correlationId: input.runId,
+            });
+            return outcome;
+          }
           await input.journal.appendNodeProgress({
             revision: revision.revision,
             nodeId: node.nodeId,
@@ -719,7 +749,7 @@ export class Orchestrator {
               schemaVersion: "prism.run-completion/v1",
               terminalDagRevision: revision.revision,
               budgets: { code: budget, browser: browserBudget },
-              approvals: [],
+              approvals: [...(input.approvedEffectClasses ?? [])],
               codeOracle,
               browserVerificationReportId: latestVerificationReport.reportId,
               verificationRefs: result.artifacts,

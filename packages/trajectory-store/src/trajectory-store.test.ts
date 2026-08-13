@@ -12,7 +12,12 @@ import {
 } from "@prism/contracts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FileTrajectoryStore, projectRunEvents, RunIntegrityError } from "./index";
+import {
+  effectApprovalDigest,
+  FileTrajectoryStore,
+  projectRunEvents,
+  RunIntegrityError,
+} from "./index";
 
 const runId = "run_6dbf6f33-69c4-4e5f-9898-3f693735f5f0";
 const createdEventId = "28bb152c-1873-4d6f-81e8-efc154bb9ad8";
@@ -75,6 +80,83 @@ describe("FileTrajectoryStore", () => {
     const reopened = new FileTrajectoryStore({ dataDirectory });
     expect(await reopened.loadRun(runId)).toEqual(created);
   });
+
+  it.each([
+    ["declined", "blocked"],
+    ["cancelled", "cancelled"],
+  ] as const)(
+    "records %s as a terminal no-mutation decision",
+    async (decision, status) => {
+      await store.createRun(request);
+      await store.recordDagRevision(runId, {
+        schemaVersion: "prism.run-dag-revision/v1",
+        revision: 1,
+        classification: "coding",
+        createdAt: recordedAt,
+        nodes: [
+          {
+            nodeId: "node-1-workspace-patch",
+            nodeType: "workspace.patch",
+            runtime: "coding",
+            effectClass: "source_effect",
+            predecessorIds: [],
+            maxAttempts: 1,
+          },
+        ],
+      });
+      const observationArtifact = await store.writeArtifact(
+        '{"source":"unchanged"}\n',
+        "application/vnd.prism.source-observation+json",
+      );
+      const proposalInput = {
+        schemaVersion: "prism.effect-control/v1" as const,
+        kind: "proposal" as const,
+        controlId: "b3e1d8aa-ff99-47f5-8e8c-2de4766c9630",
+        proposalId: "a3e1d8aa-ff99-47f5-8e8c-2de4766c9630",
+        runId,
+        nodeId: "node-1-workspace-patch",
+        origin: "pi" as const,
+        target: {
+          kind: "workspace" as const,
+          displayName: "prism-fixture",
+          paths: ["src"],
+        },
+        effectClass: "source_effect" as const,
+        parameters: [{ name: "scope", redactedValue: "src/" }],
+        preconditions: {
+          observationArtifact,
+          observationDigest: observationArtifact.hash,
+          fencingToken: 1,
+          expiresAt: "2026-07-31T05:00:00.000Z",
+        },
+        reason: "Apply the scoped source repair.",
+        recordedAt,
+      };
+      const proposalDigest = effectApprovalDigest(proposalInput);
+      await store.recordEffectControl(runId, { ...proposalInput, proposalDigest });
+      await store.recordEffectControl(runId, {
+        schemaVersion: "prism.effect-control/v1",
+        kind: "decision",
+        controlId:
+          decision === "declined"
+            ? "c3e1d8aa-ff99-47f5-8e8c-2de4766c9630"
+            : "d3e1d8aa-ff99-47f5-8e8c-2de4766c9630",
+        proposalId: proposalInput.proposalId,
+        proposalDigest,
+        decision,
+        observationDigest: observationArtifact.hash,
+        fencingToken: 1,
+        reason: `The user ${decision} the proposal.`,
+        recordedAt,
+      });
+
+      expect((await store.loadRun(runId)).snapshot).toMatchObject({
+        status,
+        workspaceEvidence: [],
+        effectControls: [{ kind: "proposal" }, { kind: "decision", decision }],
+      });
+    },
+  );
 
   it("projects workspace evidence and verifies its content-addressed artifact", async () => {
     await store.createRun(request);

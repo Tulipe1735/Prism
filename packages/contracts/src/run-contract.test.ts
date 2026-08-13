@@ -7,6 +7,7 @@ import {
   browserRuntimeResultSchema,
   browserRuntimeTaskEnvelopeSchema,
   browserVerificationReportSchema,
+  effectReconciliationSchema,
   piRuntimeResultSchema,
   runCreationSchema,
   runDagRevisionSchema,
@@ -406,7 +407,7 @@ describe("Durable Run contracts", () => {
         schemaVersion: "prism.browser-action-proposal/v1",
         proposalId: "6b3d5ed9-03ba-49e8-a15e-57ac91ef8ef8",
         runId: manifest.runId,
-        origin: "ui-tars",
+        origin: "browser-model",
         action: { kind: "click" },
         target: {
           kind: "coordinate",
@@ -425,7 +426,7 @@ describe("Durable Run contracts", () => {
         schemaVersion: "prism.browser-action-proposal/v1",
         proposalId: "6b3d5ed9-03ba-49e8-a15e-57ac91ef8ef8",
         runId: manifest.runId,
-        origin: "ui-tars",
+        origin: "browser-model",
         action: { kind: "click" },
         target: { kind: "coordinate", x: 240, y: 160 },
       }).success,
@@ -490,7 +491,7 @@ describe("Durable Run contracts", () => {
       browserActions: [],
       verificationReport: null,
       usage: {
-        model: { provider: "ui-tars", id: "ui-tars-1.5" },
+        model: { provider: "browser-model", id: "doubao-seed-2.0-pro" },
         modelCalls: 3,
         loopCount: 3,
         actionsProposed: 1,
@@ -509,7 +510,7 @@ describe("Durable Run contracts", () => {
     ).toBe(false);
   });
 
-  it("labels UI-TARS judgment supplemental and refuses a passing report without a deterministic predicate", () => {
+  it("labels model judgment supplemental and refuses a passing report without a deterministic predicate", () => {
     const assertion = {
       assertion: "The primary Save button radius is at least 8px.",
       intentLinked: true,
@@ -529,7 +530,7 @@ describe("Durable Run contracts", () => {
       assertions: [
         assertion,
         {
-          assertion: "UI-TARS judged the button visually rounded.",
+          assertion: "The browser model judged the button visually rounded.",
           intentLinked: false,
           kind: "supplemental",
           status: "passed",
@@ -560,4 +561,31 @@ describe("Durable Run contracts", () => {
       }).success,
     ).toBe(false);
   });
+
+  it.each(["source_effect", "browser_effect"] as const)(
+    "blocks unknown %s reality for human review",
+    (effectClass) => {
+      const reconciliation = {
+        schemaVersion: "prism.effect-control/v1",
+        kind: "reconciliation",
+        controlId: "b3e1d8aa-ff99-47f5-8e8c-2de4766c9630",
+        proposalId: "a3e1d8aa-ff99-47f5-8e8c-2de4766c9630",
+        nodeId: "node-3-browser-verify-attempt-1",
+        effectClass,
+        outcome: "unknown",
+        action: "human_review",
+        evidenceRefs: [artifact],
+        reason: "Browser reality could not prove whether the interrupted action fired.",
+        recordedAt: "2026-08-05T09:00:01.000Z",
+      } as const;
+
+      expect(effectReconciliationSchema.parse(reconciliation)).toEqual(reconciliation);
+      expect(
+        effectReconciliationSchema.safeParse({
+          ...reconciliation,
+          action: "retry",
+        }).success,
+      ).toBe(false);
+    },
+  );
 });

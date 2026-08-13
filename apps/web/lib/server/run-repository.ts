@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 /**
  * Field Desk 服务端 Run 仓库（repository）
@@ -27,12 +27,16 @@ import {
   type BrowserRuntimeResult,
   type BrowserRuntimeTaskEnvelope,
   CODE_ORACLE_REPORT_MEDIA_TYPE,
+  type EffectApprovalDecision,
+  type EffectApprovalProposal,
+  type EffectDecisionRequest,
   FRONTEND_REPAIR_SPEC_MEDIA_TYPE,
   piRuntimeResultSchema,
   type RepairRequest,
   RUN_CREATION_SCHEMA_VERSION,
   type RunCreation,
   runCreationSchema,
+  type RunDagNode,
   type RunDagNodeType,
   type RunDossier,
   runDossierSchema,
@@ -53,20 +57,21 @@ import {
 } from "@prism/oracle";
 import { type OrchestrationJournal, Orchestrator } from "@prism/orchestrator";
 import {
+  type BrowserPortFactory,
+  BrowserRuntime,
+  type BrowserSessionFactory,
+  type BrowserVerifier,
+  createConfiguredAgentPlanBrowserSessionFactory,
+  PlaywrightBrowserPortFactory,
+} from "@prism/runtime-browser";
+import {
   createConfiguredPiSdkSessionFactory,
   PiCodingRuntime,
   type PiSessionFactory,
 } from "@prism/runtime-pi";
 import {
-  createConfiguredUiTarsSdkSessionFactory,
-  PlaywrightBrowserPortFactory,
-  type UiTarsBrowserPortFactory,
-  UiTarsBrowserRuntime,
-  type UiTarsSessionFactory,
-  type UiTarsVerifier,
-} from "@prism/runtime-ui-tars";
-import {
   type DurableRun,
+  effectApprovalDigest,
   FileTrajectoryStore,
   RunIntegrityError,
   runTitleFromPrompt,
@@ -94,7 +99,23 @@ interface ActiveHybridRun {
   initialRevisionCommitted: Promise<void>;
   /** 整个 live 运行完成的 promise。 */
   completion: Promise<void>;
+  controller: AbortController;
 }
+
+const RUN_WORKSPACE_READ_PATTERNS = [
+  "package.json",
+  "README.md",
+  "apps/**/*.{ts,tsx,css,json,mjs}",
+  "packages/**/*.{ts,tsx,css,json,mjs}",
+  "src/**/*.{ts,tsx,css,json,mjs}",
+  "tests/**/*.{ts,tsx,css,json,mjs}",
+] as const;
+const RUN_WORKSPACE_DISCOVERY_PATTERNS = [
+  "apps/**/*.{ts,tsx}",
+  "packages/**/*.ts",
+  "src/**/*.{ts,tsx}",
+  "**/*.{test,spec}.{ts,tsx}",
+] as const;
 
 /** 进程内活动运行表，键为 dataDirectory:runId。 */
 const activeHybridRuns = new Map<string, ActiveHybridRun>();
@@ -146,6 +167,7 @@ function dossierFromRun(run: DurableRun): RunDossier {
     dagRevisions: run.snapshot.dagRevisions,
     nodeProgress: run.snapshot.nodeProgress,
     effectLease: run.snapshot.effectLease,
+    effectControls: run.snapshot.effectControls,
     terminalError: run.snapshot.terminalError,
   });
 }
@@ -193,6 +215,7 @@ async function failedDossier(runId: string, error: unknown): Promise<RunDossier>
     browserVerificationReports: [],
     repairSpec: null,
     completion: null,
+    effectControls: [],
     terminalError,
   });
 }
@@ -256,6 +279,275 @@ async function commitRepairSpec(
     spec: scenario.spec,
     artifact,
   });
+}
+
+function proposalDecision(
+  run: DurableRun,
+  proposalId: string,
+): EffectApprovalDecision | undefined {
+  return run.snapshot.effectControls.find(
+    (control): control is EffectApprovalDecision =>
+      control.kind === "decision" && control.proposalId === proposalId,
+  );
+}
+
+function pendingProposal(run: DurableRun): EffectApprovalProposal | undefined {
+  return [...run.snapshot.effectControls]
+    .reverse()
+    .find(
+      (control): control is EffectApprovalProposal =>
+        control.kind === "proposal" && !proposalDecision(run, control.proposalId),
+    );
+}
+
+async function sourceReality(scenario: ScenarioManifest) {
+  const fileHashes: Record<string, string> = {};
+  for (const relativePath of Object.keys(scenario.knownBad.fileHashes).sort()) {
+    fileHashes[relativePath] = createHash("sha256")
+      .update(await readFile(path.join(scenario.fixturePath, relativePath)))
+      .digest("hex");
+  }
+  return `${JSON.stringify({
+    schemaVersion: "prism.source-observation/v1",
+    fileHashes,
+  })}\n`;
+}
+
+/** 用已提交现实证据创建一个绑定下一 fencing token 的最小源码审批提议。 */
+async function proposeSourceEffect(
+  store: FileTrajectoryStore,
+  run: DurableRun,
+  scenario: ScenarioManifest,
+): Promise<void> {
+  if (pendingProposal(run)) return;
+  const node = run.snapshot.dagRevisions
+    .at(-1)
+    ?.nodes.find(({ nodeType }) => nodeType === "workspace.patch");
+  if (!node) return;
+  const observation = await store.writeArtifact(
+    await sourceReality(scenario),
+    "application/vnd.prism.source-observation+json",
+  );
+
+  const recordedAt = new Date();
+  const digestInput: Omit<EffectApprovalProposal, "proposalDigest"> = {
+    schemaVersion: "prism.effect-control/v1",
+    kind: "proposal",
+    controlId: randomUUID(),
+    proposalId: randomUUID(),
+    runId: run.manifest.runId,
+    nodeId: node.nodeId,
+    origin: "pi",
+    target: {
+      kind: "workspace",
+      displayName: run.manifest.request.workspace.displayName,
+      paths: scenario.codeOracle.scopedPaths.map((value) => value.replace(/\/$/u, "")),
+    },
+    effectClass: "source_effect",
+    parameters: [
+      { name: "operation", redactedValue: "apply a scoped source patch" },
+      {
+        name: "scope",
+        redactedValue: scenario.codeOracle.scopedPaths.join(", "),
+      },
+    ],
+    preconditions: {
+      observationArtifact: observation,
+      observationDigest: observation.hash,
+      fencingToken: (run.snapshot.effectLease?.token ?? 0) + 1,
+      expiresAt: new Date(recordedAt.getTime() + 15 * 60_000).toISOString(),
+    },
+    reason: "Pi proposes a scoped source repair after the committed browser baseline.",
+    recordedAt: recordedAt.toISOString(),
+  };
+  await store.recordEffectControl(run.manifest.runId, {
+    ...digestInput,
+    proposalDigest: effectApprovalDigest(digestInput),
+  });
+}
+
+/**
+ * 被消费的源码效果若未提交终态，先与已知缺陷内容核对；只有逐字节未变化时
+ * 才允许重新提议，任何部分效果或不可判定状态都转人工。
+ */
+async function reconcileInterruptedSourceEffect(
+  store: FileTrajectoryStore,
+  run: DurableRun,
+  scenario: ScenarioManifest,
+): Promise<boolean> {
+  const activeLease =
+    run.snapshot.effectLease?.state === "active" &&
+    run.snapshot.effectLease.effectClass === "source_effect" &&
+    !run.snapshot.nodeProgress.some(
+      ({ nodeId, state }) =>
+        nodeId === run.snapshot.effectLease?.holderNodeId &&
+        ["succeeded", "failed", "blocked"].includes(state),
+    )
+      ? run.snapshot.effectLease
+      : null;
+  const consumption = [...run.snapshot.effectControls]
+    .reverse()
+    .find(
+      (control) =>
+        control.kind === "consumption" &&
+        !run.snapshot.nodeProgress.some(
+          ({ nodeId, state }) =>
+            nodeId === control.nodeId &&
+            ["succeeded", "failed", "blocked"].includes(state),
+        ),
+    );
+  if ((!consumption || consumption.kind !== "consumption") && !activeLease) return true;
+  const nodeId =
+    consumption?.kind === "consumption"
+      ? consumption.nodeId
+      : activeLease!.holderNodeId;
+  const proposalId =
+    consumption?.kind === "consumption" ? consumption.proposalId : null;
+  if (
+    run.snapshot.effectControls.some(
+      (control) => control.kind === "reconciliation" && control.nodeId === nodeId,
+    )
+  ) {
+    return run.snapshot.status !== "blocked";
+  }
+
+  let outcome: "no_effect" | "effect_detected" | "unknown" = "no_effect";
+  let observationDigest = "0".repeat(64);
+  try {
+    const reality = await sourceReality(scenario);
+    observationDigest = createHash("sha256").update(reality).digest("hex");
+    const current = JSON.parse(reality) as {
+      fileHashes: Record<string, string>;
+    };
+    outcome = Object.entries(scenario.knownBad.fileHashes).every(
+      ([relativePath, knownHash]) => current.fileHashes[relativePath] === knownHash,
+    )
+      ? "no_effect"
+      : "effect_detected";
+  } catch {
+    outcome = "unknown";
+  }
+  const evidence = await store.writeArtifact(
+    `${JSON.stringify({
+      schemaVersion: "prism.effect-reality-check/v1",
+      nodeId,
+      outcome,
+      knownBad: scenario.knownBad,
+    })}\n`,
+    "application/vnd.prism.effect-reality-check+json",
+  );
+  if (!proposalId && activeLease) {
+    const proposal = [...run.snapshot.effectControls]
+      .reverse()
+      .find(
+        (control): control is EffectApprovalProposal =>
+          control.kind === "proposal" && control.nodeId === activeLease.holderNodeId,
+      );
+    if (
+      proposal &&
+      proposalDecision(run, proposal.proposalId)?.decision === "approved"
+    ) {
+      await store.recordEffectControl(run.manifest.runId, {
+        schemaVersion: "prism.effect-control/v1",
+        kind: "decision",
+        controlId: randomUUID(),
+        proposalId: proposal.proposalId,
+        proposalDigest: proposal.proposalDigest,
+        decision: "invalidated",
+        observationDigest,
+        fencingToken: activeLease.token,
+        reason: "The process stopped before approved authority was consumed.",
+        recordedAt: new Date().toISOString(),
+      });
+    }
+  }
+  if (activeLease) {
+    await store.recordEffectLease(run.manifest.runId, {
+      ...activeLease,
+      state: "released",
+      recordedAt: new Date().toISOString(),
+    });
+  }
+  await store.recordEffectControl(run.manifest.runId, {
+    schemaVersion: "prism.effect-control/v1",
+    kind: "reconciliation",
+    controlId: randomUUID(),
+    proposalId,
+    nodeId,
+    effectClass: "source_effect",
+    outcome,
+    action: outcome === "no_effect" ? "repropose" : "human_review",
+    evidenceRefs: [evidence],
+    reason:
+      outcome === "no_effect"
+        ? "The interrupted source effect changed no scoped file; fresh authority is required."
+        : "The interrupted source effect is partial or unknowable and requires human review.",
+    recordedAt: new Date().toISOString(),
+  });
+  if (outcome !== "no_effect") return false;
+  await proposeSourceEffect(store, await store.loadRun(run.manifest.runId), scenario);
+  return false;
+}
+
+/** 浏览器副作用中断后只提交当前渲染事实；无法证明动作是否发生，直接转人工。 */
+async function reconcileInterruptedBrowserEffect(
+  store: FileTrajectoryStore,
+  run: DurableRun,
+  scenario: ScenarioManifest,
+): Promise<boolean> {
+  const lease = run.snapshot.effectLease;
+  if (
+    lease?.state !== "active" ||
+    lease.effectClass !== "browser_effect" ||
+    run.snapshot.nodeProgress.some(
+      ({ nodeId, state }) =>
+        nodeId === lease.holderNodeId &&
+        ["succeeded", "failed", "blocked"].includes(state),
+    )
+  ) {
+    return true;
+  }
+
+  let observation: unknown;
+  try {
+    observation = await new BrowserOracle({
+      baseUrl: browserBaseUrl(),
+      route: scenario.route,
+      viewport: scenario.viewport,
+      target: scenario.browserOracle.target,
+      executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
+    }).observe();
+  } catch {
+    observation = { unavailable: true };
+  }
+  const evidence = await store.writeArtifact(
+    `${JSON.stringify({
+      schemaVersion: "prism.browser-effect-reality-check/v1",
+      nodeId: lease.holderNodeId,
+      observation,
+    })}\n`,
+    "application/vnd.prism.effect-reality-check+json",
+  );
+  await store.recordEffectLease(run.manifest.runId, {
+    ...lease,
+    state: "released",
+    recordedAt: new Date().toISOString(),
+  });
+  await store.recordEffectControl(run.manifest.runId, {
+    schemaVersion: "prism.effect-control/v1",
+    kind: "reconciliation",
+    controlId: randomUUID(),
+    proposalId: null,
+    nodeId: lease.holderNodeId,
+    effectClass: "browser_effect",
+    outcome: "unknown",
+    action: "human_review",
+    evidenceRefs: [evidence],
+    reason:
+      "Current browser reality is committed, but it cannot prove whether the interrupted input fired.",
+    recordedAt: new Date().toISOString(),
+  });
+  return false;
 }
 
 /** 通过同一个 WorkspaceExecutor 运行权威 build/test，并提交一份 code Oracle。 */
@@ -323,13 +615,13 @@ export async function startHybridRun(
   runIdInput: string,
   options: {
     piSessionFactory?: PiSessionFactory;
-    uiTarsSessionFactory?: UiTarsSessionFactory;
-    browserPortFactory?: UiTarsBrowserPortFactory;
+    browserSessionFactory?: BrowserSessionFactory;
+    browserPortFactory?: BrowserPortFactory;
     browserConfig?: {
       route: string;
       target: BrowserBaselineRequest["target"];
     };
-    verifier?: UiTarsVerifier;
+    verifier?: BrowserVerifier;
     stopAfterNodeType?: RunDagNodeType;
   } = {},
 ): Promise<boolean> {
@@ -348,10 +640,25 @@ export async function startHybridRun(
   }
 
   const run = await store.loadRun(parsedRunId.data);
-  if (run.snapshot.status === "completed") return true;
+  if (["completed", "blocked", "cancelled"].includes(run.snapshot.status)) return true;
   const scenario = await roundButtonScenarioFor(run);
   if (scenario) await commitRepairSpec(store, run, scenario);
-  const resumedRun = await store.loadRun(parsedRunId.data);
+  let resumedRun = await store.loadRun(parsedRunId.data);
+  if (resumedRun.snapshot.status === "awaiting_approval") return true;
+  if (
+    scenario &&
+    !(await reconcileInterruptedSourceEffect(store, resumedRun, scenario))
+  ) {
+    return true;
+  }
+  resumedRun = await store.loadRun(parsedRunId.data);
+  if (
+    scenario &&
+    !(await reconcileInterruptedBrowserEffect(store, resumedRun, scenario))
+  ) {
+    return true;
+  }
+  resumedRun = await store.loadRun(parsedRunId.data);
   const latestRevision = resumedRun.snapshot.dagRevisions.at(-1);
   const resume = latestRevision
     ? {
@@ -385,6 +692,10 @@ export async function startHybridRun(
       commit: (content, mediaType) => store.writeArtifact(content, mediaType),
     },
     workspace: {
+      guidance: {
+        allowedReadPatterns: RUN_WORKSPACE_READ_PATTERNS,
+        allowedDiscoveryPatterns: RUN_WORKSPACE_DISCOVERY_PATTERNS,
+      },
       execute: (request, signal) =>
         store.recordWorkspaceEffect(parsedRunId.data, async () => {
           const evidence = await workspaceExecutor.execute(request, { signal });
@@ -436,7 +747,12 @@ export async function startHybridRun(
       }
     : codingRuntime;
 
-  const browserConfig = browserRunConfig(options.browserConfig);
+  const browserConfig = browserRunConfig(
+    options.browserConfig ??
+      (scenario
+        ? { route: scenario.route, target: scenario.browserOracle.target }
+        : undefined),
+  );
   const baseUrl = browserBaseUrl();
   const storedBaselineObservation = resumedRun.snapshot.artifacts.find(
     ({ mediaType }) => mediaType === BROWSER_ORACLE_OBSERVATION_MEDIA_TYPE,
@@ -457,9 +773,10 @@ export async function startHybridRun(
         executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
       })
     : null;
-  const uiTarsSessionFactory =
-    options.uiTarsSessionFactory ?? (await createConfiguredUiTarsSdkSessionFactory({}));
-  const browserRuntime = new UiTarsBrowserRuntime({
+  const browserSessionFactory =
+    options.browserSessionFactory ??
+    (await createConfiguredAgentPlanBrowserSessionFactory({}));
+  const browserRuntime = new BrowserRuntime({
     baseUrl,
     viewport: run.manifest.request.viewport,
     browserPortFactory:
@@ -467,7 +784,7 @@ export async function startHybridRun(
       new PlaywrightBrowserPortFactory({
         executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
       }),
-    sessionFactory: uiTarsSessionFactory,
+    sessionFactory: browserSessionFactory,
     verifier:
       scenario && browserOracle
         ? {
@@ -512,7 +829,7 @@ export async function startHybridRun(
       ? {
           execute: async (
             envelope: BrowserRuntimeTaskEnvelope,
-            executionOptions?: Parameters<UiTarsBrowserRuntime["execute"]>[1],
+            executionOptions?: Parameters<BrowserRuntime["execute"]>[1],
           ) => {
             let observationArtifact: ArtifactRef | null = null;
             if (envelope.nodeType === "browser.observe" && !baselineObservation) {
@@ -577,6 +894,79 @@ export async function startHybridRun(
       await store.recordRunCompletion(parsedRunId.data, completionRecord);
     },
   };
+  const controller = new AbortController();
+  const approvedEffectClasses: Array<"source_effect" | "browser_effect"> = [];
+  const authorizeEffect = async (node: RunDagNode, fencingToken: number) => {
+    if (node.effectClass === "browser_effect") return true;
+    const current = await store.loadRun(parsedRunId.data);
+    const proposal = [...current.snapshot.effectControls]
+      .reverse()
+      .find(
+        (control): control is EffectApprovalProposal =>
+          control.kind === "proposal" && control.nodeId === node.nodeId,
+      );
+    const decision = proposal && proposalDecision(current, proposal.proposalId);
+    const consumed = proposal
+      ? current.snapshot.effectControls.some(
+          (control) =>
+            control.kind === "consumption" &&
+            control.proposalId === proposal.proposalId,
+        )
+      : false;
+    let observationDigest = proposal?.preconditions.observationDigest;
+    try {
+      if (scenario) {
+        observationDigest = createHash("sha256")
+          .update(await sourceReality(scenario))
+          .digest("hex");
+      }
+    } catch {
+      observationDigest = "0".repeat(64);
+    }
+    if (
+      !proposal ||
+      decision?.decision !== "approved" ||
+      consumed ||
+      proposal.preconditions.fencingToken !== fencingToken ||
+      Date.parse(proposal.preconditions.expiresAt) < Date.now() ||
+      observationDigest !== proposal.preconditions.observationDigest
+    ) {
+      if (proposal && decision?.decision === "approved" && !consumed) {
+        await store.recordEffectControl(parsedRunId.data, {
+          schemaVersion: "prism.effect-control/v1",
+          kind: "decision",
+          controlId: randomUUID(),
+          proposalId: proposal.proposalId,
+          proposalDigest: proposal.proposalDigest,
+          decision: "invalidated",
+          observationDigest: observationDigest ?? "0".repeat(64),
+          fencingToken,
+          reason:
+            "The approved proposal expired or its bound observation or fencing token drifted before consumption.",
+          recordedAt: new Date().toISOString(),
+        });
+      }
+      return false;
+    }
+    await store.recordEffectControl(parsedRunId.data, {
+      schemaVersion: "prism.effect-control/v1",
+      kind: "consumption",
+      controlId: randomUUID(),
+      proposalId: proposal.proposalId,
+      proposalDigest: proposal.proposalDigest,
+      nodeId: node.nodeId,
+      fencingToken,
+      recordedAt: new Date().toISOString(),
+    });
+    approvedEffectClasses.push("source_effect");
+    return true;
+  };
+  const requireInitialSourceApproval =
+    scenario &&
+    !resumedRun.snapshot.effectControls.some(
+      (control) =>
+        control.kind === "proposal" && control.effectClass === "source_effect",
+    );
   const completion = new Orchestrator()
     .executeHybridRun({
       runId: parsedRunId.data,
@@ -589,9 +979,27 @@ export async function startHybridRun(
         target: browserConfig.target,
       },
       resume,
-      stopAfterNodeType: options.stopAfterNodeType,
+      signal: controller.signal,
+      authorizeEffect: scenario ? authorizeEffect : undefined,
+      approvedEffectClasses,
+      stopAfterNodeType: requireInitialSourceApproval
+        ? "browser.observe"
+        : options.stopAfterNodeType,
     })
-    .then(() => undefined)
+    .then(async () => {
+      if (scenario) {
+        const current = await store.loadRun(parsedRunId.data);
+        if (
+          current.snapshot.status === "queued" &&
+          !current.snapshot.nodeProgress.some(
+            ({ nodeType, state }) =>
+              nodeType === "workspace.patch" && state === "succeeded",
+          )
+        ) {
+          await proposeSourceEffect(store, current, scenario);
+        }
+      }
+    })
     .catch((error) => {
       // 若首个修订尚未落盘即失败，放开门闩并让启动请求收到错误
       if (!initialRevisionCommitted) {
@@ -605,6 +1013,7 @@ export async function startHybridRun(
   activeHybridRuns.set(key, {
     initialRevisionCommitted: initialRevisionReady,
     completion,
+    controller,
   });
   await initialRevisionReady;
   return true;
@@ -622,6 +1031,71 @@ export async function waitForHybridRun(runIdInput: string): Promise<RunDossier |
   const store = getStore();
   const key = hybridRunKey(store.dataDirectory, parsedRunId.data);
   await activeHybridRuns.get(key)?.completion;
+  return getRunDossier(parsedRunId.data);
+}
+
+/** 提交一次绑定 proposal digest 的人类裁决；批准后从持久化节点边界继续。 */
+export async function decideRunEffect(
+  runIdInput: string,
+  request: EffectDecisionRequest,
+): Promise<RunDossier | null> {
+  const parsedRunId = runIdSchema.safeParse(runIdInput);
+  if (!parsedRunId.success) return null;
+  const store = getStore();
+  const run = await store.loadRun(parsedRunId.data);
+  const proposal = pendingProposal(run);
+  if (
+    !proposal ||
+    proposal.proposalId !== request.proposalId ||
+    proposal.proposalDigest !== request.proposalDigest
+  ) {
+    throw new TypeError("The effect decision does not match the pending proposal.");
+  }
+
+  const scenario = await roundButtonScenarioFor(run);
+  let observationDigest = proposal.preconditions.observationDigest;
+  try {
+    if (scenario) {
+      observationDigest = createHash("sha256")
+        .update(await sourceReality(scenario))
+        .digest("hex");
+    }
+  } catch {
+    observationDigest = "0".repeat(64);
+  }
+  const unchanged =
+    observationDigest === proposal.preconditions.observationDigest &&
+    proposal.preconditions.fencingToken ===
+      (run.snapshot.effectLease?.token ?? 0) + 1 &&
+    Date.parse(proposal.preconditions.expiresAt) >= Date.now();
+  const decision = unchanged ? request.decision : "invalidated";
+  await store.recordEffectControl(parsedRunId.data, {
+    schemaVersion: "prism.effect-control/v1",
+    kind: "decision",
+    controlId: randomUUID(),
+    proposalId: proposal.proposalId,
+    proposalDigest: proposal.proposalDigest,
+    decision,
+    observationDigest,
+    fencingToken: proposal.preconditions.fencingToken,
+    reason:
+      decision === "approved"
+        ? "The user approved this exact bounded proposal once."
+        : decision === "declined"
+          ? "The user declined the proposed effect."
+          : decision === "cancelled"
+            ? "The user cancelled the Run before the proposed effect."
+            : "The proposal expired or its bound observation or fencing token drifted.",
+    recordedAt: new Date().toISOString(),
+  });
+
+  if (decision === "cancelled") {
+    activeHybridRuns
+      .get(hybridRunKey(store.dataDirectory, parsedRunId.data))
+      ?.controller.abort();
+  } else if (decision === "invalidated" && scenario) {
+    await proposeSourceEffect(store, await store.loadRun(parsedRunId.data), scenario);
+  }
   return getRunDossier(parsedRunId.data);
 }
 
@@ -672,20 +1146,8 @@ export async function getRunDossier(runIdInput: string): Promise<RunDossier | nu
 async function createRunWorkspaceExecutor(workspaceRoot: string) {
   return WorkspaceExecutor.create({
     workspaceRoot,
-    allowedReadPatterns: [
-      "package.json",
-      "README.md",
-      "apps/**/*.{ts,tsx,css,json,mjs}",
-      "packages/**/*.{ts,tsx,css,json,mjs}",
-      "src/**/*.{ts,tsx,css,json,mjs}",
-      "tests/**/*.{ts,tsx,css,json,mjs}",
-    ],
-    allowedDiscoveryPatterns: [
-      "apps/**/*.{ts,tsx}",
-      "packages/**/*.ts",
-      "src/**/*.{ts,tsx}",
-      "**/*.{test,spec}.{ts,tsx}",
-    ],
+    allowedReadPatterns: RUN_WORKSPACE_READ_PATTERNS,
+    allowedDiscoveryPatterns: RUN_WORKSPACE_DISCOVERY_PATTERNS,
     allowedCommands: [
       {
         command: { executable: "pnpm", arguments: ["test"] },

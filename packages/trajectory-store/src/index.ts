@@ -39,6 +39,9 @@ import {
   browserBaselineRecordSchema,
   type BrowserVerificationReport,
   browserVerificationReportSchema,
+  type EffectApprovalProposal,
+  type EffectControlRecord,
+  effectControlRecordSchema,
   type EffectLease,
   effectLeaseSchema,
   type FrontendRepairSpecRecord,
@@ -115,6 +118,13 @@ export function runTitleFromPrompt(prompt: string): string {
 /** 计算字节数组的 SHA-256 十六进制摘要。 */
 function hashBytes(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+/** 计算审批提议全部不可变字段（摘要字段自身除外）的稳定 SHA-256。 */
+export function effectApprovalDigest(
+  input: Omit<EffectApprovalProposal, "proposalDigest">,
+): string {
+  return hashBytes(Buffer.from(JSON.stringify(input)));
 }
 
 /** 序列化单行 JSON（末尾带换行），用于 events.jsonl 与清单/快照文件。 */
@@ -255,6 +265,7 @@ export function projectRunEvents(
         dagRevisions: [],
         nodeProgress: [],
         effectLease: null,
+        effectControls: [],
         terminalError: null,
       });
       return;
@@ -264,7 +275,9 @@ export function projectRunEvents(
     if (
       snapshot === null ||
       snapshot.status === "terminal_error" ||
-      snapshot.status === "completed"
+      snapshot.status === "completed" ||
+      snapshot.status === "blocked" ||
+      snapshot.status === "cancelled"
     ) {
       throw new RunIntegrityError(
         "corrupt_event",
@@ -446,6 +459,191 @@ export function projectRunEvents(
         updatedAt: event.recordedAt,
         lastSequence: event.sequence,
         effectLease: event.payload,
+      });
+      return;
+    }
+
+    if (event.type === "run.effect-control") {
+      const control = event.payload;
+      if (
+        control.recordedAt !== event.recordedAt ||
+        snapshot.effectControls.some(({ controlId }) => controlId === control.controlId)
+      ) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Effect controls require a unique identity and matching event timestamp.",
+        );
+      }
+
+      if (control.kind === "proposal") {
+        const { proposalDigest, ...digestInput } = control;
+        const effectControls = snapshot.effectControls;
+        const node = snapshot.dagRevisions
+          .at(-1)
+          ?.nodes.find(({ nodeId }) => nodeId === control.nodeId);
+        const hasPendingProposal = effectControls.some(
+          (candidate) =>
+            candidate.kind === "proposal" &&
+            !effectControls.some(
+              (decision) =>
+                decision.kind === "decision" &&
+                decision.proposalId === candidate.proposalId,
+            ),
+        );
+        if (
+          control.runId !== manifest.runId ||
+          effectApprovalDigest(digestInput) !== proposalDigest ||
+          !node ||
+          node.effectClass !== control.effectClass ||
+          hasPendingProposal ||
+          control.preconditions.fencingToken !== (snapshot.effectLease?.token ?? 0) + 1
+        ) {
+          throw new RunIntegrityError(
+            "corrupt_event",
+            "An effect proposal must bind the current Run, node, observation, and next fencing token.",
+          );
+        }
+        snapshot = runSnapshotSchema.parse({
+          ...snapshot,
+          status: "awaiting_approval",
+          updatedAt: event.recordedAt,
+          lastSequence: event.sequence,
+          artifacts: uniqueArtifacts(snapshot.artifacts, [
+            control.preconditions.observationArtifact,
+          ]),
+          effectControls: [...snapshot.effectControls, control],
+        });
+        return;
+      }
+
+      if (control.kind === "decision") {
+        const proposal = snapshot.effectControls.find(
+          (candidate): candidate is EffectApprovalProposal =>
+            candidate.kind === "proposal" &&
+            candidate.proposalId === control.proposalId,
+        );
+        const priorDecision = snapshot.effectControls.find(
+          (candidate) =>
+            candidate.kind === "decision" &&
+            candidate.proposalId === control.proposalId &&
+            candidate.decision !== "invalidated",
+        );
+        const alreadyInvalidated = snapshot.effectControls.some(
+          (candidate) =>
+            candidate.kind === "decision" &&
+            candidate.proposalId === control.proposalId &&
+            candidate.decision === "invalidated",
+        );
+        const unchanged =
+          proposal &&
+          control.observationDigest === proposal.preconditions.observationDigest &&
+          control.fencingToken === proposal.preconditions.fencingToken;
+        const expired =
+          proposal &&
+          Date.parse(control.recordedAt) > Date.parse(proposal.preconditions.expiresAt);
+        if (
+          !proposal ||
+          control.proposalDigest !== proposal.proposalDigest ||
+          (control.decision === "invalidated"
+            ? alreadyInvalidated ||
+              (priorDecision !== undefined &&
+                (priorDecision.kind !== "decision" ||
+                  priorDecision.decision !== "approved")) ||
+              (priorDecision === undefined && unchanged && !expired)
+            : priorDecision !== undefined || !unchanged) ||
+          (control.decision === "approved" && expired)
+        ) {
+          throw new RunIntegrityError(
+            "corrupt_event",
+            "An effect proposal accepts only one bound, unexpired decision.",
+          );
+        }
+        const status =
+          control.decision === "cancelled"
+            ? "cancelled"
+            : control.decision === "declined"
+              ? "blocked"
+              : "queued";
+        snapshot = runSnapshotSchema.parse({
+          ...snapshot,
+          status,
+          updatedAt: event.recordedAt,
+          lastSequence: event.sequence,
+          effectControls: [...snapshot.effectControls, control],
+        });
+        return;
+      }
+
+      if (control.kind === "consumption") {
+        const proposal = snapshot.effectControls.find(
+          (candidate): candidate is EffectApprovalProposal =>
+            candidate.kind === "proposal" &&
+            candidate.proposalId === control.proposalId,
+        );
+        const approved = snapshot.effectControls.some(
+          (candidate) =>
+            candidate.kind === "decision" &&
+            candidate.proposalId === control.proposalId &&
+            candidate.decision === "approved",
+        );
+        const invalidated = snapshot.effectControls.some(
+          (candidate) =>
+            candidate.kind === "decision" &&
+            candidate.proposalId === control.proposalId &&
+            candidate.decision === "invalidated",
+        );
+        const alreadyConsumed = snapshot.effectControls.some(
+          (candidate) =>
+            candidate.kind === "consumption" &&
+            candidate.proposalId === control.proposalId,
+        );
+        if (
+          !proposal ||
+          !approved ||
+          invalidated ||
+          alreadyConsumed ||
+          control.proposalDigest !== proposal.proposalDigest ||
+          control.nodeId !== proposal.nodeId ||
+          control.fencingToken !== proposal.preconditions.fencingToken
+        ) {
+          throw new RunIntegrityError(
+            "corrupt_event",
+            "Approved effect authority is single-use and bound to one node and fencing token.",
+          );
+        }
+        snapshot = runSnapshotSchema.parse({
+          ...snapshot,
+          status: "queued",
+          updatedAt: event.recordedAt,
+          lastSequence: event.sequence,
+          effectControls: [...snapshot.effectControls, control],
+        });
+        return;
+      }
+
+      const node = snapshot.dagRevisions
+        .at(-1)
+        ?.nodes.find(({ nodeId }) => nodeId === control.nodeId);
+      const proposalConsumed =
+        control.proposalId === null ||
+        snapshot.effectControls.some(
+          (candidate) =>
+            candidate.kind === "consumption" &&
+            candidate.proposalId === control.proposalId,
+        );
+      if (!node || node.effectClass !== control.effectClass || !proposalConsumed) {
+        throw new RunIntegrityError(
+          "corrupt_event",
+          "Effect reconciliation must cite the interrupted node and committed reality evidence.",
+        );
+      }
+      snapshot = runSnapshotSchema.parse({
+        ...snapshot,
+        status: control.action === "human_review" ? "blocked" : "queued",
+        updatedAt: event.recordedAt,
+        lastSequence: event.sequence,
+        artifacts: uniqueArtifacts(snapshot.artifacts, control.evidenceRefs),
+        effectControls: [...snapshot.effectControls, control],
       });
       return;
     }
@@ -913,6 +1111,33 @@ export class FileTrajectoryStore {
       });
       await this.commitEvent(current, event);
       return lease;
+    });
+  }
+
+  /** 追加一条审批、authority 消费或现实核对记录。 */
+  async recordEffectControl(
+    runIdInput: string,
+    controlInput: unknown,
+  ): Promise<EffectControlRecord> {
+    const runId = runIdSchema.parse(runIdInput);
+
+    return this.withRunWrite(runId, async () => {
+      const current = await this.loadRun(runId);
+      const control = effectControlRecordSchema.parse(controlInput);
+      const previousEvent = current.events.at(-1);
+      const event = asEvent({
+        schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+        eventId: this.eventIdFactory(),
+        runId,
+        sequence: current.events.length + 1,
+        recordedAt: control.recordedAt,
+        correlationId: runId,
+        causationEventId: previousEvent?.eventId ?? null,
+        type: "run.effect-control",
+        payload: control,
+      });
+      await this.commitEvent(current, event);
+      return control;
     });
   }
 

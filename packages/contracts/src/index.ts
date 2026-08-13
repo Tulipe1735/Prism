@@ -27,6 +27,9 @@ export const FRONTEND_REPAIR_SPEC_MEDIA_TYPE =
 export const CODE_ORACLE_REPORT_MEDIA_TYPE =
   "application/vnd.prism.code-oracle-report+json" as const;
 export const RUN_COMPLETION_SCHEMA_VERSION = "prism.run-completion/v1" as const;
+export const EFFECT_CONTROL_SCHEMA_VERSION = "prism.effect-control/v1" as const;
+export const EFFECT_DECISION_REQUEST_SCHEMA_VERSION =
+  "prism.effect-decision-request/v1" as const;
 export const CONTRACT_ERROR_SCHEMA_VERSION = "prism.contract-error/v1" as const;
 export const ARTIFACT_REF_SCHEMA_VERSION = "prism.artifact-ref/v1" as const;
 export const RUN_MANIFEST_SCHEMA_VERSION = "prism.run-manifest/v1" as const;
@@ -197,6 +200,8 @@ export const contractErrorSchema = z
       "invalid_browser_baseline_request",
       "browser_baseline_not_configured",
       "browser_execution_error",
+      "invalid_effect_decision",
+      "stale_effect",
     ]),
     message: z.string().min(1),
     issues: z.array(validationIssueSchema),
@@ -285,7 +290,7 @@ export const semanticBrowserTargetSchema = z
 
 /**
  * 混合浏览器目标：语义定位之上叠加屏幕坐标边框（grounding），
- * 便于 UI-TARS 这类模型在视觉坐标与语义元素之间对齐。
+ * 便于视觉模型在坐标与语义元素之间对齐。
  */
 const hybridBrowserTargetSchema = z
   .object({
@@ -500,14 +505,14 @@ export const browserBaselineResponseSchema = z
 /**
  * 浏览器动作提议：模型或自动化逻辑提议对某目标执行一次点击。
  *
- * origin 标明提议来源（ui-tars 模型 / automation 自动化逻辑）。
+ * origin 标明提议来源（browser-model / automation）。
  */
 export const browserActionProposalSchema = z
   .object({
     schemaVersion: z.literal(BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION),
     proposalId: z.string().uuid(),
     runId: runIdSchema,
-    origin: z.enum(["ui-tars", "automation"]),
+    origin: z.enum(["browser-model", "automation"]),
     action: z.object({ kind: z.literal("click") }).strict(),
     target: browserTargetSchema,
   })
@@ -543,7 +548,7 @@ export const browserActionRecordSchema = z
  *
  * intentLinked 表示断言直接绑定到本次修复意图；kind 区分确定性
  * （deterministic，由可重复的渲染/交互谓词判定）与补充性
- * （supplemental，如 UI-TARS 的定性视觉判断）。
+ * （supplemental，如浏览器模型的定性视觉判断）。
  */
 export const browserVerificationAssertionSchema = z
   .object({
@@ -560,7 +565,7 @@ export const browserVerificationAssertionSchema = z
  *
  * verdict 只能是 passed / failed / inconclusive。superRefine 强制一条
  * 不变量：verdict 为 passed 时，必须至少有一条意图链定的确定性断言
- * 通过 —— UI-TARS 的定性视觉判断（kind=supplemental）单独不能构成
+ * 通过 —— 浏览器模型的定性视觉判断（kind=supplemental）单独不能构成
  * 通过证据。
  */
 export const browserVerificationReportSchema = z
@@ -598,7 +603,7 @@ export const browserVerificationReportSchema = z
     }
   });
 
-/** UI-TARS Browser Runtime 的资源预算：动作、时间与费用上限。 */
+/** Browser Runtime 的资源预算：动作、时间与费用上限。 */
 export const browserRuntimeBudgetSchema = z
   .object({
     maxActions: z.number().int().min(1).max(64),
@@ -608,10 +613,10 @@ export const browserRuntimeBudgetSchema = z
   .strict();
 
 /**
- * 交给同进程 UI-TARS 会话的完整、版本化浏览器任务边界。
+ * 交给同进程浏览器模型会话的完整、版本化浏览器任务边界。
  *
  * authority 携带本地路由、采集目标、验证意图与动作上限；browser.verify
- * 必须携带 intent（供确定性谓词与 UI-TARS 判断绑定），browser.observe
+ * 必须携带 intent（供确定性谓词与模型判断绑定），browser.observe
  * 可以没有。所有输入仍须通过 ActionBroker 提案，运行时不能自行放权。
  */
 export const browserRuntimeTaskEnvelopeSchema = z
@@ -973,6 +978,7 @@ export const nodeOutcomeSchema = z
           "workspace_execution_failed",
           "browser_execution_failed",
           "verification_failed",
+          "approval_required",
         ]),
         retryable: z.boolean(),
       })
@@ -1000,7 +1006,7 @@ export const browserResourceUsageSchema = z
   .strict();
 
 /**
- * UI-TARS Browser Runtime 的唯一返回形态：已校验的节点结果、已提交的产物
+ * Browser Runtime 的唯一返回形态：已校验的节点结果、已提交的产物
  * 引用、浏览器动作记录、可选验证报告与资源用量。strict() 拒绝任何旁路数据。
  */
 export const browserRuntimeResultSchema = z
@@ -1214,22 +1220,6 @@ export const runNodeProgressSchema = z
   .strict();
 
 /**
- * 副作用租约：同一时刻只允许一个节点持有 source/browser 副作用权。
- *
- * 通过单调递增的 token 串行化副作用节点，避免并发补丁/浏览器操作互相踩踏。
- */
-export const effectLeaseSchema = z
-  .object({
-    schemaVersion: z.literal(EFFECT_LEASE_SCHEMA_VERSION),
-    token: z.number().int().positive(),
-    holderNodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
-    effectClass: z.enum(["source_effect", "browser_effect"]),
-    state: z.enum(["active", "released"]),
-    recordedAt: isoDateTimeSchema,
-  })
-  .strict();
-
-/**
  * 相对工作区路径：必须归一化（"/" 分隔），禁止绝对路径、反斜杠、"."/".." 越界。
  */
 const relativeWorkspacePathSchema = z
@@ -1248,6 +1238,163 @@ const relativeWorkspacePathSchema = z
           .every((segment) => segment !== "" && segment !== "." && segment !== "..")),
     "Workspace paths must be normalized relative paths without traversal.",
   );
+
+/**
+ * 副作用租约：同一时刻只允许一个节点持有 source/browser 副作用权。
+ *
+ * 通过单调递增的 token 串行化副作用节点，避免并发补丁/浏览器操作互相踩踏。
+ */
+export const effectLeaseSchema = z
+  .object({
+    schemaVersion: z.literal(EFFECT_LEASE_SCHEMA_VERSION),
+    token: z.number().int().positive(),
+    holderNodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    effectClass: z.enum(["source_effect", "browser_effect"]),
+    state: z.enum(["active", "released"]),
+    recordedAt: isoDateTimeSchema,
+  })
+  .strict();
+
+/** 用户可审阅的副作用目标；工作区目标只暴露显示名与受限路径。 */
+export const effectTargetSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("workspace"),
+      displayName: z.string().trim().min(1).max(200),
+      paths: z.array(relativeWorkspacePathSchema).min(1).max(64),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("browser"),
+      route: browserRouteSchema,
+      target: browserCaptureTargetSchema,
+    })
+    .strict(),
+]);
+
+/**
+ * 一次待审批副作用。proposalDigest 绑定全部展示字段和执行前置条件；
+ * parameters 只能包含已经脱敏、可安全展示的字符串。
+ */
+export const effectApprovalProposalSchema = z
+  .object({
+    schemaVersion: z.literal(EFFECT_CONTROL_SCHEMA_VERSION),
+    kind: z.literal("proposal"),
+    controlId: z.string().uuid(),
+    proposalId: z.string().uuid(),
+    proposalDigest: sha256Schema,
+    runId: runIdSchema,
+    nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    origin: z.enum(["pi", "browser-model", "automation"]),
+    target: effectTargetSchema,
+    effectClass: z.enum(["source_effect", "browser_effect"]),
+    parameters: z
+      .array(
+        z
+          .object({
+            name: z.string().trim().min(1).max(120),
+            redactedValue: z.string().trim().min(1).max(500),
+          })
+          .strict(),
+      )
+      .max(24),
+    preconditions: z
+      .object({
+        observationArtifact: artifactRefSchema,
+        observationDigest: sha256Schema,
+        fencingToken: z.number().int().positive(),
+        expiresAt: isoDateTimeSchema,
+      })
+      .strict(),
+    reason: z.string().trim().min(1).max(500),
+    recordedAt: isoDateTimeSchema,
+  })
+  .strict()
+  .superRefine((proposal, context) => {
+    if (
+      Date.parse(proposal.preconditions.expiresAt) <= Date.parse(proposal.recordedAt)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["preconditions", "expiresAt"],
+        message: "Effect approval must expire after it is proposed.",
+      });
+    }
+  });
+
+/** 人或策略对某一原始 proposal digest 的一次、不可覆盖的裁决。 */
+export const effectApprovalDecisionSchema = z
+  .object({
+    schemaVersion: z.literal(EFFECT_CONTROL_SCHEMA_VERSION),
+    kind: z.literal("decision"),
+    controlId: z.string().uuid(),
+    proposalId: z.string().uuid(),
+    proposalDigest: sha256Schema,
+    decision: z.enum(["approved", "declined", "cancelled", "invalidated"]),
+    observationDigest: sha256Schema,
+    fencingToken: z.number().int().positive(),
+    reason: z.string().trim().min(1).max(500),
+    recordedAt: isoDateTimeSchema,
+  })
+  .strict();
+
+/** 调度器在真实副作用入口消费一次已批准 authority。 */
+export const effectApprovalConsumptionSchema = z
+  .object({
+    schemaVersion: z.literal(EFFECT_CONTROL_SCHEMA_VERSION),
+    kind: z.literal("consumption"),
+    controlId: z.string().uuid(),
+    proposalId: z.string().uuid(),
+    proposalDigest: sha256Schema,
+    nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    fencingToken: z.number().int().positive(),
+    recordedAt: isoDateTimeSchema,
+  })
+  .strict();
+
+/** 进程中断后的现实核对结果；检测到效果时只允许转人工。 */
+export const effectReconciliationSchema = z
+  .object({
+    schemaVersion: z.literal(EFFECT_CONTROL_SCHEMA_VERSION),
+    kind: z.literal("reconciliation"),
+    controlId: z.string().uuid(),
+    proposalId: z.string().uuid().nullable(),
+    nodeId: z.string().regex(/^node-[a-z0-9-]{1,120}$/),
+    effectClass: z.enum(["source_effect", "browser_effect"]),
+    outcome: z.enum(["no_effect", "effect_detected", "unknown"]),
+    action: z.enum(["repropose", "retry", "human_review"]),
+    evidenceRefs: z.array(artifactRefSchema).min(1).max(12),
+    reason: z.string().trim().min(1).max(500),
+    recordedAt: isoDateTimeSchema,
+  })
+  .strict()
+  .superRefine((record, context) => {
+    if (record.outcome !== "no_effect" && record.action !== "human_review") {
+      context.addIssue({
+        code: "custom",
+        path: ["action"],
+        message: "Detected or unknown effects must stop for human review.",
+      });
+    }
+  });
+
+export const effectControlRecordSchema = z.discriminatedUnion("kind", [
+  effectApprovalProposalSchema,
+  effectApprovalDecisionSchema,
+  effectApprovalConsumptionSchema,
+  effectReconciliationSchema,
+]);
+
+/** HTTP 边界只接受 proposal 身份、摘要与三个明确的人类动作。 */
+export const effectDecisionRequestSchema = z
+  .object({
+    schemaVersion: z.literal(EFFECT_DECISION_REQUEST_SCHEMA_VERSION),
+    proposalId: z.string().uuid(),
+    proposalDigest: sha256Schema,
+    decision: z.enum(["approved", "declined", "cancelled"]),
+  })
+  .strict();
 
 /**
  * 工作区 glob 模式：必须相对工作区，禁止绝对路径、反斜杠与 ".." 越级。
@@ -1654,6 +1801,15 @@ export const effectLeaseEventSchema = z
   })
   .strict();
 
+/** 审批、authority 消费与中断后核对共用一类追加式事件。 */
+export const effectControlEventSchema = z
+  .object({
+    ...runEventEnvelopeShape,
+    type: z.literal("run.effect-control"),
+    payload: effectControlRecordSchema,
+  })
+  .strict();
+
 /**
  * 运行事件联合：按 type 判别全部事件类型，构成追加式事件日志的基本单元。
  */
@@ -1670,6 +1826,7 @@ export const runEventSchema = z.discriminatedUnion("type", [
   runDagRevisionEventSchema,
   runNodeProgressEventSchema,
   effectLeaseEventSchema,
+  effectControlEventSchema,
 ]);
 
 /**
@@ -1678,6 +1835,9 @@ export const runEventSchema = z.discriminatedUnion("type", [
 export const runStatusSchema = z.enum([
   "created",
   "queued",
+  "awaiting_approval",
+  "blocked",
+  "cancelled",
   "completed",
   "terminal_error",
 ]);
@@ -1707,6 +1867,7 @@ export const runSnapshotSchema = z
     dagRevisions: z.array(runDagRevisionSchema).default([]),
     nodeProgress: z.array(runNodeProgressSchema).default([]),
     effectLease: effectLeaseSchema.nullable().default(null),
+    effectControls: z.array(effectControlRecordSchema).default([]),
     terminalError: terminalRunErrorSchema.nullable(),
   })
   .strict();
@@ -1759,6 +1920,7 @@ export const runDossierSchema = runSummarySchema
     dagRevisions: z.array(runDagRevisionSchema).default([]),
     nodeProgress: z.array(runNodeProgressSchema).default([]),
     effectLease: effectLeaseSchema.nullable().default(null),
+    effectControls: z.array(effectControlRecordSchema).default([]),
     terminalError: terminalRunErrorSchema.nullable(),
   })
   .strict();
@@ -1804,6 +1966,12 @@ export type OrchestrationStartResponse = z.infer<
 export type ArtifactRef = z.infer<typeof artifactRefSchema>;
 export type EffectLease = z.infer<typeof effectLeaseSchema>;
 export type EffectClass = z.infer<typeof effectClassSchema>;
+export type EffectApprovalProposal = z.infer<typeof effectApprovalProposalSchema>;
+export type EffectApprovalDecision = z.infer<typeof effectApprovalDecisionSchema>;
+export type EffectApprovalConsumption = z.infer<typeof effectApprovalConsumptionSchema>;
+export type EffectControlRecord = z.infer<typeof effectControlRecordSchema>;
+export type EffectDecisionRequest = z.infer<typeof effectDecisionRequestSchema>;
+export type EffectReconciliation = z.infer<typeof effectReconciliationSchema>;
 export type NodeOutcome = z.infer<typeof nodeOutcomeSchema>;
 export type PiRuntimeResult = z.infer<typeof piRuntimeResultSchema>;
 export type RouterClassification = z.infer<typeof routerClassificationSchema>;

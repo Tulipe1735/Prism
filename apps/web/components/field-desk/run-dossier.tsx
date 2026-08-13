@@ -1,6 +1,11 @@
 "use client";
 
-import type { RunDossier, WorkspaceRequest } from "@prism/contracts";
+import type {
+  EffectApprovalProposal,
+  EffectDecisionRequest,
+  RunDossier,
+  WorkspaceRequest,
+} from "@prism/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -11,7 +16,9 @@ import {
   FolderSearch2,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import {
+  decideEffect,
   fetchRunDossier,
   runWorkspaceRequest,
   startOrchestration,
@@ -25,6 +32,11 @@ import {
  */
 function shouldPollRunDossier(dossier: RunDossier | undefined): boolean {
   if (!dossier) return false;
+  if (
+    ["awaiting_approval", "blocked", "cancelled", "completed"].includes(dossier.status)
+  ) {
+    return false;
+  }
   const latestRevision = dossier.dagRevisions[dossier.dagRevisions.length - 1];
   if (!latestRevision) return false;
   const progressByNode = new Map(
@@ -80,6 +92,12 @@ export function RunDossierView({
   // 启动 live 编排的变更
   const orchestrationMutation = useMutation({
     mutationFn: () => startOrchestration(runId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["runs", runId] });
+    },
+  });
+  const effectDecisionMutation = useMutation({
+    mutationFn: (request: EffectDecisionRequest) => decideEffect(runId, request),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["runs", runId] });
     },
@@ -146,6 +164,26 @@ export function RunDossierView({
     dossier.nodeProgress.map((progress) => [progress.nodeId, progress]),
   );
   const orchestrationActive = shouldPollRunDossier(dossier);
+  const pendingEffect = [...dossier.effectControls]
+    .reverse()
+    .find(
+      (control): control is EffectApprovalProposal =>
+        control.kind === "proposal" &&
+        !dossier.effectControls.some(
+          (decision) =>
+            decision.kind === "decision" && decision.proposalId === control.proposalId,
+        ),
+    );
+
+  function decidePendingEffect(decision: EffectDecisionRequest["decision"]) {
+    if (!pendingEffect) return;
+    effectDecisionMutation.mutate({
+      schemaVersion: "prism.effect-decision-request/v1",
+      proposalId: pendingEffect.proposalId,
+      proposalDigest: pendingEffect.proposalDigest,
+      decision,
+    });
+  }
 
   return (
     <section className="py-12">
@@ -268,6 +306,109 @@ export function RunDossierView({
           </a>
         </section>
       )}
+
+      <section className="mt-10 border-2 border-stone-900 bg-white/40 p-5">
+        <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em]">
+          EFFECT AUTHORITY / SINGLE USE
+        </p>
+        {pendingEffect ? (
+          <div className="mt-4">
+            <h2 className="font-serif text-3xl">Review the exact proposed effect</h2>
+            <dl className="mt-5 grid gap-3 text-xs sm:grid-cols-2">
+              <div>
+                <dt className="font-mono text-stone-500">RUN / NODE / ORIGIN</dt>
+                <dd className="mt-1 break-all">
+                  {pendingEffect.runId} / {pendingEffect.nodeId} /{" "}
+                  {pendingEffect.origin}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-mono text-stone-500">EFFECT / TARGET</dt>
+                <dd className="mt-1 break-all">
+                  {pendingEffect.effectClass} /{" "}
+                  {pendingEffect.target.kind === "workspace"
+                    ? `${pendingEffect.target.displayName}: ${pendingEffect.target.paths.join(", ")}`
+                    : `${pendingEffect.target.route}: ${pendingEffect.target.target.kind}`}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-mono text-stone-500">REDACTED PARAMETERS</dt>
+                <dd className="mt-1">
+                  {pendingEffect.parameters
+                    .map(({ name, redactedValue }) => `${name}=${redactedValue}`)
+                    .join("; ") || "none"}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-mono text-stone-500">PRECONDITIONS</dt>
+                <dd className="mt-1 break-all">
+                  observation {pendingEffect.preconditions.observationDigest} / fence #
+                  {pendingEffect.preconditions.fencingToken} / expires{" "}
+                  {pendingEffect.preconditions.expiresAt}
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-4 text-sm leading-6">{pendingEffect.reason}</p>
+            <p className="mt-2 break-all font-mono text-[0.58rem] text-stone-500">
+              PROPOSAL SHA-256 / {pendingEffect.proposalDigest}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button
+                disabled={effectDecisionMutation.isPending}
+                onClick={() => decidePendingEffect("approved")}
+                type="button"
+              >
+                Approve once
+              </Button>
+              <Button
+                disabled={effectDecisionMutation.isPending}
+                onClick={() => decidePendingEffect("declined")}
+                type="button"
+                variant="secondary"
+              >
+                Decline
+              </Button>
+              <Button
+                disabled={effectDecisionMutation.isPending}
+                onClick={() => decidePendingEffect("cancelled")}
+                type="button"
+                variant="quiet"
+              >
+                Cancel Run
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-stone-600">
+            No effect is awaiting authority. Decisions, consumption, and recovery stay
+            visible in the durable log below.
+          </p>
+        )}
+        {effectDecisionMutation.isError && (
+          <p
+            className="mt-4 border border-red-800 bg-red-50 p-3 text-sm text-red-900"
+            role="alert"
+          >
+            The proposal changed or expired. Prism did not reuse its authority.
+          </p>
+        )}
+        {dossier.effectControls.length > 0 && (
+          <ol className="mt-5 space-y-2 border-t border-stone-300 pt-4 text-xs">
+            {dossier.effectControls.map((control) => (
+              <li className="break-all font-mono" key={control.controlId}>
+                {control.kind.toUpperCase()} /{" "}
+                {control.kind === "proposal"
+                  ? control.proposalDigest
+                  : control.kind === "decision"
+                    ? `${control.decision}: ${control.reason}`
+                    : control.kind === "consumption"
+                      ? `fence #${control.fencingToken}: ${control.proposalDigest}`
+                      : `${control.outcome} → ${control.action}: ${control.reason}`}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
       {/* 哈希产物清单 */}
       <section className="mt-10 border-t border-stone-400 pt-7">
@@ -396,7 +537,7 @@ export function RunDossierView({
       {/* 浏览器验证报告：意图链定谓词 + 补充性视觉判断 */}
       <section className="mt-10 border-t-2 border-stone-900 pt-7">
         <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-stone-500">
-          UI-TARS BROWSER VERIFICATION
+          KIMI K3 BROWSER VERIFICATION
         </p>
         <h2 className="mt-2 inline-flex items-center gap-2 font-serif text-3xl">
           <CheckCircle2 aria-hidden size={22} /> What the browser proved after repair
@@ -404,8 +545,8 @@ export function RunDossierView({
         {dossier.browserVerificationReports.length === 0 ? (
           <p className="mt-5 border border-dashed border-stone-500 p-5 text-sm text-stone-600">
             No Browser Verification Report is committed. A passing report requires an
-            intent-linked deterministic predicate; UI-TARS visual judgment alone can
-            never pass.
+            intent-linked deterministic predicate; model visual judgment alone can never
+            pass.
           </p>
         ) : (
           <ol className="mt-5 space-y-4">
@@ -483,7 +624,12 @@ export function RunDossierView({
           {/* 启动是幂等的；未完成 Run 可在进程重启后从节点边界恢复。 */}
           <button
             className="border border-stone-900 px-3 py-2 font-mono text-[0.62rem] font-bold disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={orchestrationMutation.isPending || dossier.status === "completed"}
+            disabled={
+              orchestrationMutation.isPending ||
+              ["completed", "awaiting_approval", "blocked", "cancelled"].includes(
+                dossier.status,
+              )
+            }
             onClick={() => orchestrationMutation.mutate()}
             type="button"
           >
@@ -491,9 +637,15 @@ export function RunDossierView({
               ? "Starting durable Run…"
               : dossier.status === "completed"
                 ? "Run completed"
-                : latestRevision
-                  ? "Resume hybrid Run"
-                  : "Start hybrid Run"}
+                : dossier.status === "awaiting_approval"
+                  ? "Approval required"
+                  : dossier.status === "blocked"
+                    ? "Run blocked"
+                    : dossier.status === "cancelled"
+                      ? "Run cancelled"
+                      : latestRevision
+                        ? "Resume hybrid Run"
+                        : "Start hybrid Run"}
           </button>
         </div>
 

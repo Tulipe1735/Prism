@@ -30,14 +30,17 @@ describe("ActionBroker", () => {
   it("executes a semantic click only after recording matching observations", async () => {
     const after = { ...before, observationId: "6b3d5ed9-03ba-49e8-a15e-57ac91ef8ef8" };
     const port = new TestBrowserPort([before, after]);
-    const broker = new ActionBroker({ port, clock: () => new Date("2026-08-04T04:00:00.000Z") });
+    const broker = new ActionBroker({
+      port,
+      clock: () => new Date("2026-08-04T04:00:00.000Z"),
+    });
 
     await expect(
       broker.execute({
         schemaVersion: "prism.browser-action-proposal/v1",
         proposalId: "f374f1ae-8ce2-432f-af52-c8973588bb0a",
         runId: "run_6dbf6f33-69c4-4e5f-9898-3f693735f5f0",
-        origin: "ui-tars",
+        origin: "browser-model",
         action: { kind: "click" },
         target: { kind: "semantic", role: "button", name: "Save", exact: true },
       }),
@@ -52,16 +55,23 @@ describe("ActionBroker", () => {
 
   it("fails a coordinate proposal closed after page state drift without clicking", async () => {
     const port = new TestBrowserPort([
-      { ...before, pageStateHash: "c".repeat(64), observationId: "6b3d5ed9-03ba-49e8-a15e-57ac91ef8ef8" },
+      {
+        ...before,
+        pageStateHash: "c".repeat(64),
+        observationId: "6b3d5ed9-03ba-49e8-a15e-57ac91ef8ef8",
+      },
     ]);
-    const broker = new ActionBroker({ port, clock: () => new Date("2026-08-04T04:00:00.000Z") });
+    const broker = new ActionBroker({
+      port,
+      clock: () => new Date("2026-08-04T04:00:00.000Z"),
+    });
 
     await expect(
       broker.execute({
         schemaVersion: "prism.browser-action-proposal/v1",
         proposalId: "f374f1ae-8ce2-432f-af52-c8973588bb0a",
         runId: "run_6dbf6f33-69c4-4e5f-9898-3f693735f5f0",
-        origin: "ui-tars",
+        origin: "browser-model",
         action: { kind: "click" },
         target: {
           kind: "coordinate",

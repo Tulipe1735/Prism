@@ -1,18 +1,18 @@
 import type { ArtifactRef, BrowserRuntimeTaskEnvelope } from "@prism/contracts";
-import type { InvokeOutput } from "@ui-tars/sdk/core";
 import type { AddressInfo } from "node:net";
 import { Buffer } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 
 import { createServer, type Server } from "node:http";
-import { UITarsModel } from "@ui-tars/sdk/core";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  type UiTarsBrowserPort,
-  UiTarsBrowserRuntime,
-  type UiTarsSessionFactory,
+  type BrowserModelAction,
+  type BrowserPort,
+  BrowserRuntime,
+  type BrowserSessionFactory,
+  AgentPlanBrowserSessionFactory,
 } from "./index";
 
 const runId = "run_6dbf6f33-69c4-4e5f-9898-3f693735f5f0";
@@ -39,34 +39,14 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true })));
 });
 
-describe("UiTarsBrowserRuntime", () => {
-  it("runs a scripted UI-TARS session that proposes one typed click through the ActionBroker and returns committed browser evidence", async () => {
+describe("BrowserRuntime", () => {
+  it("routes one model click through the ActionBroker and returns browser evidence", async () => {
     const artifacts = new Map<string, string>();
     const sessionFactory = scriptedSessionFactory([
-      {
-        prediction: 'click(start_box="[0.45, 0.4, 0.55, 0.5]")',
-        parsedPredictions: [
-          {
-            action_type: "click",
-            action_inputs: { start_box: "[0.45, 0.4, 0.55, 0.5]" },
-            reflection: null,
-            thought: "Click the Save button.",
-          },
-        ],
-      },
-      {
-        prediction: "finished()",
-        parsedPredictions: [
-          {
-            action_type: "finished",
-            action_inputs: {},
-            reflection: "The button was clicked.",
-            thought: "The task is complete.",
-          },
-        ],
-      },
+      { action: "click", x: 640, y: 324 },
+      { action: "finished", judgment: "The button was clicked." },
     ]);
-    const runtime = new UiTarsBrowserRuntime({
+    const runtime = new BrowserRuntime({
       baseUrl: "http://127.0.0.1:4173",
       viewport,
       browserPortFactory: { create: async () => scriptedPort() },
@@ -99,7 +79,7 @@ describe("UiTarsBrowserRuntime", () => {
     expect(result.browserActions).toHaveLength(1);
     expect(result.browserActions[0]!.policy.decision).toBe("allowed");
     expect(result.browserActions[0]!.execution.status).toBe("executed");
-    expect(result.browserActions[0]!.proposal.origin).toBe("ui-tars");
+    expect(result.browserActions[0]!.proposal.origin).toBe("browser-model");
     expect(result.browserActions[0]!.proposal.target).toMatchObject({
       kind: "coordinate",
       observationId: expect.any(String),
@@ -112,46 +92,45 @@ describe("UiTarsBrowserRuntime", () => {
     });
     expect(result.verificationReport?.assertions).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ kind: "deterministic", intentLinked: true, status: "passed" }),
+        expect.objectContaining({
+          kind: "deterministic",
+          intentLinked: true,
+          status: "passed",
+        }),
         expect.objectContaining({ kind: "supplemental", intentLinked: false }),
       ]),
     );
     expect(result.usage).toMatchObject({
-      model: { provider: "scripted-ui-tars", id: "scripted-1" },
+      model: { provider: "scripted-browser-model", id: "scripted-1" },
       modelCalls: 2,
       actionsProposed: 1,
       actionsExecuted: 1,
     });
     const trajectory = result.artifacts.find(
       (artifact) =>
-        artifact.mediaType === "application/vnd.prism.ui-tars-trajectory+json",
+        artifact.mediaType === "application/vnd.prism.browser-trajectory+json",
     );
     expect(trajectory).toBeDefined();
     expect(artifacts.get(trajectory!.hash)).toContain("browser.session");
   });
 
-  it("refuses any non-click prediction without sending browser input", async () => {
-    const sessionFactory = scriptedSessionFactory([
-      {
-        prediction: 'type(content="rm -rf /")',
-        parsedPredictions: [
-          {
-            action_type: "type",
-            action_inputs: { content: "rm -rf /" },
-            reflection: null,
-            thought: "Attempt a source write.",
-          },
-        ],
-      },
-    ]);
+  it("rejects an unsupported Kimi function call without sending browser input", async () => {
+    const sessionFactory = new AgentPlanBrowserSessionFactory({
+      apiKey: "fixture",
+      fetchImpl: responsesFetch([{ name: "type", arguments: { content: "rm -rf /" } }]),
+    });
     let clicked = false;
-    const runtime = new UiTarsBrowserRuntime({
+    const runtime = new BrowserRuntime({
       baseUrl: "http://127.0.0.1:4173",
       viewport,
       browserPortFactory: {
         create: async () => ({
           observe: async () => observation(),
-          screenshot: async () => ({ base64: pngBase64, scaleFactor: 1, observation: observation() }),
+          screenshot: async () => ({
+            base64: pngBase64,
+            scaleFactor: 1,
+            observation: observation(),
+          }),
           click: async () => {
             clicked = true;
           },
@@ -175,19 +154,9 @@ describe("UiTarsBrowserRuntime", () => {
 
   it("returns a typed verification_failed outcome when a deterministic predicate fails", async () => {
     const sessionFactory = scriptedSessionFactory([
-      {
-        prediction: "finished()",
-        parsedPredictions: [
-          {
-            action_type: "finished",
-            action_inputs: {},
-            reflection: "The button appears fine to me.",
-            thought: "Done.",
-          },
-        ],
-      },
+      { action: "finished", judgment: "The button appears fine to me." },
     ]);
-    const runtime = new UiTarsBrowserRuntime({
+    const runtime = new BrowserRuntime({
       baseUrl: "http://127.0.0.1:4173",
       viewport,
       browserPortFactory: { create: async () => scriptedPort() },
@@ -213,21 +182,11 @@ describe("UiTarsBrowserRuntime", () => {
     });
   });
 
-  it("cannot create a passing verification report from UI-TARS judgment alone", async () => {
+  it("cannot create a passing verification report from model judgment alone", async () => {
     const sessionFactory = scriptedSessionFactory([
-      {
-        prediction: "finished()",
-        parsedPredictions: [
-          {
-            action_type: "finished",
-            action_inputs: {},
-            reflection: "The button definitely looks rounded.",
-            thought: "Done.",
-          },
-        ],
-      },
+      { action: "finished", judgment: "The button definitely looks rounded." },
     ]);
-    const runtime = new UiTarsBrowserRuntime({
+    const runtime = new BrowserRuntime({
       baseUrl: "http://127.0.0.1:4173",
       viewport,
       browserPortFactory: { create: async () => scriptedPort() },
@@ -258,8 +217,8 @@ describe("UiTarsBrowserRuntime", () => {
 
   it("maps external cancellation to a blocked typed outcome", async () => {
     const controller = new AbortController();
-    const sessionFactory: UiTarsSessionFactory = {
-      model: { provider: "scripted-ui-tars", id: "scripted-1" },
+    const sessionFactory: BrowserSessionFactory = {
+      model: { provider: "scripted-browser-model", id: "scripted-1" },
       create: async ({ signal }) => ({
         run: async () => {
           await new Promise<void>((resolve) => {
@@ -279,7 +238,7 @@ describe("UiTarsBrowserRuntime", () => {
         getUsage: () => usage(),
       }),
     };
-    const runtime = new UiTarsBrowserRuntime({
+    const runtime = new BrowserRuntime({
       baseUrl: "http://127.0.0.1:4173",
       viewport,
       browserPortFactory: { create: async () => scriptedPort() },
@@ -289,7 +248,9 @@ describe("UiTarsBrowserRuntime", () => {
     });
     setTimeout(() => controller.abort(), 10);
 
-    const result = await runtime.execute(observeEnvelope(), { signal: controller.signal });
+    const result = await runtime.execute(observeEnvelope(), {
+      signal: controller.signal,
+    });
 
     expect(result.outcome).toMatchObject({
       state: "blocked",
@@ -304,7 +265,11 @@ describe("PlaywrightBrowserPortFactory integration smoke", () => {
     const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
     const factory = new (await import("./index")).PlaywrightBrowserPortFactory();
-    const port = await factory.create({ baseUrl, route: "/settings/profile", viewport });
+    const port = await factory.create({
+      baseUrl,
+      route: "/settings/profile",
+      viewport,
+    });
 
     // 1. observe the allowlisted page and record the grounded observation
     const observation = await port.observe();
@@ -320,7 +285,7 @@ describe("PlaywrightBrowserPortFactory integration smoke", () => {
       schemaVersion: "prism.browser-action-proposal/v1",
       proposalId: randomUUID(),
       runId,
-      origin: "ui-tars",
+      origin: "browser-model",
       action: { kind: "click" },
       target: { kind: "semantic", role: "button", name: "Save", exact: true },
     });
@@ -334,7 +299,7 @@ describe("PlaywrightBrowserPortFactory integration smoke", () => {
       schemaVersion: "prism.browser-action-proposal/v1",
       proposalId: randomUUID(),
       runId,
-      origin: "ui-tars",
+      origin: "browser-model",
       action: { kind: "click" },
       target: {
         kind: "coordinate",
@@ -350,47 +315,36 @@ describe("PlaywrightBrowserPortFactory integration smoke", () => {
     expect(stale.execution.status).toBe("stale");
 
     // 4. the port exposes no source-write capability
-    expect(Object.keys(port).sort()).toEqual(["click", "dispose", "observe", "screenshot"]);
+    expect(Object.keys(port).sort()).toEqual([
+      "click",
+      "dispose",
+      "observe",
+      "screenshot",
+    ]);
     expect(port).not.toHaveProperty("writeSource");
 
     await port.dispose();
   });
 
-  it("drives a real embedded GUIAgent session through a custom Prism Operator and commits the verify report", async () => {
+  it("drives a real browser with Agent Plan Responses tool calls", async () => {
     const server = await serveFixture();
     const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     const artifacts = new Map<string, string>();
-    const sessionFactory = new (await import("./index")).UiTarsSdkSessionFactory({
-      baseURL: baseUrl,
+    const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const sessionFactory = new AgentPlanBrowserSessionFactory({
       apiKey: "fixture",
-      model: "scripted-model",
-      maxLoopCount: 4,
-      modelInstance: new ScriptedUiTarsModel([
-        {
-          prediction: 'click(start_box="[0.1, 0.1, 0.9, 0.9]")',
-          parsedPredictions: [
-            {
-              action_type: "click",
-              action_inputs: { start_box: "[0.1, 0.1, 0.9, 0.9]" },
-              reflection: null,
-              thought: "Click the Save button.",
-            },
-          ],
-        },
-        {
-          prediction: "finished()",
-          parsedPredictions: [
-            {
-              action_type: "finished",
-              action_inputs: {},
-              reflection: "The page responded to the interaction.",
-              thought: "Done.",
-            },
-          ],
-        },
-      ]),
+      fetchImpl: responsesFetch(
+        [
+          { name: "click", arguments: { x: 45, y: 70 } },
+          {
+            name: "finished",
+            arguments: { judgment: "The page responded to the interaction." },
+          },
+        ],
+        requests,
+      ),
     });
-    const runtime = new (await import("./index")).UiTarsBrowserRuntime({
+    const runtime = new (await import("./index")).BrowserRuntime({
       baseUrl,
       viewport,
       browserPortFactory: new (await import("./index")).PlaywrightBrowserPortFactory(),
@@ -430,6 +384,11 @@ describe("PlaywrightBrowserPortFactory integration smoke", () => {
     expect(result.browserActions[0]!.execution.status).toBe("executed");
     expect(result.verificationReport?.verdict).toBe("passed");
     expect(result.usage.modelCalls).toBe(2);
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toMatchObject({
+      url: "https://ark.cn-beijing.volces.com/api/plan/v3/responses",
+      body: { model: "doubao-seed-2.0-pro", tool_choice: "required" },
+    });
   });
 });
 
@@ -464,7 +423,7 @@ function observation() {
   return { ...stableObservation };
 }
 
-function scriptedPort(): UiTarsBrowserPort {
+function scriptedPort(): BrowserPort {
   let current = observation();
   return {
     observe: async () => current,
@@ -482,7 +441,7 @@ function scriptedPort(): UiTarsBrowserPort {
 
 function usage() {
   return {
-    model: { provider: "scripted-ui-tars", id: "scripted-1" },
+    model: { provider: "scripted-browser-model", id: "scripted-1" },
     modelCalls: 0,
     loopCount: 0,
     actionsProposed: 0,
@@ -502,11 +461,13 @@ function artifactRef(hash: string, _content: string, mediaType: string): Artifac
   };
 }
 
-function commitArtifact(content: string | Uint8Array, mediaType: string): Promise<ArtifactRef> {
-  const bytes = typeof content === "string" ? Buffer.from(content) : Buffer.from(content);
-  return Promise.resolve(
-    artifactRef(sha256(bytes), bytes.toString(), mediaType),
-  );
+function commitArtifact(
+  content: string | Uint8Array,
+  mediaType: string,
+): Promise<ArtifactRef> {
+  const bytes =
+    typeof content === "string" ? Buffer.from(content) : Buffer.from(content);
+  return Promise.resolve(artifactRef(sha256(bytes), bytes.toString(), mediaType));
 }
 
 function observeEnvelope(intent: string | null = null): BrowserRuntimeTaskEnvelope {
@@ -529,7 +490,7 @@ function observeEnvelope(intent: string | null = null): BrowserRuntimeTaskEnvelo
     },
     budget: { maxActions: 8, maxDurationMs: 30_000, maxCostUsd: 1 },
     deadline: "2026-08-05T09:05:00.000Z",
-    cancellationId: "cancel-ui-tars-smoke",
+    cancellationId: "cancel-browser-smoke",
     correlationId: runId,
     causationEventId: null,
     idempotencyKey: `${runId}:1:node-1-browser-observe:1`,
@@ -548,34 +509,18 @@ function verifyEnvelope(options: { intent?: string } = {}): BrowserRuntimeTaskEn
   };
 }
 
-/** 脚本化 UI-TARS 会话工厂：按队列逐条返回预测，跳过真实模型网络调用。 */
-function scriptedSessionFactory(  responses: Array<{ prediction: string; parsedPredictions: unknown[] }>,
-): UiTarsSessionFactory {
+/** 脚本化会话工厂：按队列逐条执行已校验动作。 */
+function scriptedSessionFactory(actions: BrowserModelAction[]): BrowserSessionFactory {
   let index = 0;
   const usageValue = usage();
   return {
     model: usageValue.model,
     create: async ({ operator }) => ({
       run: async () => {
-        for (const response of responses) {
+        for (const action of actions) {
           index += 1;
           await operator.screenshot();
-          let ended = false;
-          for (const parsed of response.parsedPredictions) {
-            const status = await operator.execute({
-              prediction: response.prediction,
-              parsedPrediction: parsed as never,
-              screenWidth: 1280,
-              screenHeight: 720,
-              scaleFactor: 1,
-              factors: [1, 1],
-            });
-            if (status.status === "end" || status.status === "user_stopped") {
-              ended = true;
-              break;
-            }
-          }
-          if (ended) break;
+          if ((await operator.execute(action)).status !== "running") break;
         }
       },
       abort: async () => undefined,
@@ -593,34 +538,29 @@ function scriptedSessionFactory(  responses: Array<{ prediction: string; parsedP
   };
 }
 
-/**
- * 脚本化 UITarsModel：按队列逐条返回预测，跳过真实模型服务调用。
- * 用真实的 GUIAgent 循环驱动 screenshot → invoke → execute，验证
- * 官方 SDK 会话与自定义 Operator 的完整链路。
- */
-class ScriptedUiTarsModel extends UITarsModel {
-  private queue: Array<{ prediction: string; parsedPredictions: unknown[] }>;
-
-  constructor(responses: Array<{ prediction: string; parsedPredictions: unknown[] }>) {
-    super({ model: "scripted-model", apiKey: "fixture", baseURL: "http://127.0.0.1" });
-    this.queue = [...responses];
-  }
-
-  override async invoke(): Promise<InvokeOutput> {
-    const response = this.queue.shift() ?? {
-      prediction: "finished()",
-      parsedPredictions: [
-        {
-          action_type: "finished",
-          action_inputs: {},
-          reflection: null,
-          thought: "The task is complete.",
-        },
-      ],
-    };
-    return {
-      prediction: response.prediction,
-      parsedPredictions: response.parsedPredictions as never,
-    };
-  }
+function responsesFetch(
+  calls: Array<{ name: string; arguments: Record<string, unknown> }>,
+  requests: Array<{ url: string; body: Record<string, unknown> }> = [],
+): typeof fetch {
+  let index = 0;
+  return (async (input, init) => {
+    requests.push({
+      url: input.toString(),
+      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+    });
+    const call = calls[index++];
+    if (!call) return new Response("No scripted response", { status: 500 });
+    return new Response(
+      JSON.stringify({
+        output: [
+          {
+            type: "function_call",
+            name: call.name,
+            arguments: JSON.stringify(call.arguments),
+          },
+        ],
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }) as typeof fetch;
 }

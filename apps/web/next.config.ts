@@ -11,8 +11,10 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   serverExternalPackages: [
+    "@earendil-works/pi-ai",
+    "@earendil-works/pi-coding-agent",
     "@prism/action-broker",
-    "@prism/runtime-ui-tars",
+    "@prism/runtime-browser",
     "playwright-core",
   ],
   transpilePackages: [

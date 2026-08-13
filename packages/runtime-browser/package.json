@@ -1,5 +1,5 @@
 {
-  "name": "@prism/runtime-ui-tars",
+  "name": "@prism/runtime-browser",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,9 +14,7 @@
   "dependencies": {
     "@prism/action-broker": "workspace:*",
     "@prism/contracts": "workspace:*",
-    "@ui-tars/sdk": "1.2.3",
-    "playwright-core": "1.61.1",
-    "uuid": "11.1.0"
+    "playwright-core": "1.61.1"
   },
   "devDependencies": {
     "@prism/tooling-config": "workspace:*",
