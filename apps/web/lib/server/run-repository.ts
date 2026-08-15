@@ -52,6 +52,7 @@ import {
   BrowserOracle,
   CodeOracle,
   createCardShadowScenario,
+  createProfileDialogScenario,
   createRoundButtonScenario,
   type RenderedTargetObservation,
   type ScenarioManifest,
@@ -258,6 +259,8 @@ async function scenarioFor(run: DurableRun): Promise<ScenarioManifest | null> {
       return createRoundButtonScenario(options);
     case "Restore a subtle but visible shadow to the profile card without moving it.":
       return createCardShadowScenario(options);
+    case "The Edit profile button does nothing; make it open the dialog.":
+      return createProfileDialogScenario(options);
     default:
       return null;
   }
@@ -514,6 +517,7 @@ async function reconcileInterruptedBrowserEffect(
       route: scenario.route,
       viewport: scenario.viewport,
       target: scenario.browserOracle.target,
+      dialogName: scenario.browserOracle.dialogName,
       executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
     }).observe();
   } catch {
@@ -769,6 +773,7 @@ export async function startHybridRun(
         route: scenario.route,
         viewport: scenario.viewport,
         target: scenario.browserOracle.target,
+        dialogName: scenario.browserOracle.dialogName,
         executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
       })
     : null;
@@ -787,14 +792,39 @@ export async function startHybridRun(
     verifier:
       scenario && browserOracle
         ? {
-            verify: async () => {
+            verify: async ({ observation, inspectDialog, pressKey }) => {
               if (!baselineObservation) {
                 return {
                   assertion: "The committed rendered baseline is unavailable.",
                   status: "inconclusive" as const,
                 };
               }
-              const after = await browserOracle.observe();
+              let after = await browserOracle.observe();
+              let interactionEvidence: unknown = null;
+              if (scenario.browserOracle.dialogName) {
+                const opened = await inspectDialog(scenario.browserOracle.dialogName);
+                const escape = await pressKey("Escape");
+                const closed = await inspectDialog(scenario.browserOracle.dialogName);
+                after = {
+                  ...after,
+                  observationId: observation.observationId,
+                  url: observation.url,
+                  viewport: observation.viewport,
+                  screenshotHash: observation.screenshotHash,
+                  dialog: {
+                    name: scenario.browserOracle.dialogName,
+                    visible: opened.visible,
+                    focusInside: opened.focusInside,
+                    escapeCloses:
+                      escape.execution.status === "executed" && !closed.visible,
+                    focusReturnsToTrigger:
+                      closed.activeElementName === scenario.spec.target.name,
+                    activeElementName: closed.activeElementName,
+                    consoleErrors: [...opened.consoleErrors, ...closed.consoleErrors],
+                  },
+                };
+                interactionEvidence = { opened, escape, closed };
+              }
               const evaluation = BrowserOracle.evaluateSpec(
                 scenario.spec,
                 baselineObservation,
@@ -806,6 +836,7 @@ export async function startHybridRun(
                   before: baselineObservation,
                   after,
                   evaluation,
+                  interactionEvidence,
                 })}\n`,
                 "application/vnd.prism.browser-oracle-evaluation+json",
               );

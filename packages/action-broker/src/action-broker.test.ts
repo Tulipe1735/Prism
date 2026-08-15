@@ -14,6 +14,7 @@ const before: BrowserObservationReference = {
 
 class TestBrowserPort implements BrowserPort {
   clicked = false;
+  pressed: string[] = [];
 
   constructor(private readonly observations: BrowserObservationReference[]) {}
 
@@ -23,6 +24,10 @@ class TestBrowserPort implements BrowserPort {
 
   async click(): Promise<void> {
     this.clicked = true;
+  }
+
+  async press(key: "Tab" | "Enter" | "Escape"): Promise<void> {
+    this.pressed.push(key);
   }
 }
 
@@ -89,5 +94,21 @@ describe("ActionBroker", () => {
       after: null,
     });
     expect(port.clicked).toBe(false);
+  });
+
+  it("records an allowlisted keyboard action", async () => {
+    const port = new TestBrowserPort([before, before]);
+    const broker = new ActionBroker({ port });
+
+    const record = await broker.execute({
+      schemaVersion: "prism.browser-action-proposal/v1",
+      proposalId: "f374f1ae-8ce2-432f-af52-c8973588bb0a",
+      runId: "run_6dbf6f33-69c4-4e5f-9898-3f693735f5f0",
+      origin: "automation",
+      action: { kind: "press", key: "Escape" },
+    });
+
+    expect(record.execution.status).toBe("executed");
+    expect(port.pressed).toEqual(["Escape"]);
   });
 });

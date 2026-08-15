@@ -427,6 +427,13 @@ function scriptedBrowserPortFactory() {
         observation,
       }),
       click: async () => undefined,
+      press: async () => undefined,
+      inspectDialog: async () => ({
+        visible: false,
+        focusInside: false,
+        activeElementName: null,
+        consoleErrors: [],
+      }),
       dispose: async () => undefined,
     }),
   };

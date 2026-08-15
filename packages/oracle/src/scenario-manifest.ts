@@ -56,6 +56,7 @@ const browserOracleConfigSchema = z
   .object({
     baseUrl: z.string().url().max(2_048),
     target: semanticBrowserTargetSchema,
+    dialogName: z.string().trim().min(1).max(200).optional(),
     /** 固定的浏览器身份：名称 + 可选可执行文件路径（用于可复现渲染）。 */
     browser: z
       .object({

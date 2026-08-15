@@ -379,6 +379,123 @@ it("completes the card-shadow repair with baseline, dual-Oracle, and replay evid
   });
 }, 60_000);
 
+it("repairs the profile Dialog with brokered keyboard and focus evidence", async () => {
+  const dialogPrompt = "The Edit profile button does nothing; make it open the dialog.";
+  const creation = await createRun({
+    schemaVersion: "prism.repair-request/v1",
+    prompt: dialogPrompt,
+    workspace: {
+      kind: "local",
+      path: fixtureDirectory,
+      displayName: "profile-dialog-fixture",
+    },
+    viewport: { width: 1280, height: 720, deviceScaleFactor: 1 },
+  });
+  const browserConfig = {
+    route: "/profile-dialog",
+    target: {
+      kind: "semantic" as const,
+      role: "button",
+      name: "Edit profile",
+      exact: true,
+    },
+  };
+
+  await startHybridRun(creation.runId, {
+    piSessionFactory: profileDialogPiSessionFactory(),
+    browserSessionFactory: profileDialogBrowserSessionFactory(),
+    browserConfig,
+  });
+  const paused = await waitForHybridRun(creation.runId);
+  expect(paused).toMatchObject({
+    status: "awaiting_approval",
+    browserBaselines: [expect.objectContaining({ route: "/profile-dialog" })],
+    browserActions: expect.arrayContaining([
+      expect.objectContaining({
+        proposal: expect.objectContaining({
+          action: { kind: "press", key: "Tab" },
+        }),
+        execution: expect.objectContaining({ status: "executed" }),
+      }),
+      expect.objectContaining({
+        proposal: expect.objectContaining({
+          action: { kind: "press", key: "Enter" },
+        }),
+        execution: expect.objectContaining({ status: "executed" }),
+      }),
+    ]),
+  });
+  const baseline = paused?.browserBaselines[0];
+  if (!baseline) throw new Error("Missing profile Dialog baseline");
+  const store = new FileTrajectoryStore({ dataDirectory });
+  const computed = JSON.parse(
+    Buffer.from(await store.readArtifact(baseline.computed)).toString("utf8"),
+  );
+  const consoleEvidence = JSON.parse(
+    Buffer.from(await store.readArtifact(baseline.console)).toString("utf8"),
+  );
+  expect(computed.dialogs).toContainEqual({
+    name: "Edit profile",
+    open: false,
+    visible: false,
+  });
+  expect(computed.activeElement).toMatchObject({ tagName: "BODY" });
+  expect(
+    consoleEvidence.filter(({ type }: { type: string }) => type === "error"),
+  ).toEqual([]);
+
+  const proposal = paused?.effectControls.find(
+    (control) => control.kind === "proposal",
+  );
+  if (!proposal || proposal.kind !== "proposal") throw new Error("Missing proposal");
+  await decideRunEffect(creation.runId, {
+    schemaVersion: "prism.effect-decision-request/v1",
+    proposalId: proposal.proposalId,
+    proposalDigest: proposal.proposalDigest,
+    decision: "approved",
+  });
+  await startHybridRun(creation.runId, {
+    piSessionFactory: profileDialogPiSessionFactory(),
+    browserSessionFactory: profileDialogBrowserSessionFactory(),
+    browserConfig,
+  });
+  const dossier = await waitForHybridRun(creation.runId);
+
+  expect(dossier).toMatchObject({
+    status: "completed",
+    prompt: dialogPrompt,
+    repairSpec: {
+      spec: {
+        predicates: [{ kind: "dialog-behavior", dialogName: "Edit profile" }],
+      },
+    },
+    browserActions: expect.arrayContaining([
+      expect.objectContaining({
+        proposal: expect.objectContaining({
+          action: { kind: "press", key: "Escape" },
+        }),
+        execution: expect.objectContaining({ status: "executed" }),
+      }),
+    ]),
+    browserVerificationReports: [expect.objectContaining({ verdict: "passed" })],
+    completion: {
+      approvals: ["source_effect"],
+      codeOracle: expect.objectContaining({
+        mediaType: "application/vnd.prism.code-oracle-report+json",
+      }),
+      browserVerificationReportId: expect.any(String),
+      verificationRefs: expect.any(Array),
+    },
+  });
+  const replayed = await store.loadRun(creation.runId);
+  expect(replayed.snapshot).toMatchObject({
+    status: dossier?.status,
+    browserActions: dossier?.browserActions,
+    browserVerificationReports: dossier?.browserVerificationReports,
+    completion: dossier?.completion,
+  });
+}, 60_000);
+
 function roundButtonPiSessionFactory(): PiSessionFactory {
   const usage = {
     model: { provider: "scripted", id: "round-button" },
@@ -502,6 +619,103 @@ function cardShadowPiSessionFactory(): PiSessionFactory {
           state: "succeeded",
           summary: "The card-shadow source was inspected.",
           request: { kind: "successor", nodeType: "workspace.patch" },
+        });
+      },
+      abort: async () => undefined,
+      dispose: () => undefined,
+      getUsage: () => usage,
+    }),
+  };
+}
+
+function profileDialogPiSessionFactory(): PiSessionFactory {
+  const usage = {
+    model: { provider: "scripted", id: "profile-dialog" },
+    modelCalls: 1,
+    inputTokens: 10,
+    outputTokens: 2,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    totalTokens: 12,
+    costUsd: 0,
+    durationMs: 1,
+  };
+
+  return {
+    model: usage.model,
+    create: async ({ handlers }) => ({
+      prompt: async () => {
+        const inspected = await handlers.inspect?.({
+          paths: ["src/routes/profile-dialog.tsx"],
+          patterns: [],
+        });
+        if (handlers.patch && handlers.test) {
+          const details =
+            workspaceEvidenceRecordSchema.parse(inspected).evidence.details;
+          if (details?.operation !== "inspect")
+            throw new Error("Dialog inspection failed.");
+          const read = details.reads.find(
+            ({ path: file }) => file === "src/routes/profile-dialog.tsx",
+          );
+          if (!read) throw new Error("Dialog source evidence is missing.");
+          await handlers.patch({
+            files: [
+              {
+                path: "src/routes/profile-dialog.tsx",
+                expectedSha256: createHash("sha256").update(read.content).digest("hex"),
+                content: read.content.replace(
+                  "onClick={() => undefined}",
+                  "onClick={() => dialogRef.current?.showModal()}",
+                ),
+              },
+            ],
+          });
+          await handlers.test({
+            command: { executable: "pnpm", arguments: ["test"] },
+            workingDirectory: ".",
+            timeoutMs: 120_000,
+          });
+          await handlers.submit({
+            state: "succeeded",
+            summary: "The scoped profile Dialog repair passed its relevant test.",
+            request: { kind: "successor", nodeType: "browser.verify" },
+          });
+          return;
+        }
+
+        await handlers.submit({
+          state: "succeeded",
+          summary: "The profile Dialog source was inspected.",
+          request: { kind: "successor", nodeType: "workspace.patch" },
+        });
+      },
+      abort: async () => undefined,
+      dispose: () => undefined,
+      getUsage: () => usage,
+    }),
+  };
+}
+
+function profileDialogBrowserSessionFactory(): BrowserSessionFactory {
+  const usage: BrowserResourceUsage = {
+    model: { provider: "scripted-browser-model", id: "profile-dialog" },
+    modelCalls: 1,
+    loopCount: 1,
+    actionsProposed: 2,
+    actionsExecuted: 2,
+    costUsd: 0,
+    durationMs: 1,
+  };
+  return {
+    model: usage.model,
+    create: async ({ operator }) => ({
+      run: async () => {
+        await operator.screenshot();
+        await operator.press("Tab");
+        await operator.press("Enter");
+        await operator.execute({
+          action: "finished",
+          judgment: "The named profile Dialog opened and accepted keyboard focus.",
         });
       },
       abort: async () => undefined,

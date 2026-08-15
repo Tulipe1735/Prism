@@ -53,6 +53,16 @@ export interface RenderedTargetObservation {
     parent: RenderedRectangle | null;
     siblings: RenderedRectangle[];
   };
+  /** 可选交互状态；Dialog 场景由同一受控会话补齐关闭与焦点归还结果。 */
+  dialog?: {
+    name: string;
+    visible: boolean;
+    focusInside: boolean;
+    escapeCloses: boolean;
+    focusReturnsToTrigger: boolean;
+    activeElementName?: string | null;
+    consoleErrors: string[];
+  };
   /** 目标元素的可访问名/文本。 */
   text: string;
   /** 元素是否可用（非 disabled）。 */
@@ -102,6 +112,8 @@ export interface BrowserOracleOptions {
    * 用于在测量前复现交互状态（例如打开菜单、注入修复样式）。
    */
   beforeMeasure?: (page: Page) => Promise<void>;
+  /** 需要读取的具名 Dialog；不发送任何输入。 */
+  dialogName?: string;
 }
 
 /** 校验并解析本地基础 URL（必须为显式本地 HTTP origin）。 */
@@ -232,6 +244,10 @@ export class BrowserOracle {
       });
       await confineNetwork(context, this.baseUrl);
       const page = await context.newPage();
+      const consoleErrors: string[] = [];
+      page.on("console", (message) => {
+        if (message.type() === "error") consoleErrors.push(message.text());
+      });
       await page.goto(targetUrl.toString(), { waitUntil: "networkidle" });
 
       const locator = page.getByRole(this.options.target.role as never, {
@@ -241,6 +257,28 @@ export class BrowserOracle {
       await locator.waitFor({ state: "visible" });
 
       await this.options.beforeMeasure?.(page);
+
+      let dialog: RenderedTargetObservation["dialog"];
+      if (this.options.dialogName) {
+        const dialogLocator = page.getByRole("dialog", {
+          name: this.options.dialogName,
+          exact: true,
+        });
+        const exists = (await dialogLocator.count()) > 0;
+        dialog = {
+          name: this.options.dialogName,
+          visible: exists && (await dialogLocator.isVisible()),
+          focusInside:
+            exists &&
+            (await dialogLocator.evaluate((element) =>
+              element.contains(document.activeElement),
+            )),
+          escapeCloses: false,
+          focusReturnsToTrigger: false,
+          activeElementName: null,
+          consoleErrors,
+        };
+      }
 
       const facts = await locator.evaluate(renderFacts);
       // 阴影绘制在元素边界外；局部证据需保留一圈固定上下文。
@@ -277,6 +315,7 @@ export class BrowserOracle {
         xPx: facts.rectangle.x,
         yPx: facts.rectangle.y,
         surroundings: facts.surroundings,
+        ...(dialog ? { dialog } : {}),
         text: facts.text,
         enabled: !facts.disabled,
         visible: facts.visible,
@@ -328,6 +367,26 @@ export class BrowserOracle {
         const passed = before.boxShadow === "none" && after.boxShadow !== "none";
         return {
           assertion: `Rendered box-shadow changed from ${before.boxShadow} to ${after.boxShadow}.`,
+          predicate,
+          status: passed ? "passed" : "failed",
+        };
+      }
+      case "dialog-behavior": {
+        const beforeDialog = before.dialog;
+        const afterDialog = after.dialog;
+        const passed =
+          beforeDialog?.name === predicate.dialogName &&
+          beforeDialog.visible === false &&
+          afterDialog?.name === predicate.dialogName &&
+          afterDialog.visible &&
+          afterDialog.focusInside &&
+          afterDialog.escapeCloses &&
+          afterDialog.focusReturnsToTrigger &&
+          afterDialog.consoleErrors.length === 0;
+        return {
+          assertion: passed
+            ? `Dialog "${predicate.dialogName}" opened, received focus, closed with Escape, returned focus to its trigger, and added no console error.`
+            : `Dialog "${predicate.dialogName}" failed its interaction invariants: ${JSON.stringify(afterDialog ?? null)}.`,
           predicate,
           status: passed ? "passed" : "failed",
         };

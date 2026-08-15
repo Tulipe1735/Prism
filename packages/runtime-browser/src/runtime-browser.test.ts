@@ -8,11 +8,11 @@ import { createServer, type Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  AgentPlanBrowserSessionFactory,
   type BrowserModelAction,
   type BrowserPort,
   BrowserRuntime,
   type BrowserSessionFactory,
-  AgentPlanBrowserSessionFactory,
 } from "./index";
 
 const runId = "run_6dbf6f33-69c4-4e5f-9898-3f693735f5f0";
@@ -80,11 +80,13 @@ describe("BrowserRuntime", () => {
     expect(result.browserActions[0]!.policy.decision).toBe("allowed");
     expect(result.browserActions[0]!.execution.status).toBe("executed");
     expect(result.browserActions[0]!.proposal.origin).toBe("browser-model");
-    expect(result.browserActions[0]!.proposal.target).toMatchObject({
-      kind: "coordinate",
-      observationId: expect.any(String),
-      screenshotHash: expect.stringMatching(/^[0-9a-f]{64}$/),
-      pageStateHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+    expect(result.browserActions[0]!.proposal).toMatchObject({
+      target: {
+        kind: "coordinate",
+        observationId: expect.any(String),
+        screenshotHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+        pageStateHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      },
     });
     expect(result.verificationReport).toMatchObject({
       verdict: "passed",
@@ -134,6 +136,13 @@ describe("BrowserRuntime", () => {
           click: async () => {
             clicked = true;
           },
+          press: async () => undefined,
+          inspectDialog: async () => ({
+            visible: false,
+            focusInside: false,
+            activeElementName: null,
+            consoleErrors: [],
+          }),
           dispose: async () => undefined,
         }),
       },
@@ -318,7 +327,9 @@ describe("PlaywrightBrowserPortFactory integration smoke", () => {
     expect(Object.keys(port).sort()).toEqual([
       "click",
       "dispose",
+      "inspectDialog",
       "observe",
+      "press",
       "screenshot",
     ]);
     expect(port).not.toHaveProperty("writeSource");
@@ -435,6 +446,13 @@ function scriptedPort(): BrowserPort {
     click: async () => {
       current = { ...current, pageStateHash: "c".repeat(64) };
     },
+    press: async () => undefined,
+    inspectDialog: async () => ({
+      visible: false,
+      focusInside: false,
+      activeElementName: null,
+      consoleErrors: [],
+    }),
     dispose: async () => undefined,
   };
 }

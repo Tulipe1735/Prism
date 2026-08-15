@@ -16,11 +16,16 @@ import {
   browserActionProposalSchema,
   type BrowserActionRecord,
   browserActionRecordSchema,
+  type BrowserKey,
   type BrowserObservationReference,
   type BrowserTarget,
 } from "@prism/contracts";
 
-export { type BrowserBaselineCapture, BrowserExecutor, type BrowserExecutorOptions } from "./browser-executor";
+export {
+  type BrowserBaselineCapture,
+  BrowserExecutor,
+  type BrowserExecutorOptions,
+} from "./browser-executor";
 
 /** 浏览器端口：动作代理执行浏览器操作所需的两个原语。 */
 export interface BrowserPort {
@@ -28,6 +33,8 @@ export interface BrowserPort {
   observe: () => Promise<BrowserObservationReference>;
   /** 在页面上点击给定目标。 */
   click: (target: BrowserTarget) => Promise<void>;
+  /** 发送一枚允许的键盘按键。 */
+  press: (key: BrowserKey) => Promise<void>;
 }
 
 /** 动作代理构造选项。 */
@@ -49,7 +56,9 @@ function coordinateTargetIsFresh(
   proposal: BrowserActionProposal,
   observation: BrowserObservationReference,
 ): boolean {
-  if (proposal.target.kind !== "coordinate") return true;
+  if (!("target" in proposal) || proposal.target.kind !== "coordinate") {
+    return true;
+  }
 
   const target = proposal.target;
   return (
@@ -107,7 +116,11 @@ export class ActionBroker {
     }
 
     try {
-      await this.options.port.click(proposal.target);
+      if ("target" in proposal) {
+        await this.options.port.click(proposal.target);
+      } else {
+        await this.options.port.press(proposal.action.key);
+      }
       const after = await this.options.port.observe();
       return browserActionRecordSchema.parse({
         schemaVersion: BROWSER_ACTION_RECORD_SCHEMA_VERSION,

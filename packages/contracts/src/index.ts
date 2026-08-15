@@ -385,6 +385,13 @@ export const frontendRepairPredicateSchema = z.discriminatedUnion("kind", [
     .strict(),
   // 关系谓词：缺失的阴影恢复为可见的计算样式
   z.object({ kind: z.literal("shadow-present") }).strict(),
+  // 交互谓词：具名 Dialog 打开、接管焦点、Escape 关闭并归还焦点
+  z
+    .object({
+      kind: z.literal("dialog-behavior"),
+      dialogName: z.string().trim().min(1).max(200),
+    })
+    .strict(),
   // 关系谓词：局部目标区域的 before/after 渲染必须实际发生改变
   z.object({ kind: z.literal("region-clip-differs") }).strict(),
   // 不变式：目标标签文本保持不变
@@ -516,16 +523,30 @@ export const browserBaselineResponseSchema = z
  *
  * origin 标明提议来源（browser-model / automation）。
  */
-export const browserActionProposalSchema = z
-  .object({
-    schemaVersion: z.literal(BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION),
-    proposalId: z.string().uuid(),
-    runId: runIdSchema,
-    origin: z.enum(["browser-model", "automation"]),
-    action: z.object({ kind: z.literal("click") }).strict(),
-    target: browserTargetSchema,
-  })
-  .strict();
+export const browserKeySchema = z.enum(["Tab", "Enter", "Escape"]);
+
+const browserActionProposalBase = {
+  schemaVersion: z.literal(BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION),
+  proposalId: z.string().uuid(),
+  runId: runIdSchema,
+  origin: z.enum(["browser-model", "automation"]),
+};
+
+export const browserActionProposalSchema = z.union([
+  z
+    .object({
+      ...browserActionProposalBase,
+      action: z.object({ kind: z.literal("click") }).strict(),
+      target: browserTargetSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...browserActionProposalBase,
+      action: z.object({ kind: z.literal("press"), key: browserKeySchema }).strict(),
+    })
+    .strict(),
+]);
 
 /**
  * 浏览器动作记录：一次动作提议的完整生命周期 —— 策略裁决 + 执行结果 + 前后观测。
@@ -2040,6 +2061,7 @@ export type Viewport = z.infer<typeof viewportSchema>;
 export type FrontendRepairPredicate = z.infer<typeof frontendRepairPredicateSchema>;
 export type FrontendRepairSpec = z.infer<typeof frontendRepairSpecSchema>;
 export type FrontendRepairSpecRecord = z.infer<typeof frontendRepairSpecRecordSchema>;
+export type BrowserKey = z.infer<typeof browserKeySchema>;
 export type SemanticBrowserTarget = z.infer<typeof semanticBrowserTargetSchema>;
 
 /**

@@ -30,6 +30,7 @@ import {
   type BrowserActionProposal,
   browserActionProposalSchema,
   type BrowserActionRecord,
+  type BrowserKey,
   type BrowserObservationReference,
   type BrowserResourceUsage,
   browserResourceUsageSchema,
@@ -79,8 +80,19 @@ export interface BrowserPort {
   }>;
   /** 在页面上点击给定目标（仅 ActionBroker 放行后调用）。 */
   click: (target: BrowserTarget) => Promise<void>;
+  /** 发送允许的键盘按键（仅 ActionBroker 放行后调用）。 */
+  press: (key: BrowserKey) => Promise<void>;
+  /** 读取具名 Dialog、焦点与本次会话控制台错误。 */
+  inspectDialog: (name: string) => Promise<DialogState>;
   /** 关闭并释放浏览器会话。 */
   dispose: () => Promise<void>;
+}
+
+export interface DialogState {
+  visible: boolean;
+  focusInside: boolean;
+  activeElementName: string | null;
+  consoleErrors: string[];
 }
 
 /** 浏览器端口工厂：按本地基址与路由创建一次受限会话。 */
@@ -117,6 +129,8 @@ export interface BrowserVerifier {
     intent: string;
     observation: BrowserObservationReference;
     screenshotArtifact: ArtifactRef;
+    inspectDialog: (name: string) => Promise<DialogState>;
+    pressKey: (key: BrowserKey) => Promise<BrowserActionRecord>;
   }) => Promise<{
     assertion: string;
     status: "passed" | "failed" | "inconclusive";
@@ -191,6 +205,19 @@ export class PrismBrowserOperator {
     const record = await this.options.broker.execute(proposal);
     this.records.push(record);
     return { status: "running" };
+  }
+
+  /** 仅供确定性验证器使用；键盘输入仍通过 ActionBroker 留痕。 */
+  async press(key: BrowserKey): Promise<BrowserActionRecord> {
+    const record = await this.options.broker.execute({
+      schemaVersion: BROWSER_ACTION_PROPOSAL_SCHEMA_VERSION,
+      proposalId: randomUUID(),
+      runId: this.options.runId,
+      origin: "automation",
+      action: { kind: "press", key },
+    });
+    this.records.push(record);
+    return record;
   }
 
   /** 是否被模型显式标记完成（finished）。 */
@@ -498,6 +525,10 @@ export class PlaywrightBrowserPortFactory implements BrowserPortFactory {
     });
     await confineNetwork(context, baseUrl);
     const page = await context.newPage();
+    const consoleErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
     await page.goto(targetUrl.toString(), { waitUntil: "networkidle" });
 
     let cached: BrowserObservationReference | null = null;
@@ -540,6 +571,50 @@ export class PlaywrightBrowserPortFactory implements BrowserPortFactory {
           exact: target.exact,
         });
         await locator.click();
+      },
+      press: async (key) => {
+        await page.keyboard.press(key);
+        await page.evaluate(
+          () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+        );
+      },
+      inspectDialog: async (name) => {
+        const state = await page.evaluate((dialogName) => {
+          const accessibleName = (element: Element): string => {
+            const labelledBy = element.getAttribute("aria-labelledby");
+            return (
+              element.getAttribute("aria-label") ??
+              (labelledBy
+                ? labelledBy
+                    .split(/\s+/u)
+                    .map((id) => document.getElementById(id)?.textContent ?? "")
+                    .join(" ")
+                : "")
+            ).trim();
+          };
+          const element = Array.from(
+            document.querySelectorAll("dialog,[role='dialog']"),
+          ).find((candidate) => accessibleName(candidate) === dialogName);
+          const active = document.activeElement;
+          const activeName = active
+            ? (
+                active.getAttribute("aria-label") ??
+                active.getAttribute("name") ??
+                active.textContent ??
+                ""
+              ).trim()
+            : "";
+          return {
+            visible:
+              element instanceof HTMLDialogElement
+                ? element.open
+                : element !== undefined && element.getClientRects().length > 0,
+            focusInside:
+              element !== undefined && active !== null && element.contains(active),
+            activeElementName: activeName || null,
+          };
+        }, name);
+        return { ...state, consoleErrors: [...consoleErrors] };
       },
       dispose: async () => {
         await context.close();
@@ -602,6 +677,16 @@ async function observePage(
     scrollX: window.scrollX,
     scrollY: window.scrollY,
     bodyText: document.body.textContent ?? "",
+    activeElement: document.activeElement
+      ? {
+          tagName: document.activeElement.tagName,
+          name:
+            document.activeElement.getAttribute("aria-label") ??
+            document.activeElement.textContent ??
+            document.activeElement.getAttribute("name") ??
+            "",
+        }
+      : null,
   }));
   return {
     observationId: randomUUID(),
@@ -698,6 +783,7 @@ export class BrowserRuntime {
           port: {
             observe: () => port!.observe(),
             click: (target) => port!.click(target),
+            press: (key) => port!.press(key),
           },
           clock: this.clock,
         });
@@ -836,6 +922,8 @@ export class BrowserRuntime {
         intent,
         observation: screenshot.observation,
         screenshotArtifact,
+        inspectDialog: (name) => port.inspectDialog(name),
+        pressKey: (key) => operator.press(key),
       });
       deterministic = {
         assertion: result.assertion,

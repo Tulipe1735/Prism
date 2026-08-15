@@ -155,6 +155,7 @@ describe("BrowserOracle.observe", () => {
     const page = {
       getByRole: () => locator,
       goto: async () => null,
+      on: () => page,
       screenshot: async () => Buffer.from("page", "utf8"),
       url: () => "http://127.0.0.1:4173/round-button",
     } as unknown as Page;

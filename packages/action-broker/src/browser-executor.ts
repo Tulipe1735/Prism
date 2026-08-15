@@ -265,6 +265,7 @@ export class BrowserExecutor {
           };
           const style = getComputedStyle(element);
           const parent = element.parentElement;
+          const active = document.activeElement;
           return {
             rectangle: rectangleOf(element),
             parentRectangle: parent ? rectangleOf(parent) : null,
@@ -280,6 +281,31 @@ export class BrowserExecutor {
               pointerEvents: style.pointerEvents,
               boxShadow: style.boxShadow,
             },
+            dialogs: Array.from(
+              document.querySelectorAll("dialog, [role='dialog']"),
+            ).map((dialog) => {
+              const dialogStyle = getComputedStyle(dialog);
+              return {
+                name: dialog.getAttribute("aria-label") ?? "",
+                open:
+                  dialog instanceof HTMLDialogElement
+                    ? dialog.open
+                    : dialog.getAttribute("aria-hidden") !== "true",
+                visible:
+                  dialogStyle.display !== "none" && dialogStyle.visibility !== "hidden",
+              };
+            }),
+            activeElement: active
+              ? {
+                  tagName: active.tagName,
+                  name: (
+                    active.getAttribute("aria-label") ??
+                    active.textContent ??
+                    active.getAttribute("name") ??
+                    ""
+                  ).trim(),
+                }
+              : null,
           };
         }),
       ]);
