@@ -1,6 +1,7 @@
 import type { BrowserSessionFactory } from "@prism/runtime-browser";
 import type { PiSessionFactory } from "@prism/runtime-pi";
 import type { AddressInfo } from "node:net";
+import { Buffer } from "node:buffer";
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { cp, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
@@ -280,6 +281,104 @@ it("completes the round-button request with replayable dual-Oracle evidence", as
   });
 }, 60_000);
 
+it("completes the card-shadow repair with baseline, dual-Oracle, and replay evidence", async () => {
+  const cardPrompt =
+    "Restore a subtle but visible shadow to the profile card without moving it.";
+  const creation = await createRun({
+    schemaVersion: "prism.repair-request/v1",
+    prompt: cardPrompt,
+    workspace: {
+      kind: "local",
+      path: fixtureDirectory,
+      displayName: "card-shadow-fixture",
+    },
+    viewport: { width: 1280, height: 720, deviceScaleFactor: 1 },
+  });
+  const browserConfig = {
+    route: "/card-shadow",
+    target: {
+      kind: "semantic" as const,
+      role: "region",
+      name: "Profile card",
+      exact: true,
+    },
+  };
+
+  await startHybridRun(creation.runId, {
+    piSessionFactory: cardShadowPiSessionFactory(),
+    browserSessionFactory: successfulBrowserSessionFactory(
+      "card-shadow",
+      "The profile card has a subtle visible shadow and did not move.",
+    ),
+    browserConfig,
+  });
+  const paused = await waitForHybridRun(creation.runId);
+  expect(paused).toMatchObject({
+    status: "awaiting_approval",
+    browserBaselines: [expect.objectContaining({ route: "/card-shadow" })],
+  });
+  const baseline = paused?.browserBaselines[0];
+  if (!baseline) throw new Error("Missing card-shadow baseline");
+  const store = new FileTrajectoryStore({ dataDirectory });
+  const computed = JSON.parse(
+    Buffer.from(await store.readArtifact(baseline.computed)).toString("utf8"),
+  );
+  expect(computed).toMatchObject({
+    rectangle: expect.objectContaining({ width: 360, height: 180 }),
+    parentRectangle: expect.objectContaining({ width: 1280 }),
+    siblingRectangles: [expect.objectContaining({ width: expect.any(Number) })],
+    styles: { boxShadow: "none" },
+  });
+
+  const proposal = paused?.effectControls.find(
+    (control) => control.kind === "proposal",
+  );
+  if (!proposal || proposal.kind !== "proposal") throw new Error("Missing proposal");
+  await decideRunEffect(creation.runId, {
+    schemaVersion: "prism.effect-decision-request/v1",
+    proposalId: proposal.proposalId,
+    proposalDigest: proposal.proposalDigest,
+    decision: "approved",
+  });
+  await startHybridRun(creation.runId, {
+    piSessionFactory: cardShadowPiSessionFactory(),
+    browserSessionFactory: successfulBrowserSessionFactory(
+      "card-shadow",
+      "The profile card has a subtle visible shadow and did not move.",
+    ),
+    browserConfig,
+  });
+  const dossier = await waitForHybridRun(creation.runId);
+
+  expect(dossier).toMatchObject({
+    status: "completed",
+    prompt: cardPrompt,
+    repairSpec: {
+      spec: {
+        predicates: expect.arrayContaining([
+          { kind: "shadow-present" },
+          { kind: "surroundings-within", tolerancePx: 2 },
+        ]),
+      },
+    },
+    browserVerificationReports: [expect.objectContaining({ verdict: "passed" })],
+    completion: {
+      approvals: ["source_effect"],
+      codeOracle: expect.objectContaining({
+        mediaType: "application/vnd.prism.code-oracle-report+json",
+      }),
+      browserVerificationReportId: expect.any(String),
+      verificationRefs: expect.any(Array),
+    },
+  });
+  const replayed = await store.loadRun(creation.runId);
+  expect(replayed.snapshot).toMatchObject({
+    status: dossier?.status,
+    completion: dossier?.completion,
+    browserVerificationReports: dossier?.browserVerificationReports,
+  });
+}, 60_000);
+
 function roundButtonPiSessionFactory(): PiSessionFactory {
   const usage = {
     model: { provider: "scripted", id: "round-button" },
@@ -344,9 +443,80 @@ function roundButtonPiSessionFactory(): PiSessionFactory {
   };
 }
 
-function successfulBrowserSessionFactory(): BrowserSessionFactory {
+function cardShadowPiSessionFactory(): PiSessionFactory {
+  const usage = {
+    model: { provider: "scripted", id: "card-shadow" },
+    modelCalls: 1,
+    inputTokens: 10,
+    outputTokens: 2,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    totalTokens: 12,
+    costUsd: 0,
+    durationMs: 1,
+  };
+
+  return {
+    model: usage.model,
+    create: async ({ handlers }) => ({
+      prompt: async () => {
+        const inspected = await handlers.inspect?.({
+          paths: ["src/routes/card-shadow.css"],
+          patterns: [],
+        });
+        if (handlers.patch && handlers.test) {
+          const details =
+            workspaceEvidenceRecordSchema.parse(inspected).evidence.details;
+          if (details?.operation !== "inspect")
+            throw new Error("CSS inspection failed.");
+          const read = details.reads.find(
+            ({ path: file }) => file === "src/routes/card-shadow.css",
+          );
+          if (!read) throw new Error("CSS evidence is missing.");
+          await handlers.patch({
+            files: [
+              {
+                path: "src/routes/card-shadow.css",
+                expectedSha256: createHash("sha256").update(read.content).digest("hex"),
+                content: read.content.replace(
+                  "box-shadow: none;",
+                  "box-shadow: 0 10px 28px rgba(31, 36, 48, 0.18);",
+                ),
+              },
+            ],
+          });
+          await handlers.test({
+            command: { executable: "pnpm", arguments: ["test"] },
+            workingDirectory: ".",
+            timeoutMs: 120_000,
+          });
+          await handlers.submit({
+            state: "succeeded",
+            summary: "The scoped card-shadow repair passed its relevant test.",
+            request: { kind: "successor", nodeType: "browser.verify" },
+          });
+          return;
+        }
+
+        await handlers.submit({
+          state: "succeeded",
+          summary: "The card-shadow source was inspected.",
+          request: { kind: "successor", nodeType: "workspace.patch" },
+        });
+      },
+      abort: async () => undefined,
+      dispose: () => undefined,
+      getUsage: () => usage,
+    }),
+  };
+}
+
+function successfulBrowserSessionFactory(
+  id = "round-button",
+  judgment = "The rendered Save button is visibly rounded.",
+): BrowserSessionFactory {
   const usage: BrowserResourceUsage = {
-    model: { provider: "scripted-browser-model", id: "round-button" },
+    model: { provider: "scripted-browser-model", id },
     modelCalls: 1,
     loopCount: 1,
     actionsProposed: 0,
@@ -361,7 +531,7 @@ function successfulBrowserSessionFactory(): BrowserSessionFactory {
         await operator.screenshot();
         await operator.execute({
           action: "finished",
-          judgment: "The rendered Save button is visibly rounded.",
+          judgment,
         });
       },
       abort: async () => undefined,

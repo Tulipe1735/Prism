@@ -252,20 +252,33 @@ export class BrowserExecutor {
         page.content(),
         locator.ariaSnapshot(),
         locator.evaluate((element) => {
-          const style = getComputedStyle(element);
-          const rectangle = element.getBoundingClientRect();
-          return {
-            rectangle: {
+          const rectangleOf = (
+            candidate: Element,
+          ): { x: number; y: number; width: number; height: number } => {
+            const rectangle = candidate.getBoundingClientRect();
+            return {
               x: rectangle.x,
               y: rectangle.y,
               width: rectangle.width,
               height: rectangle.height,
-            },
+            };
+          };
+          const style = getComputedStyle(element);
+          const parent = element.parentElement;
+          return {
+            rectangle: rectangleOf(element),
+            parentRectangle: parent ? rectangleOf(parent) : null,
+            siblingRectangles: parent
+              ? Array.from(parent.children)
+                  .filter((candidate) => candidate !== element)
+                  .map(rectangleOf)
+              : [],
             styles: {
               display: style.display,
               visibility: style.visibility,
               opacity: style.opacity,
               pointerEvents: style.pointerEvents,
+              boxShadow: style.boxShadow,
             },
           };
         }),

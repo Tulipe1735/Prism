@@ -383,6 +383,8 @@ export const frontendRepairPredicateSchema = z.discriminatedUnion("kind", [
       minAfterPx: z.number().positive(),
     })
     .strict(),
+  // 关系谓词：缺失的阴影恢复为可见的计算样式
+  z.object({ kind: z.literal("shadow-present") }).strict(),
   // 关系谓词：局部目标区域的 before/after 渲染必须实际发生改变
   z.object({ kind: z.literal("region-clip-differs") }).strict(),
   // 不变式：目标标签文本保持不变
@@ -400,6 +402,13 @@ export const frontendRepairPredicateSchema = z.discriminatedUnion("kind", [
   z
     .object({
       kind: z.literal("layout-within"),
+      tolerancePx: z.number().nonnegative(),
+    })
+    .strict(),
+  // 不变式：目标父级与相邻元素的几何保持在声明容差内
+  z
+    .object({
+      kind: z.literal("surroundings-within"),
       tolerancePx: z.number().nonnegative(),
     })
     .strict(),

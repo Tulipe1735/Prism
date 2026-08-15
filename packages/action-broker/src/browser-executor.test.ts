@@ -21,11 +21,14 @@ describe("BrowserExecutor", () => {
       ariaSnapshot: async () => '- button "Save"',
       evaluate: async () => ({
         rectangle: { x: 40, y: 20, width: 120, height: 44 },
+        parentRectangle: { x: 0, y: 0, width: 1280, height: 720 },
+        siblingRectangles: [{ x: 40, y: 80, width: 120, height: 20 }],
         styles: {
           display: "block",
           visibility: "visible",
           opacity: "1",
           pointerEvents: "auto",
+          boxShadow: "none",
         },
       }),
       waitFor: async () => undefined,
@@ -89,6 +92,11 @@ describe("BrowserExecutor", () => {
       targetIdentity: "role=button[name=Save]",
     });
     expect(capture.artifacts.trace.toString("utf8")).toBe("trace");
+    expect(JSON.parse(capture.artifacts.computed.toString("utf8"))).toMatchObject({
+      parentRectangle: { width: 1280, height: 720 },
+      siblingRectangles: [{ width: 120, height: 20 }],
+      styles: { boxShadow: "none" },
+    });
     expect(interceptedRequest).toEqual(expect.any(Function));
 
     const abort = vi.fn(async () => undefined);

@@ -51,6 +51,7 @@ import {
 import {
   BrowserOracle,
   CodeOracle,
+  createCardShadowScenario,
   createRoundButtonScenario,
   type RenderedTargetObservation,
   type ScenarioManifest,
@@ -242,16 +243,8 @@ export async function createRun(request: RepairRequest): Promise<RunCreation> {
   });
 }
 
-/** R9 当前唯一可执行场景；其它请求继续走通用运行时而不伪造规范。 */
-async function roundButtonScenarioFor(
-  run: DurableRun,
-): Promise<ScenarioManifest | null> {
-  if (
-    run.manifest.request.prompt.trim() !==
-    "Make the primary Save button clearly rounded instead of square."
-  ) {
-    return null;
-  }
+/** 已实现的确定性 fixture 场景；其它请求继续走通用运行时。 */
+async function scenarioFor(run: DurableRun): Promise<ScenarioManifest | null> {
   const packageJson = JSON.parse(
     await readFile(
       path.join(run.manifest.request.workspace.path, "package.json"),
@@ -259,9 +252,15 @@ async function roundButtonScenarioFor(
     ),
   ) as { name?: string };
   if (packageJson.name !== "@prism/fixture-react-repair") return null;
-  return createRoundButtonScenario({
-    fixtureRoot: run.manifest.request.workspace.path,
-  });
+  const options = { fixtureRoot: run.manifest.request.workspace.path };
+  switch (run.manifest.request.prompt.trim()) {
+    case "Make the primary Save button clearly rounded instead of square.":
+      return createRoundButtonScenario(options);
+    case "Restore a subtle but visible shadow to the profile card without moving it.":
+      return createCardShadowScenario(options);
+    default:
+      return null;
+  }
 }
 
 /** 在任何源码副作用前把规范与内容哈希一起写入 Journal。 */
@@ -641,7 +640,7 @@ export async function startHybridRun(
 
   const run = await store.loadRun(parsedRunId.data);
   if (["completed", "blocked", "cancelled"].includes(run.snapshot.status)) return true;
-  const scenario = await roundButtonScenarioFor(run);
+  const scenario = await scenarioFor(run);
   if (scenario) await commitRepairSpec(store, run, scenario);
   let resumedRun = await store.loadRun(parsedRunId.data);
   if (resumedRun.snapshot.status === "awaiting_approval") return true;
@@ -1052,7 +1051,7 @@ export async function decideRunEffect(
     throw new TypeError("The effect decision does not match the pending proposal.");
   }
 
-  const scenario = await roundButtonScenarioFor(run);
+  const scenario = await scenarioFor(run);
   let observationDigest = proposal.preconditions.observationDigest;
   try {
     if (scenario) {

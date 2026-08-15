@@ -13,15 +13,12 @@
 import path from "node:path";
 import process from "node:process";
 
-import { execa } from "execa";
-
-import { gitRepoRoot, toRepoRelativePath } from "../git";
-import { sha256 } from "../hash";
 import {
   SCENARIO_MANIFEST_SCHEMA_VERSION,
   type ScenarioManifest,
   scenarioManifestSchema,
 } from "../scenario-manifest";
+import { knownBadIdentity } from "./known-bad";
 
 const DEFAULT_FIXTURE_ROOT = path.resolve(process.cwd(), "../../fixtures/react-repair");
 
@@ -37,41 +34,6 @@ export interface RoundButtonScenarioOptions {
   revision?: string;
 }
 
-/** 当前 git 修订：调用方应确保 fixture 以缺陷态提交后调用。 */
-async function currentRevision(workspaceRoot: string): Promise<string> {
-  const result = await execa("git", ["rev-parse", "HEAD"], {
-    cwd: workspaceRoot,
-    reject: false,
-    shell: false,
-  });
-  if (result.exitCode !== 0) {
-    throw new Error("Unable to resolve the fixture's known-bad git revision.");
-  }
-  return result.stdout.trim();
-}
-
-/** 从 git 修订读取已提交文件内容并计算 SHA-256（不读工作区）。 */
-async function committedSha256(
-  workspaceRoot: string,
-  revision: string,
-  relativePath: string,
-): Promise<string> {
-  const repoRoot = await gitRepoRoot(workspaceRoot);
-  // git show <rev>:<path> 需要仓库相对路径；工作区通常嵌套在仓库内
-  const repoRelative = toRepoRelativePath(workspaceRoot, repoRoot, relativePath);
-  const result = await execa("git", ["show", `${revision}:${repoRelative}`], {
-    cwd: workspaceRoot,
-    reject: false,
-    shell: false,
-    encoding: "buffer",
-    stripFinalNewline: false,
-  });
-  if (result.exitCode !== 0) {
-    throw new Error(`Known-bad file ${relativePath} is not committed at ${revision}.`);
-  }
-  return sha256(result.stdout);
-}
-
 /**
  * 构造并校验 round-button 场景清单。
  *
@@ -81,15 +43,11 @@ export async function createRoundButtonScenario(
   options: RoundButtonScenarioOptions = {},
 ): Promise<ScenarioManifest> {
   const fixtureRoot = options.fixtureRoot ?? DEFAULT_FIXTURE_ROOT;
-  const revision = options.revision ?? (await currentRevision(fixtureRoot));
-  const fileHashes: Record<string, string> = {};
-  for (const relativePath of KNOWN_BAD_SOURCE_FILES) {
-    fileHashes[relativePath] = await committedSha256(
-      fixtureRoot,
-      revision,
-      relativePath,
-    );
-  }
+  const knownBad = await knownBadIdentity(
+    fixtureRoot,
+    KNOWN_BAD_SOURCE_FILES,
+    options.revision,
+  );
 
   return scenarioManifestSchema.parse({
     schemaVersion: SCENARIO_MANIFEST_SCHEMA_VERSION,
@@ -99,7 +57,7 @@ export async function createRoundButtonScenario(
     fixturePath: fixtureRoot,
     route: "/round-button",
     viewport: { width: 1280, height: 720, deviceScaleFactor: 1 },
-    knownBad: { revision, fileHashes },
+    knownBad,
     spec: {
       schemaVersion: "prism.frontend-repair-spec/v1",
       prompt: "Make the primary Save button clearly rounded instead of square.",

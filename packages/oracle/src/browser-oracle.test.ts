@@ -34,10 +34,15 @@ function observation(
     viewport,
     target,
     borderRadiusPx: 0,
+    boxShadow: "none",
     widthPx: 96,
     heightPx: 44,
     xPx: 100,
     yPx: 200,
+    surroundings: {
+      parent: { x: 0, y: 0, width: 1280, height: 720 },
+      siblings: [],
+    },
     text: "Save",
     enabled: true,
     visible: true,
@@ -133,7 +138,12 @@ describe("BrowserOracle.observe", () => {
     const locator = {
       evaluate: async () => ({
         borderRadius: "12px",
+        boxShadow: "none",
         rectangle: { x: 100, y: 200, width: 96, height: 44 },
+        surroundings: {
+          parent: { x: 0, y: 0, width: 1280, height: 720 },
+          siblings: [],
+        },
         text: "Save",
         disabled: false,
         visible: true,

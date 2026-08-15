@@ -41,11 +41,18 @@ export interface RenderedTargetObservation {
   target: SemanticBrowserTarget;
   /** 计算样式解析出的圆角半径（px）。 */
   borderRadiusPx: number;
+  /** 目标元素的计算阴影；缺失时为 "none"。 */
+  boxShadow: string;
   /** 渲染包围盒（CSS px）。 */
   widthPx: number;
   heightPx: number;
   xPx: number;
   yPx: number;
+  /** 父级与相邻元素几何，用于证明修复未移动周边布局。 */
+  surroundings: {
+    parent: RenderedRectangle | null;
+    siblings: RenderedRectangle[];
+  };
   /** 目标元素的可访问名/文本。 */
   text: string;
   /** 元素是否可用（非 disabled）。 */
@@ -58,6 +65,13 @@ export interface RenderedTargetObservation {
   regionClipHash: string;
   /** 页面截图 SHA-256。 */
   screenshotHash: string;
+}
+
+export interface RenderedRectangle {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 /** 单条谓词判定结果。 */
@@ -140,22 +154,40 @@ function parsePixels(value: string): number {
 /** 从计算样式与包围盒提取渲染事实（在页面上下文内执行）。 */
 function renderFacts(element: HTMLElement): {
   borderRadius: string;
-  rectangle: { x: number; y: number; width: number; height: number };
+  boxShadow: string;
+  rectangle: RenderedRectangle;
+  surroundings: {
+    parent: RenderedRectangle | null;
+    siblings: RenderedRectangle[];
+  };
   text: string;
   disabled: boolean;
   visible: boolean;
   pointerEvents: string;
 } {
-  const style = getComputedStyle(element);
-  const rectangle = element.getBoundingClientRect();
-  const opacity = Number.parseFloat(style.opacity);
-  return {
-    borderRadius: style.borderRadius,
-    rectangle: {
+  const rectangleOf = (candidate: Element): RenderedRectangle => {
+    const rectangle = candidate.getBoundingClientRect();
+    return {
       x: rectangle.x,
       y: rectangle.y,
       width: rectangle.width,
       height: rectangle.height,
+    };
+  };
+  const style = getComputedStyle(element);
+  const parent = element.parentElement;
+  const opacity = Number.parseFloat(style.opacity);
+  return {
+    borderRadius: style.borderRadius,
+    boxShadow: style.boxShadow,
+    rectangle: rectangleOf(element),
+    surroundings: {
+      parent: parent ? rectangleOf(parent) : null,
+      siblings: parent
+        ? Array.from(parent.children)
+            .filter((candidate) => candidate !== element)
+            .map(rectangleOf)
+        : [],
     },
     text: (element.textContent ?? "").trim(),
     disabled: "disabled" in element && (element as HTMLButtonElement).disabled,
@@ -210,10 +242,26 @@ export class BrowserOracle {
 
       await this.options.beforeMeasure?.(page);
 
-      const [regionClip, pageScreenshot, facts] = await Promise.all([
-        locator.screenshot(),
+      const facts = await locator.evaluate(renderFacts);
+      // 阴影绘制在元素边界外；局部证据需保留一圈固定上下文。
+      const padding = 32;
+      const clip = {
+        x: Math.max(0, facts.rectangle.x - padding),
+        y: Math.max(0, facts.rectangle.y - padding),
+        width:
+          Math.min(
+            this.options.viewport.width,
+            facts.rectangle.x + facts.rectangle.width + padding,
+          ) - Math.max(0, facts.rectangle.x - padding),
+        height:
+          Math.min(
+            this.options.viewport.height,
+            facts.rectangle.y + facts.rectangle.height + padding,
+          ) - Math.max(0, facts.rectangle.y - padding),
+      };
+      const [regionClip, pageScreenshot] = await Promise.all([
+        page.screenshot({ type: "png", clip }),
         page.screenshot({ type: "png" }),
-        locator.evaluate(renderFacts),
       ]);
 
       await context.close();
@@ -223,10 +271,12 @@ export class BrowserOracle {
         viewport: this.options.viewport,
         target: this.options.target,
         borderRadiusPx: parsePixels(facts.borderRadius),
+        boxShadow: facts.boxShadow,
         widthPx: facts.rectangle.width,
         heightPx: facts.rectangle.height,
         xPx: facts.rectangle.x,
         yPx: facts.rectangle.y,
+        surroundings: facts.surroundings,
         text: facts.text,
         enabled: !facts.disabled,
         visible: facts.visible,
@@ -270,6 +320,14 @@ export class BrowserOracle {
           delta >= predicate.minDeltaPx && after.borderRadiusPx >= predicate.minAfterPx;
         return {
           assertion: `Rendered border-radius increased materially from ${before.borderRadiusPx}px to ${after.borderRadiusPx}px (delta ${delta}px >= ${predicate.minDeltaPx}px, after >= ${predicate.minAfterPx}px).`,
+          predicate,
+          status: passed ? "passed" : "failed",
+        };
+      }
+      case "shadow-present": {
+        const passed = before.boxShadow === "none" && after.boxShadow !== "none";
+        return {
+          assertion: `Rendered box-shadow changed from ${before.boxShadow} to ${after.boxShadow}.`,
           predicate,
           status: passed ? "passed" : "failed",
         };
@@ -318,6 +376,36 @@ export class BrowserOracle {
           xDelta <= predicate.tolerancePx && yDelta <= predicate.tolerancePx;
         return {
           assertion: `Declared layout invariant preserved within ${predicate.tolerancePx}px (x delta ${xDelta.toFixed(1)}px, y delta ${yDelta.toFixed(1)}px).`,
+          predicate,
+          status: passed ? "passed" : "failed",
+        };
+      }
+      case "surroundings-within": {
+        const beforeRectangles = [
+          ...(before.surroundings.parent ? [before.surroundings.parent] : []),
+          ...before.surroundings.siblings,
+        ];
+        const afterRectangles = [
+          ...(after.surroundings.parent ? [after.surroundings.parent] : []),
+          ...after.surroundings.siblings,
+        ];
+        const deltas = beforeRectangles.flatMap((rectangle, index) => {
+          const afterRectangle = afterRectangles[index];
+          return afterRectangle
+            ? [
+                Math.abs(afterRectangle.x - rectangle.x),
+                Math.abs(afterRectangle.y - rectangle.y),
+                Math.abs(afterRectangle.width - rectangle.width),
+                Math.abs(afterRectangle.height - rectangle.height),
+              ]
+            : [Number.POSITIVE_INFINITY];
+        });
+        const maxDelta = Math.max(0, ...deltas);
+        const passed =
+          beforeRectangles.length === afterRectangles.length &&
+          maxDelta <= predicate.tolerancePx;
+        return {
+          assertion: `Surrounding layout preserved within ${predicate.tolerancePx}px (maximum geometry delta ${maxDelta.toFixed(1)}px).`,
           predicate,
           status: passed ? "passed" : "failed",
         };

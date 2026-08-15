@@ -76,7 +76,7 @@ body {
   margin: 0;
 }
 
-/* 已知缺陷：主 Save 按钮是方形。修复应让 border-radius 明显增大。 */
+/* 修复：主 Save 按钮明显变圆。border-radius 设为 22px，与按钮高度一致以达到全圆角。 */
 .save-button {
   font: inherit;
   font-weight: 600;
@@ -84,7 +84,7 @@ body {
   background: #2563eb;
   color: #ffffff;
   border: none;
-  border-radius: 0;
+  border-radius: 22px;
   box-sizing: border-box;
   width: 96px;
   height: 44px;

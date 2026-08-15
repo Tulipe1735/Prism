@@ -2,4 +2,5 @@ export * from "./browser-oracle";
 export * from "./code-oracle";
 export * from "./reset";
 export * from "./scenario-manifest";
+export * from "./scenarios/card-shadow";
 export * from "./scenarios/round-button";
