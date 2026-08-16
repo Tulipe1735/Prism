@@ -53,6 +53,14 @@ export interface RenderedTargetObservation {
     parent: RenderedRectangle | null;
     siblings: RenderedRectangle[];
   };
+  /** 当前视口的页面与操作控件几何。 */
+  layout?: ResponsiveLayoutFacts;
+  /** 响应式场景的固定桌面参照。 */
+  desktop?: {
+    viewport: Viewport;
+    target: RenderedRectangle;
+    layout: ResponsiveLayoutFacts;
+  };
   /** 可选交互状态；Dialog 场景由同一受控会话补齐关闭与焦点归还结果。 */
   dialog?: {
     name: string;
@@ -61,6 +69,15 @@ export interface RenderedTargetObservation {
     escapeCloses: boolean;
     focusReturnsToTrigger: boolean;
     activeElementName?: string | null;
+    consoleErrors: string[];
+  };
+  /** 可选表单状态转换；由真实键盘输入驱动并记录原生/无障碍禁用状态。 */
+  form?: {
+    inputName: string;
+    empty: FormControlState;
+    invalid: FormControlState;
+    valid: FormControlState;
+    keyboardFocusReachedTarget: boolean;
     consoleErrors: string[];
   };
   /** 目标元素的可访问名/文本。 */
@@ -82,6 +99,23 @@ export interface RenderedRectangle {
   y: number;
   width: number;
   height: number;
+}
+
+export interface ResponsiveLayoutFacts {
+  documentWidthPx: number;
+  horizontalOverflowPx: number;
+  targetInsideViewport: boolean;
+  targetClipped: boolean;
+  actionRectangles: RenderedRectangle[];
+  actionsInsideViewport: boolean;
+  actionsOverlap: boolean;
+}
+
+export interface FormControlState {
+  value: string;
+  inputValid: boolean;
+  enabled: boolean;
+  accessibilityDisabled: boolean;
 }
 
 /** 单条谓词判定结果。 */
@@ -114,6 +148,12 @@ export interface BrowserOracleOptions {
   beforeMeasure?: (page: Page) => Promise<void>;
   /** 需要读取的具名 Dialog；不发送任何输入。 */
   dialogName?: string;
+  /** 需要验证的邮箱输入转换；使用页面键盘完成输入与 Tab 导航。 */
+  form?: {
+    inputName: string;
+    invalidValue: string;
+    validValue: string;
+  };
 }
 
 /** 校验并解析本地基础 URL（必须为显式本地 HTTP origin）。 */
@@ -172,6 +212,7 @@ function renderFacts(element: HTMLElement): {
     parent: RenderedRectangle | null;
     siblings: RenderedRectangle[];
   };
+  layout: ResponsiveLayoutFacts;
   text: string;
   disabled: boolean;
   visible: boolean;
@@ -189,10 +230,33 @@ function renderFacts(element: HTMLElement): {
   const style = getComputedStyle(element);
   const parent = element.parentElement;
   const opacity = Number.parseFloat(style.opacity);
+  const rectangle = rectangleOf(element);
+  const actionRectangles = Array.from(
+    element.querySelectorAll("button,a,input,select,textarea"),
+  ).map(rectangleOf);
+  const insideViewport = (candidate: RenderedRectangle): boolean =>
+    candidate.x >= 0 &&
+    candidate.y >= 0 &&
+    candidate.x + candidate.width <= window.innerWidth &&
+    candidate.y + candidate.height <= window.innerHeight;
+  const actionsOverlap = actionRectangles.some((left, index) =>
+    actionRectangles.slice(index + 1).some(
+      (right) =>
+        left.x < right.x + right.width &&
+        left.x + left.width > right.x &&
+        left.y < right.y + right.height &&
+        left.y + left.height > right.y,
+    ),
+  );
+  const documentWidthPx = Math.max(
+    document.documentElement.scrollWidth,
+    document.body.scrollWidth,
+  );
+  const targetInsideViewport = insideViewport(rectangle);
   return {
     borderRadius: style.borderRadius,
     boxShadow: style.boxShadow,
-    rectangle: rectangleOf(element),
+    rectangle,
     surroundings: {
       parent: parent ? rectangleOf(parent) : null,
       siblings: parent
@@ -200,6 +264,15 @@ function renderFacts(element: HTMLElement): {
             .filter((candidate) => candidate !== element)
             .map(rectangleOf)
         : [],
+    },
+    layout: {
+      documentWidthPx,
+      horizontalOverflowPx: Math.max(0, documentWidthPx - window.innerWidth),
+      targetInsideViewport,
+      targetClipped: !targetInsideViewport,
+      actionRectangles,
+      actionsInsideViewport: actionRectangles.every(insideViewport),
+      actionsOverlap,
     },
     text: (element.textContent ?? "").trim(),
     disabled: "disabled" in element && (element as HTMLButtonElement).disabled,
@@ -258,6 +331,54 @@ export class BrowserOracle {
 
       await this.options.beforeMeasure?.(page);
 
+      let form: RenderedTargetObservation["form"];
+      if (this.options.form) {
+        const input = page.getByRole("textbox", {
+          name: this.options.form.inputName,
+          exact: true,
+        });
+        await input.waitFor({ state: "visible" });
+        const readState = async (): Promise<FormControlState> => {
+          const inputState = await input.evaluate((element) => ({
+            value: (element as HTMLInputElement).value,
+            inputValid: (element as HTMLInputElement).validity.valid,
+          }));
+          const buttonState = await locator.evaluate((element) => {
+            const disabled =
+              "disabled" in element && (element as HTMLButtonElement).disabled;
+            return {
+              enabled: !disabled,
+              accessibilityDisabled:
+                element.getAttribute("aria-disabled") === "true" || disabled,
+            };
+          });
+          return { ...inputState, ...buttonState };
+        };
+        const replaceValue = async (value: string): Promise<void> => {
+          await input.focus();
+          await page.keyboard.press("Control+A");
+          await page.keyboard.type(value);
+        };
+
+        const empty = await readState();
+        await replaceValue(this.options.form.invalidValue);
+        const invalid = await readState();
+        await replaceValue(this.options.form.validValue);
+        const valid = await readState();
+        await page.keyboard.press("Tab");
+        const keyboardFocusReachedTarget = await locator.evaluate(
+          (element) => document.activeElement === element,
+        );
+        form = {
+          inputName: this.options.form.inputName,
+          empty,
+          invalid,
+          valid,
+          keyboardFocusReachedTarget,
+          consoleErrors,
+        };
+      }
+
       let dialog: RenderedTargetObservation["dialog"];
       if (this.options.dialogName) {
         const dialogLocator = page.getByRole("dialog", {
@@ -315,7 +436,9 @@ export class BrowserOracle {
         xPx: facts.rectangle.x,
         yPx: facts.rectangle.y,
         surroundings: facts.surroundings,
+        layout: facts.layout,
         ...(dialog ? { dialog } : {}),
+        ...(form ? { form } : {}),
         text: facts.text,
         enabled: !facts.disabled,
         visible: facts.visible,
@@ -387,6 +510,81 @@ export class BrowserOracle {
           assertion: passed
             ? `Dialog "${predicate.dialogName}" opened, received focus, closed with Escape, returned focus to its trigger, and added no console error.`
             : `Dialog "${predicate.dialogName}" failed its interaction invariants: ${JSON.stringify(afterDialog ?? null)}.`,
+          predicate,
+          status: passed ? "passed" : "failed",
+        };
+      }
+      case "form-enablement": {
+        const beforeForm = before.form;
+        const afterForm = after.form;
+        const passed =
+          beforeForm?.inputName === predicate.inputName &&
+          beforeForm.empty.enabled === false &&
+          beforeForm.invalid.enabled === false &&
+          beforeForm.valid.enabled === false &&
+          afterForm?.inputName === predicate.inputName &&
+          afterForm.empty.value === "" &&
+          afterForm.empty.inputValid === false &&
+          afterForm.empty.enabled === false &&
+          afterForm.empty.accessibilityDisabled &&
+          afterForm.invalid.value === predicate.invalidValue &&
+          afterForm.invalid.inputValid === false &&
+          afterForm.invalid.enabled === false &&
+          afterForm.invalid.accessibilityDisabled &&
+          afterForm.valid.value === predicate.validValue &&
+          afterForm.valid.inputValid &&
+          afterForm.valid.enabled &&
+          afterForm.valid.accessibilityDisabled === false &&
+          afterForm.keyboardFocusReachedTarget &&
+          afterForm.consoleErrors.length === 0;
+        return {
+          assertion: passed
+            ? `Empty and invalid ${predicate.inputName} values kept Submit disabled; keyboard entry of ${predicate.validValue} enabled and focused Submit with no console error.`
+            : `Form enablement failed its input, accessibility, or keyboard invariants: ${JSON.stringify(afterForm ?? null)}.`,
+          predicate,
+          status: passed ? "passed" : "failed",
+        };
+      }
+      case "responsive-layout": {
+        const beforeLayout = before.layout;
+        const afterLayout = after.layout;
+        const beforeDesktop = before.desktop;
+        const afterDesktop = after.desktop;
+        const desktopDeltas =
+          beforeDesktop && afterDesktop
+            ? [
+                Math.abs(afterDesktop.target.x - beforeDesktop.target.x),
+                Math.abs(afterDesktop.target.y - beforeDesktop.target.y),
+                Math.abs(afterDesktop.target.width - beforeDesktop.target.width),
+                Math.abs(afterDesktop.target.height - beforeDesktop.target.height),
+              ]
+            : [Number.POSITIVE_INFINITY];
+        const maxDesktopDelta = Math.max(...desktopDeltas);
+        const passed =
+          beforeLayout !== undefined &&
+          beforeLayout.horizontalOverflowPx > 0 &&
+          beforeLayout.targetInsideViewport === false &&
+          afterLayout !== undefined &&
+          afterLayout.horizontalOverflowPx === 0 &&
+          afterLayout.targetInsideViewport &&
+          afterLayout.targetClipped === false &&
+          afterLayout.actionsInsideViewport &&
+          afterLayout.actionsOverlap === false &&
+          beforeDesktop?.viewport.width === predicate.desktopViewport.width &&
+          beforeDesktop.viewport.height === predicate.desktopViewport.height &&
+          beforeDesktop.layout.horizontalOverflowPx === 0 &&
+          beforeDesktop.layout.actionsInsideViewport &&
+          beforeDesktop.layout.actionsOverlap === false &&
+          afterDesktop?.viewport.width === predicate.desktopViewport.width &&
+          afterDesktop.viewport.height === predicate.desktopViewport.height &&
+          afterDesktop.layout.horizontalOverflowPx === 0 &&
+          afterDesktop.layout.actionsInsideViewport &&
+          afterDesktop.layout.actionsOverlap === false &&
+          maxDesktopDelta <= predicate.tolerancePx;
+        return {
+          assertion: passed
+            ? `Mobile horizontal overflow was removed, every checkout action is visible and non-overlapping, and desktop target geometry stayed within ${predicate.tolerancePx}px.`
+            : `Responsive layout failed its mobile or desktop invariants: mobile=${JSON.stringify(afterLayout ?? null)}, desktop=${JSON.stringify(afterDesktop ?? null)}.`,
           predicate,
           status: passed ? "passed" : "failed",
         };

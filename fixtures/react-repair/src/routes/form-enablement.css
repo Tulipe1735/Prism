@@ -1,0 +1,24 @@
+.signup-form {
+  display: grid;
+  gap: 12px;
+  width: 360px;
+  padding: 24px;
+  border: 1px solid #d9dee8;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.signup-form input,
+.signup-form button {
+  box-sizing: border-box;
+  min-height: 44px;
+  font: inherit;
+}
+
+.signup-form input {
+  padding: 0 12px;
+}
+
+.signup-form button {
+  padding: 0 16px;
+}

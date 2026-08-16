@@ -75,6 +75,8 @@ function classify(prompt: string): RouterClassification {
     "shadow",
     "dialog",
     "form",
+    "submit",
+    "overflow",
     "layout",
     "radius",
   ]);
@@ -87,6 +89,8 @@ function classify(prompt: string): RouterClassification {
     "page",
     "browser",
     "ui",
+    "submit",
+    "overflow",
   ]);
 
   if (coding && browser) return "hybrid";

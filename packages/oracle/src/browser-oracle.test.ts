@@ -131,6 +131,108 @@ describe("BrowserOracle.evaluateSpec", () => {
     );
     expect(layoutAssertion?.status).toBe("failed");
   });
+
+  it("passes only when valid keyboard input enables the form target", () => {
+    const formSpec: FrontendRepairSpec = {
+      schemaVersion: "prism.frontend-repair-spec/v1",
+      prompt: "Submit remains disabled after I enter a valid email.",
+      target: { ...target, name: "Submit" },
+      predicates: [
+        {
+          kind: "form-enablement",
+          inputName: "Email",
+          invalidValue: "not-an-email",
+          validValue: "ada@example.test",
+        },
+      ],
+    };
+    const state = (value: string, inputValid: boolean, enabled: boolean) => ({
+      value,
+      inputValid,
+      enabled,
+      accessibilityDisabled: !enabled,
+    });
+    const before = observation({
+      target: formSpec.target,
+      form: {
+        inputName: "Email",
+        empty: state("", false, false),
+        invalid: state("not-an-email", false, false),
+        valid: state("ada@example.test", true, false),
+        keyboardFocusReachedTarget: true,
+        consoleErrors: [],
+      },
+    });
+    const after = observation({
+      target: formSpec.target,
+      enabled: true,
+      form: {
+        ...before.form!,
+        valid: state("ada@example.test", true, true),
+      },
+    });
+
+    expect(BrowserOracle.evaluateSpec(formSpec, before, after).verdict).toBe("passed");
+    expect(BrowserOracle.evaluateSpec(formSpec, before, before).verdict).toBe("failed");
+  });
+
+  it("passes when mobile overflow is removed without moving the desktop target", () => {
+    const responsiveSpec: FrontendRepairSpec = {
+      schemaVersion: "prism.frontend-repair-spec/v1",
+      prompt: "Checkout actions overflow off-screen on mobile.",
+      target: { kind: "semantic", role: "region", name: "Checkout actions", exact: true },
+      predicates: [
+        {
+          kind: "responsive-layout",
+          desktopViewport: viewport,
+          tolerancePx: 2,
+        },
+      ],
+    };
+    const healthyLayout = {
+      documentWidthPx: 390,
+      horizontalOverflowPx: 0,
+      targetInsideViewport: true,
+      targetClipped: false,
+      actionRectangles: [
+        { x: 57, y: 220, width: 157, height: 44 },
+        { x: 226, y: 220, width: 157, height: 44 },
+      ],
+      actionsInsideViewport: true,
+      actionsOverlap: false,
+    };
+    const desktop = {
+      viewport,
+      target: { x: 57, y: 220, width: 440, height: 44 },
+      layout: { ...healthyLayout, documentWidthPx: 1280 },
+    };
+    const before = observation({
+      viewport: { width: 390, height: 844, deviceScaleFactor: 1 },
+      target: responsiveSpec.target,
+      layout: {
+        ...healthyLayout,
+        documentWidthPx: 497,
+        horizontalOverflowPx: 107,
+        targetInsideViewport: false,
+        targetClipped: true,
+        actionsInsideViewport: false,
+      },
+      desktop,
+    });
+    const after = observation({
+      viewport: before.viewport,
+      target: responsiveSpec.target,
+      layout: healthyLayout,
+      desktop,
+    });
+
+    expect(BrowserOracle.evaluateSpec(responsiveSpec, before, after).verdict).toBe(
+      "passed",
+    );
+    expect(BrowserOracle.evaluateSpec(responsiveSpec, before, before).verdict).toBe(
+      "failed",
+    );
+  });
 });
 
 describe("BrowserOracle.observe", () => {

@@ -496,6 +496,261 @@ it("repairs the profile Dialog with brokered keyboard and focus evidence", async
   });
 }, 60_000);
 
+it("repairs form enablement across empty, invalid, and valid keyboard input", async () => {
+  const formPrompt = "Submit remains disabled after I enter a valid email.";
+  const creation = await createRun({
+    schemaVersion: "prism.repair-request/v1",
+    prompt: formPrompt,
+    workspace: {
+      kind: "local",
+      path: fixtureDirectory,
+      displayName: "form-enablement-fixture",
+    },
+    viewport: { width: 1280, height: 720, deviceScaleFactor: 1 },
+  });
+  const browserConfig = {
+    route: "/form-enablement",
+    target: {
+      kind: "semantic" as const,
+      role: "button",
+      name: "Submit",
+      exact: true,
+    },
+  };
+
+  await startHybridRun(creation.runId, {
+    piSessionFactory: formEnablementPiSessionFactory(),
+    browserSessionFactory: successfulBrowserSessionFactory(
+      "form-enablement",
+      "Valid keyboard input enabled Submit while invalid input stayed disabled.",
+    ),
+    browserConfig,
+  });
+  const paused = await waitForHybridRun(creation.runId);
+  expect(paused).toMatchObject({
+    status: "awaiting_approval",
+    browserBaselines: [expect.objectContaining({ route: "/form-enablement" })],
+  });
+  const baseline = paused?.browserBaselines[0];
+  if (!baseline) throw new Error("Missing form-enablement baseline");
+  const store = new FileTrajectoryStore({ dataDirectory });
+  const computed = JSON.parse(
+    Buffer.from(await store.readArtifact(baseline.computed)).toString("utf8"),
+  );
+  expect(computed).toMatchObject({
+    enabled: false,
+    accessibilityDisabled: true,
+  });
+
+  const proposal = paused?.effectControls.find(
+    (control) => control.kind === "proposal",
+  );
+  if (!proposal || proposal.kind !== "proposal") throw new Error("Missing proposal");
+  await decideRunEffect(creation.runId, {
+    schemaVersion: "prism.effect-decision-request/v1",
+    proposalId: proposal.proposalId,
+    proposalDigest: proposal.proposalDigest,
+    decision: "approved",
+  });
+  await startHybridRun(creation.runId, {
+    piSessionFactory: formEnablementPiSessionFactory(),
+    browserSessionFactory: successfulBrowserSessionFactory(
+      "form-enablement",
+      "Valid keyboard input enabled Submit while invalid input stayed disabled.",
+    ),
+    browserConfig,
+  });
+  const dossier = await waitForHybridRun(creation.runId);
+
+  expect(dossier).toMatchObject({
+    status: "completed",
+    prompt: formPrompt,
+    repairSpec: {
+      spec: {
+        predicates: [expect.objectContaining({ kind: "form-enablement" })],
+      },
+    },
+    browserVerificationReports: [expect.objectContaining({ verdict: "passed" })],
+    completion: {
+      approvals: ["source_effect"],
+      codeOracle: expect.objectContaining({
+        mediaType: "application/vnd.prism.code-oracle-report+json",
+      }),
+      browserVerificationReportId: expect.any(String),
+      verificationRefs: expect.any(Array),
+    },
+  });
+  const evaluationRef = dossier?.artifacts.find(
+    ({ mediaType }) =>
+      mediaType === "application/vnd.prism.browser-oracle-evaluation+json",
+  );
+  if (!evaluationRef) throw new Error("Missing form Oracle evidence");
+  const evaluation = JSON.parse(
+    Buffer.from(await store.readArtifact(evaluationRef)).toString("utf8"),
+  );
+  expect(evaluation).toMatchObject({
+    before: {
+      form: {
+        empty: { enabled: false, accessibilityDisabled: true },
+        invalid: { enabled: false, accessibilityDisabled: true },
+        valid: { enabled: false, accessibilityDisabled: true },
+      },
+    },
+    after: {
+      form: {
+        empty: { enabled: false, accessibilityDisabled: true },
+        invalid: { enabled: false, accessibilityDisabled: true },
+        valid: { enabled: true, accessibilityDisabled: false },
+        keyboardFocusReachedTarget: true,
+        consoleErrors: [],
+      },
+    },
+    evaluation: { verdict: "passed" },
+  });
+  const replayed = await store.loadRun(creation.runId);
+  expect(replayed.snapshot).toMatchObject({
+    status: dossier?.status,
+    browserVerificationReports: dossier?.browserVerificationReports,
+    completion: dossier?.completion,
+  });
+}, 60_000);
+
+it("repairs mobile checkout overflow without moving the desktop layout", async () => {
+  const mobilePrompt = "Checkout actions overflow off-screen on mobile.";
+  const creation = await createRun({
+    schemaVersion: "prism.repair-request/v1",
+    prompt: mobilePrompt,
+    workspace: {
+      kind: "local",
+      path: fixtureDirectory,
+      displayName: "mobile-overflow-fixture",
+    },
+    viewport: { width: 390, height: 844, deviceScaleFactor: 1 },
+  });
+  const browserConfig = {
+    route: "/mobile-overflow",
+    target: {
+      kind: "semantic" as const,
+      role: "region",
+      name: "Checkout actions",
+      exact: true,
+    },
+  };
+
+  await startHybridRun(creation.runId, {
+    piSessionFactory: mobileOverflowPiSessionFactory(),
+    browserSessionFactory: successfulBrowserSessionFactory(
+      "mobile-overflow",
+      "Every checkout action is visible on mobile and desktop stayed stable.",
+    ),
+    browserConfig,
+  });
+  const paused = await waitForHybridRun(creation.runId);
+  expect(paused).toMatchObject({
+    status: "awaiting_approval",
+    browserBaselines: [
+      expect.objectContaining({
+        route: "/mobile-overflow",
+        viewport: { width: 390, height: 844, deviceScaleFactor: 1 },
+      }),
+    ],
+  });
+  const baseline = paused?.browserBaselines[0];
+  if (!baseline) throw new Error("Missing mobile-overflow baseline");
+  const store = new FileTrajectoryStore({ dataDirectory });
+  const computed = JSON.parse(
+    Buffer.from(await store.readArtifact(baseline.computed)).toString("utf8"),
+  );
+  expect(computed.responsiveLayout).toMatchObject({
+    viewport: { width: 390, height: 844 },
+    horizontalOverflow: expect.any(Number),
+    targetInsideViewport: false,
+    targetClipped: true,
+    actionsInsideViewport: false,
+    actionsOverlap: false,
+  });
+  expect(computed.responsiveLayout.horizontalOverflow).toBeGreaterThan(0);
+
+  const proposal = paused?.effectControls.find(
+    (control) => control.kind === "proposal",
+  );
+  if (!proposal || proposal.kind !== "proposal") throw new Error("Missing proposal");
+  await decideRunEffect(creation.runId, {
+    schemaVersion: "prism.effect-decision-request/v1",
+    proposalId: proposal.proposalId,
+    proposalDigest: proposal.proposalDigest,
+    decision: "approved",
+  });
+  await startHybridRun(creation.runId, {
+    piSessionFactory: mobileOverflowPiSessionFactory(),
+    browserSessionFactory: successfulBrowserSessionFactory(
+      "mobile-overflow",
+      "Every checkout action is visible on mobile and desktop stayed stable.",
+    ),
+    browserConfig,
+  });
+  const dossier = await waitForHybridRun(creation.runId);
+
+  expect(dossier).toMatchObject({
+    status: "completed",
+    prompt: mobilePrompt,
+    repairSpec: {
+      spec: {
+        predicates: [expect.objectContaining({ kind: "responsive-layout" })],
+      },
+    },
+    browserVerificationReports: [expect.objectContaining({ verdict: "passed" })],
+    completion: {
+      approvals: ["source_effect"],
+      codeOracle: expect.objectContaining({
+        mediaType: "application/vnd.prism.code-oracle-report+json",
+      }),
+      browserVerificationReportId: expect.any(String),
+      verificationRefs: expect.any(Array),
+    },
+  });
+  const evaluationRef = dossier?.artifacts.find(
+    ({ mediaType }) =>
+      mediaType === "application/vnd.prism.browser-oracle-evaluation+json",
+  );
+  if (!evaluationRef) throw new Error("Missing responsive Oracle evidence");
+  const evaluation = JSON.parse(
+    Buffer.from(await store.readArtifact(evaluationRef)).toString("utf8"),
+  );
+  expect(evaluation).toMatchObject({
+    before: {
+      layout: {
+        targetInsideViewport: false,
+        actionsInsideViewport: false,
+      },
+      desktop: {
+        viewport: { width: 1280, height: 720 },
+        layout: { horizontalOverflowPx: 0, actionsInsideViewport: true },
+      },
+    },
+    after: {
+      layout: {
+        horizontalOverflowPx: 0,
+        targetInsideViewport: true,
+        targetClipped: false,
+        actionsInsideViewport: true,
+        actionsOverlap: false,
+      },
+      desktop: {
+        viewport: { width: 1280, height: 720 },
+        layout: { horizontalOverflowPx: 0, actionsInsideViewport: true },
+      },
+    },
+    evaluation: { verdict: "passed" },
+  });
+  const replayed = await store.loadRun(creation.runId);
+  expect(replayed.snapshot).toMatchObject({
+    status: dossier?.status,
+    browserVerificationReports: dossier?.browserVerificationReports,
+    completion: dossier?.completion,
+  });
+}, 60_000);
+
 function roundButtonPiSessionFactory(): PiSessionFactory {
   const usage = {
     model: { provider: "scripted", id: "round-button" },
@@ -686,6 +941,139 @@ function profileDialogPiSessionFactory(): PiSessionFactory {
         await handlers.submit({
           state: "succeeded",
           summary: "The profile Dialog source was inspected.",
+          request: { kind: "successor", nodeType: "workspace.patch" },
+        });
+      },
+      abort: async () => undefined,
+      dispose: () => undefined,
+      getUsage: () => usage,
+    }),
+  };
+}
+
+function formEnablementPiSessionFactory(): PiSessionFactory {
+  const usage = {
+    model: { provider: "scripted", id: "form-enablement" },
+    modelCalls: 1,
+    inputTokens: 10,
+    outputTokens: 2,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    totalTokens: 12,
+    costUsd: 0,
+    durationMs: 1,
+  };
+
+  return {
+    model: usage.model,
+    create: async ({ handlers }) => ({
+      prompt: async () => {
+        const inspected = await handlers.inspect?.({
+          paths: ["src/routes/form-enablement.tsx"],
+          patterns: [],
+        });
+        if (handlers.patch && handlers.test) {
+          const details =
+            workspaceEvidenceRecordSchema.parse(inspected).evidence.details;
+          if (details?.operation !== "inspect")
+            throw new Error("Form inspection failed.");
+          const read = details.reads.find(
+            ({ path: file }) => file === "src/routes/form-enablement.tsx",
+          );
+          if (!read) throw new Error("Form source evidence is missing.");
+          await handlers.patch({
+            files: [
+              {
+                path: "src/routes/form-enablement.tsx",
+                expectedSha256: createHash("sha256").update(read.content).digest("hex"),
+                content: read.content.replace(
+                  'disabled={!valid || email.includes("@")}',
+                  "disabled={!valid}",
+                ),
+              },
+            ],
+          });
+          await handlers.test({
+            command: { executable: "pnpm", arguments: ["test"] },
+            workingDirectory: ".",
+            timeoutMs: 120_000,
+          });
+          await handlers.submit({
+            state: "succeeded",
+            summary: "The scoped form-enablement repair passed its relevant test.",
+            request: { kind: "successor", nodeType: "browser.verify" },
+          });
+          return;
+        }
+
+        await handlers.submit({
+          state: "succeeded",
+          summary: "The form-enablement source was inspected.",
+          request: { kind: "successor", nodeType: "workspace.patch" },
+        });
+      },
+      abort: async () => undefined,
+      dispose: () => undefined,
+      getUsage: () => usage,
+    }),
+  };
+}
+
+function mobileOverflowPiSessionFactory(): PiSessionFactory {
+  const usage = {
+    model: { provider: "scripted", id: "mobile-overflow" },
+    modelCalls: 1,
+    inputTokens: 10,
+    outputTokens: 2,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    totalTokens: 12,
+    costUsd: 0,
+    durationMs: 1,
+  };
+
+  return {
+    model: usage.model,
+    create: async ({ handlers }) => ({
+      prompt: async () => {
+        const inspected = await handlers.inspect?.({
+          paths: ["src/routes/mobile-overflow.css"],
+          patterns: [],
+        });
+        if (handlers.patch && handlers.test) {
+          const details =
+            workspaceEvidenceRecordSchema.parse(inspected).evidence.details;
+          if (details?.operation !== "inspect")
+            throw new Error("Mobile layout inspection failed.");
+          const read = details.reads.find(
+            ({ path: file }) => file === "src/routes/mobile-overflow.css",
+          );
+          if (!read) throw new Error("Mobile layout source evidence is missing.");
+          await handlers.patch({
+            files: [
+              {
+                path: "src/routes/mobile-overflow.css",
+                expectedSha256: createHash("sha256").update(read.content).digest("hex"),
+                content: read.content.replace("max-width: none;", "max-width: 100%;"),
+              },
+            ],
+          });
+          await handlers.test({
+            command: { executable: "pnpm", arguments: ["test"] },
+            workingDirectory: ".",
+            timeoutMs: 120_000,
+          });
+          await handlers.submit({
+            state: "succeeded",
+            summary: "The scoped mobile-overflow repair passed its relevant test.",
+            request: { kind: "successor", nodeType: "browser.verify" },
+          });
+          return;
+        }
+
+        await handlers.submit({
+          state: "succeeded",
+          summary: "The mobile-overflow source was inspected.",
           request: { kind: "successor", nodeType: "workspace.patch" },
         });
       },

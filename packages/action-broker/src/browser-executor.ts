@@ -266,8 +266,34 @@ export class BrowserExecutor {
           const style = getComputedStyle(element);
           const parent = element.parentElement;
           const active = document.activeElement;
+          const disabled =
+            "disabled" in element && (element as HTMLButtonElement).disabled;
+          const rectangle = rectangleOf(element);
+          const actionRectangles = Array.from(
+            element.querySelectorAll("button,a,input,select,textarea"),
+          ).map(rectangleOf);
+          const insideViewport = (
+            candidate: ReturnType<typeof rectangleOf>,
+          ): boolean =>
+            candidate.x >= 0 &&
+            candidate.y >= 0 &&
+            candidate.x + candidate.width <= window.innerWidth &&
+            candidate.y + candidate.height <= window.innerHeight;
+          const actionsOverlap = actionRectangles.some((left, index) =>
+            actionRectangles.slice(index + 1).some(
+              (right) =>
+                left.x < right.x + right.width &&
+                left.x + left.width > right.x &&
+                left.y < right.y + right.height &&
+                left.y + left.height > right.y,
+            ),
+          );
+          const documentWidth = Math.max(
+            document.documentElement.scrollWidth,
+            document.body.scrollWidth,
+          );
           return {
-            rectangle: rectangleOf(element),
+            rectangle,
             parentRectangle: parent ? rectangleOf(parent) : null,
             siblingRectangles: parent
               ? Array.from(parent.children)
@@ -280,6 +306,19 @@ export class BrowserExecutor {
               opacity: style.opacity,
               pointerEvents: style.pointerEvents,
               boxShadow: style.boxShadow,
+            },
+            enabled: !disabled,
+            accessibilityDisabled:
+              element.getAttribute("aria-disabled") === "true" || disabled,
+            responsiveLayout: {
+              viewport: { width: window.innerWidth, height: window.innerHeight },
+              documentWidth,
+              horizontalOverflow: Math.max(0, documentWidth - window.innerWidth),
+              targetInsideViewport: insideViewport(rectangle),
+              targetClipped: !insideViewport(rectangle),
+              actionRectangles,
+              actionsInsideViewport: actionRectangles.every(insideViewport),
+              actionsOverlap,
             },
             dialogs: Array.from(
               document.querySelectorAll("dialog, [role='dialog']"),

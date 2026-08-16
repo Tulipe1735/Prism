@@ -52,6 +52,8 @@ import {
   BrowserOracle,
   CodeOracle,
   createCardShadowScenario,
+  createFormEnablementScenario,
+  createMobileOverflowScenario,
   createProfileDialogScenario,
   createRoundButtonScenario,
   type RenderedTargetObservation,
@@ -261,9 +263,49 @@ async function scenarioFor(run: DurableRun): Promise<ScenarioManifest | null> {
       return createCardShadowScenario(options);
     case "The Edit profile button does nothing; make it open the dialog.":
       return createProfileDialogScenario(options);
+    case "Submit remains disabled after I enter a valid email.":
+      return createFormEnablementScenario(options);
+    case "Checkout actions overflow off-screen on mobile.":
+      return createMobileOverflowScenario(options);
     default:
       return null;
   }
+}
+
+function formVerification(scenario: ScenarioManifest) {
+  const predicate = scenario.spec.predicates.find(
+    (candidate) => candidate.kind === "form-enablement",
+  );
+  return predicate?.kind === "form-enablement"
+    ? {
+        inputName: predicate.inputName,
+        invalidValue: predicate.invalidValue,
+        validValue: predicate.validValue,
+      }
+    : undefined;
+}
+
+function responsiveVerification(scenario: ScenarioManifest) {
+  const predicate = scenario.spec.predicates.find(
+    (candidate) => candidate.kind === "responsive-layout",
+  );
+  return predicate?.kind === "responsive-layout" ? predicate : undefined;
+}
+
+function desktopEvidence(
+  observation: RenderedTargetObservation,
+): NonNullable<RenderedTargetObservation["desktop"]> {
+  if (!observation.layout) throw new TypeError("Desktop layout evidence is missing.");
+  return {
+    viewport: observation.viewport,
+    target: {
+      x: observation.xPx,
+      y: observation.yPx,
+      width: observation.widthPx,
+      height: observation.heightPx,
+    },
+    layout: observation.layout,
+  };
 }
 
 /** 在任何源码副作用前把规范与内容哈希一起写入 Journal。 */
@@ -512,14 +554,29 @@ async function reconcileInterruptedBrowserEffect(
 
   let observation: unknown;
   try {
-    observation = await new BrowserOracle({
+    const oracle = new BrowserOracle({
       baseUrl: browserBaseUrl(),
       route: scenario.route,
       viewport: scenario.viewport,
       target: scenario.browserOracle.target,
       dialogName: scenario.browserOracle.dialogName,
+      form: formVerification(scenario),
       executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
-    }).observe();
+    });
+    const mobile = await oracle.observe();
+    observation = mobile;
+    const responsive = responsiveVerification(scenario);
+    if (responsive) {
+      const desktop = await new BrowserOracle({
+        baseUrl: browserBaseUrl(),
+        route: scenario.route,
+        viewport: responsive.desktopViewport,
+        target: scenario.browserOracle.target,
+        executablePath:
+          process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
+      }).observe();
+      observation = { ...mobile, desktop: desktopEvidence(desktop) };
+    }
   } catch {
     observation = { unavailable: true };
   }
@@ -774,9 +831,29 @@ export async function startHybridRun(
         viewport: scenario.viewport,
         target: scenario.browserOracle.target,
         dialogName: scenario.browserOracle.dialogName,
+        form: formVerification(scenario),
         executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
       })
     : null;
+  const responsive = scenario ? responsiveVerification(scenario) : undefined;
+  const desktopBrowserOracle =
+    scenario && responsive
+      ? new BrowserOracle({
+          baseUrl,
+          route: scenario.route,
+          viewport: responsive.desktopViewport,
+          target: scenario.browserOracle.target,
+          executablePath:
+            process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
+        })
+      : null;
+  const observeScenario = async (): Promise<RenderedTargetObservation> => {
+    if (!browserOracle) throw new TypeError("The scenario Browser Oracle is missing.");
+    const observation = await browserOracle.observe();
+    if (!desktopBrowserOracle) return observation;
+    const desktop = await desktopBrowserOracle.observe();
+    return { ...observation, desktop: desktopEvidence(desktop) };
+  };
   const browserSessionFactory =
     options.browserSessionFactory ??
     (await createConfiguredAgentPlanBrowserSessionFactory({}));
@@ -799,7 +876,7 @@ export async function startHybridRun(
                   status: "inconclusive" as const,
                 };
               }
-              let after = await browserOracle.observe();
+              let after = await observeScenario();
               let interactionEvidence: unknown = null;
               if (scenario.browserOracle.dialogName) {
                 const opened = await inspectDialog(scenario.browserOracle.dialogName);
@@ -870,7 +947,7 @@ export async function startHybridRun(
                 route: scenario.route,
                 target: scenario.browserOracle.target,
               });
-              baselineObservation = await browserOracle.observe();
+              baselineObservation = await observeScenario();
               observationArtifact = await store.writeArtifact(
                 `${JSON.stringify(baselineObservation)}\n`,
                 BROWSER_ORACLE_OBSERVATION_MEDIA_TYPE,

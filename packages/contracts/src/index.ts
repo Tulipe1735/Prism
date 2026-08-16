@@ -392,6 +392,23 @@ export const frontendRepairPredicateSchema = z.discriminatedUnion("kind", [
       dialogName: z.string().trim().min(1).max(200),
     })
     .strict(),
+  // 交互谓词：空值/非法邮箱保持禁用，合法邮箱通过键盘输入后启用
+  z
+    .object({
+      kind: z.literal("form-enablement"),
+      inputName: z.string().trim().min(1).max(200),
+      invalidValue: z.string().min(1).max(320),
+      validValue: z.string().email().max(320),
+    })
+    .strict(),
+  // 响应式谓词：移动端无溢出/裁切/重叠，且桌面目标几何保持稳定
+  z
+    .object({
+      kind: z.literal("responsive-layout"),
+      desktopViewport: viewportSchema,
+      tolerancePx: z.number().nonnegative(),
+    })
+    .strict(),
   // 关系谓词：局部目标区域的 before/after 渲染必须实际发生改变
   z.object({ kind: z.literal("region-clip-differs") }).strict(),
   // 不变式：目标标签文本保持不变

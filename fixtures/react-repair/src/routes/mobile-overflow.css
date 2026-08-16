@@ -1,0 +1,28 @@
+.checkout-card {
+  box-sizing: border-box;
+  width: 720px;
+  max-width: 100%;
+  padding: 24px;
+  border: 1px solid #d9dee8;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.checkout-card h2,
+.checkout-card p {
+  margin: 0 0 16px;
+}
+
+.checkout-actions {
+  display: flex;
+  gap: 12px;
+  width: 440px;
+  max-width: none;
+}
+
+.checkout-actions button {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  font: inherit;
+}
