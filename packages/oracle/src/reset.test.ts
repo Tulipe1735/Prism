@@ -135,7 +135,10 @@ describe("resetFixture", () => {
   it("restores source without opening a browser so an evaluation Run can capture baseline", async () => {
     const knownBadContent =
       ".save-button { border-radius: 0; width: 96px; height: 44px; }";
-    await writeFile(path.join(root, "global.css"), ".save-button { border-radius: 9px; }\n");
+    await writeFile(
+      path.join(root, "global.css"),
+      ".save-button { border-radius: 9px; }\n",
+    );
     const result = await resetKnownBadSource(
       root,
       revision,

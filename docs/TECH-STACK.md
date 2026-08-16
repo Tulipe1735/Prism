@@ -3,19 +3,20 @@
 Status: `Field Desk, durable Runs, confined workspace execution, embedded Pi Coding Runtime, and embedded Agent Plan Browser Runtime implemented`
 
 This document describes the current Prism technology boundary. The Field Desk,
-durable Run seam, confined workspace execution, and both embedded runtimes are
-verified; the fixture and evaluation packages remain owned by later
-implementation tickets.
+durable Run seam, confined workspace and browser execution, both embedded
+runtimes, six-scenario fixture, deterministic Oracles, and evaluation GUI are
+implemented.
 
 ## Product runtime
 
 | Technology | Responsibility |
 | --- | --- |
 | Next.js 15.5.21 + React 19.2.8 | Production Field Desk and second-level Run dossier routes |
-| TypeScript on Node.js ≥22.19.0 | Orchestrator, contracts, runtimes, controlled executors, CLI, and evaluation tooling |
+| TypeScript on Node.js ≥22.19.0 | Orchestrator, contracts, runtimes, controlled executors, and evaluation tooling |
 | pnpm 9.15.9 + Turborepo 2.10.7 | Package boundaries and shared build, typecheck, lint, and test tasks |
 | Zod 4.4.3 | Versioned repair-request, Run, event, snapshot, artifact, and boundary-response validation |
 | React Hook Form + TanStack Query | Validated repair composition and client caching of server-owned Run state |
+| TanStack Table 9.1.2 + Recharts 3.10.1 + date-fns 4.4.0 | Accessible evaluation evidence table, scenario chart, and timestamps |
 | React Toastify + Zustand | Submission feedback and ephemeral UI filters; neither is canonical Run state |
 | `@antfu/eslint-config` 4.0.1 + Prettier 3.9.6 | Node ≥22.19.0 lint baseline with formatting kept in Prettier |
 | Vitest 3.2.7 | Deterministic contract, storage, and route tests on the Node ≥22.19.0 baseline |
@@ -54,6 +55,9 @@ packages/
   runtime-pi/
   runtime-browser/
   action-broker/
+  oracle/
+fixtures/
+  react-repair/
 ```
 
 - `web` owns the real Field Desk, independently validated API boundaries, Run
@@ -71,21 +75,15 @@ packages/
 - `runtime-pi` embeds the Pi Agent SDK session with an explicit tool allowlist; it translates SDK events into Prism contracts and may not execute unrestricted effects or mutate the DAG.
 - `runtime-browser` turns each validated browser-model tool call into an ActionBroker proposal; it may not execute browser input directly, expose source/shell/file capability, or mutate the DAG.
 - `action-broker` validates browser proposals and owns BrowserExecutor access.
+- `oracle` owns the six scenario manifests, deterministic source/render
+  predicates, verified resets, and release gates.
+- `react-repair` is the controlled local fixture used by the six GUI repair
+  scenarios.
 - `tooling-config` shares TypeScript, Antfu ESLint, Prettier, and Vitest
   configuration.
-
-The following approved packages remain planned:
-
-```text
-packages/
-  eval/
-fixtures/
-  react-repair/
-```
-
-- Later contract tickets extend `contracts` with versioned DAG, task-envelope,
-  outcome, evidence, event, and artifact schemas.
-- `eval` owns deterministic fault tests, React scenarios, and the frozen SWE-bench non-regression manifest.
+- `web/lib/server/evaluation-repository` owns durable evaluation scheduling,
+  capability verdict reconstruction, and the frozen SWE-bench non-regression
+  manifest; there is no separate evaluation service.
 
 ## Browser and verification boundary
 

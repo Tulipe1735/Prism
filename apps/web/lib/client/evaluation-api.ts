@@ -35,7 +35,9 @@ export async function fetchEvaluation(evaluationId: string): Promise<EvaluationR
   return evaluationResponseSchema.parse(await trusted(response)).report;
 }
 
-export async function resumeEvaluation(evaluationId: string): Promise<EvaluationReport> {
+export async function resumeEvaluation(
+  evaluationId: string,
+): Promise<EvaluationReport> {
   const response = await fetch(
     `/api/evaluations/${encodeURIComponent(evaluationId)}/resume`,
     { method: "POST" },

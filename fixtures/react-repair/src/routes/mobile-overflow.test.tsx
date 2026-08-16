@@ -8,7 +8,10 @@ import { MobileOverflowPage } from "./mobile-overflow";
 describe("mobile-overflow fixture", () => {
   it("keeps named checkout actions and 44px controls", async () => {
     const markup = renderToString(<MobileOverflowPage />);
-    const css = await readFile(new URL("./mobile-overflow.css", import.meta.url), "utf8");
+    const css = await readFile(
+      new URL("./mobile-overflow.css", import.meta.url),
+      "utf8",
+    );
 
     expect(markup).toContain('aria-label="Checkout actions"');
     expect(markup).toContain("Place order");

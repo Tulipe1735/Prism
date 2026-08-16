@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { Buffer } from "node:buffer";
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { cp, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -47,6 +47,13 @@ beforeEach(async () => {
     filter: (source) =>
       !["node_modules", "dist", ".turbo"].includes(path.basename(source)),
   });
+  const globalCssPath = path.join(fixtureDirectory, "src", "global.css");
+  const globalCss = await readFile(globalCssPath, "utf8");
+  const knownBadCss = globalCss.replace("border-radius: 22px;", "border-radius: 0;");
+  if (knownBadCss === globalCss) {
+    throw new Error("The round-button fixture no longer contains its repaired state.");
+  }
+  await writeFile(globalCssPath, knownBadCss);
   await symlink(
     path.join(fixtureRoot, "node_modules"),
     path.join(fixtureDirectory, "node_modules"),

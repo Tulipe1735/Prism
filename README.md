@@ -4,36 +4,44 @@ Prism is a standalone TypeScript Visual SWE harness. It accepts a natural-langua
 
 ## Current status
 
-The developer-ready architecture is approved. The first three implementation
-slices are now built: a production-shaped Next.js Field Desk, shared Zod
-contracts, durable and reopenable Runs, and a confined WorkspaceExecutor. A Run
-can inspect allowlisted repository files, apply a hash-guarded scoped patch, or
-run one exact allowlisted test command; bounded and redacted outcomes become
-content-addressed evidence in the Run dossier. Orchestration, the browser
-executor, Pi, Agent Plan browser grounding, browser evidence, and end-to-end repair replay remain
-planned work rather than implemented capability.
+Prism now ships as a local Next.js GUI. The Field Desk creates durable repair
+Runs; `/runs` reopens their journal-backed dossiers; `/evaluations` starts and
+resumes the six-scenario capability evaluation. Embedded Pi and Agent Plan
+runtimes can only request source, command, and browser effects through confined
+executors. Approvals, recovery, budgets, deterministic browser verification,
+and SHA-256 content-addressed evidence remain visible in the dossier.
 
 - [Read the canonical Prism roadmap](docs/prism-roadmap.md)
+- [Reproduce the release evidence](docs/RELEASE-EVIDENCE.md)
 - [Open the completed Wayfinder map](.scratch/prism/issues/00-design-the-dual-route-prism-architecture.md)
 - [Read the selected technical baseline](docs/TECH-STACK.md)
 - [Review the deferred dashboard-adapter expansion](.scratch/prism/scenarios.md)
 - [Read the local tracker conventions](docs/agents/issue-tracker.md)
-- [Open the selected Field Desk UI prototype](apps/web/app/prototype/prism/NOTES.md)
 
-Run the current product shell:
+Run the product:
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-The Field Desk is at `/`; the selected throwaway prototype remains available at
-`/prototype/prism` for regression comparison.
-
-Run the repeatable prototype-isolation regression with:
+The Field Desk is at `/`, Run history at `/runs`, and evaluation analysis at
+`/evaluations`. By default the workspace is the repository root and durable data
+is stored under `.prism/`. Override them when needed:
 
 ```bash
-pnpm test:prototype
+PRISM_WORKSPACE_PATH="/path/with spaces/project" \
+PRISM_DATA_DIR="/path/to/prism-data" \
+pnpm dev
+```
+
+Before release, run the same workspace gates used by the evidence record:
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
 ```
 
 ## First product boundary
@@ -51,16 +59,13 @@ GitHub, Vercel, and Supabase dashboard repair is a deferred adapter direction, n
 ## Delivery sequence
 
 Implementation tickets are published under `.scratch/prism-implementation/`.
-The current handoff is:
+The delivered vertical slice is:
 
 ```text
 selected Field Desk prototype
 → real Field Desk and shared request contracts
 → durable Run creation and replayable state
 → controlled workspace and browser evidence paths
-→ first complete round-button tracer bullet
+→ six complete repair scenarios
+→ resumable evaluation dashboard and release evidence
 ```
-
-The prototype remains throwaway validation work. Production code preserves its
-workspace-first information hierarchy but does not import its mock Runs, DAG,
-evidence, or verdicts.

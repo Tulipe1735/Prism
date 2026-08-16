@@ -14,7 +14,11 @@ export async function GET(
     const { evaluationId } = await params;
     const report = await getEvaluation(evaluationId);
     if (!report) {
-      return contractErrorResponse(404, "run_not_found", "The requested evaluation does not exist.");
+      return contractErrorResponse(
+        404,
+        "run_not_found",
+        "The requested evaluation does not exist.",
+      );
     }
     return Response.json(
       evaluationResponseSchema.parse({
@@ -24,6 +28,10 @@ export async function GET(
       { headers: JSON_RESPONSE_HEADERS },
     );
   } catch {
-    return contractErrorResponse(500, "run_storage_error", "Prism could not read evaluation storage.");
+    return contractErrorResponse(
+      500,
+      "run_storage_error",
+      "Prism could not read evaluation storage.",
+    );
   }
 }

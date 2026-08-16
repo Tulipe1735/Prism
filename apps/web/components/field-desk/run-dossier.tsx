@@ -16,6 +16,7 @@ import {
   FolderSearch2,
 } from "lucide-react";
 
+import { ArtifactPreview } from "@/components/field-desk/artifact-preview";
 import { Button } from "@/components/ui/button";
 import {
   decideEffect,
@@ -193,6 +194,7 @@ export function RunDossierView({
           COMMITTED RUN / JOURNAL #{dossier.lastSequence}
         </span>
         <span
+          aria-live="polite"
           className={
             dossier.integrity === "verified"
               ? "inline-flex items-center gap-2 border border-emerald-700 px-3 py-2 font-mono text-[0.62rem] font-bold text-emerald-800"
@@ -418,12 +420,15 @@ export function RunDossierView({
         <ul className="mt-5 space-y-3">
           {dossier.artifacts.map((artifact) => (
             <li
-              className="grid gap-2 border border-stone-400 p-4 font-mono text-[0.61rem] sm:grid-cols-[auto_1fr_auto]"
+              className="grid items-center gap-2 border border-stone-400 p-4 font-mono text-[0.61rem] sm:grid-cols-[auto_1fr_auto_auto]"
               key={artifact.hash}
             >
               <strong>{artifact.algorithm}</strong>
               <span className="break-all">{artifact.hash}</span>
-              <span>{artifact.byteLength} bytes</span>
+              <span>
+                {artifact.mediaType} · {artifact.byteLength} bytes
+              </span>
+              <ArtifactPreview artifact={artifact} runId={runId} />
             </li>
           ))}
         </ul>
@@ -623,7 +628,7 @@ export function RunDossierView({
           </div>
           {/* 启动是幂等的；未完成 Run 可在进程重启后从节点边界恢复。 */}
           <button
-            className="border border-stone-900 px-3 py-2 font-mono text-[0.62rem] font-bold disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-11 border border-stone-900 px-3 font-mono text-[0.62rem] font-bold disabled:cursor-not-allowed disabled:opacity-50"
             disabled={
               orchestrationMutation.isPending ||
               ["completed", "awaiting_approval", "blocked", "cancelled"].includes(
@@ -723,7 +728,7 @@ export function RunDossierView({
           </div>
           <div className="flex flex-wrap gap-2">
             <button
-              className="inline-flex items-center gap-2 border border-stone-900 px-3 py-2 font-mono text-[0.62rem] font-bold disabled:cursor-wait disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-2 border border-stone-900 px-3 font-mono text-[0.62rem] font-bold disabled:cursor-wait disabled:opacity-50"
               disabled={workspaceMutation.isPending}
               onClick={inspectWorkspace}
               type="button"
@@ -731,7 +736,7 @@ export function RunDossierView({
               <FolderSearch2 aria-hidden size={14} /> Inspect registered files
             </button>
             <button
-              className="inline-flex items-center gap-2 bg-stone-900 px-3 py-2 font-mono text-[0.62rem] font-bold text-stone-50 disabled:cursor-wait disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-2 bg-stone-900 px-3 font-mono text-[0.62rem] font-bold text-stone-50 disabled:cursor-wait disabled:opacity-50"
               disabled={workspaceMutation.isPending}
               onClick={testWorkspace}
               type="button"

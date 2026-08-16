@@ -6,11 +6,15 @@ export const EVALUATION_RESPONSE_SCHEMA_VERSION =
 
 export const evaluationIdSchema = z
   .string()
-  .regex(/^eval_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+  .regex(
+    /^eval_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+  );
 
-const evaluationRunIdSchema = z.string().regex(
-  /^run_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
-);
+const evaluationRunIdSchema = z
+  .string()
+  .regex(
+    /^run_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+  );
 
 export const capabilityScenarioIdSchema = z.enum([
   "round-button",
@@ -53,13 +57,7 @@ export const capabilityAttemptSchema = z
     runId: evaluationRunIdSchema,
     reset: z.enum(["pending", "verified", "failed"]),
     resetMismatches: z.array(z.string().min(1).max(300)),
-    status: z.enum([
-      "planned",
-      "running",
-      "awaiting_approval",
-      "passed",
-      "failed",
-    ]),
+    status: z.enum(["planned", "running", "awaiting_approval", "passed", "failed"]),
     passed: z.boolean().nullable(),
     failureClass: evaluationFailureClassSchema.nullable(),
     failureDetail: z.string().max(500).nullable(),
@@ -131,13 +129,7 @@ export const evaluationRecordSchema = z
     evaluationId: evaluationIdSchema,
     createdAt: z.string().datetime({ offset: true }),
     updatedAt: z.string().datetime({ offset: true }),
-    status: z.enum([
-      "queued",
-      "running",
-      "awaiting_approval",
-      "completed",
-      "blocked",
-    ]),
+    status: z.enum(["queued", "running", "awaiting_approval", "completed", "blocked"]),
     capability: z
       .object({
         attemptsPerScenario: z.literal(3),

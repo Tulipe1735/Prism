@@ -101,7 +101,9 @@ function evaluationRecord(): EvaluationRecord {
 describe("evaluation reporting", () => {
   it("freezes one official task per repository and applies both release gates", () => {
     expect(FROZEN_SWE_BENCH_TASKS).toHaveLength(12);
-    expect(new Set(FROZEN_SWE_BENCH_TASKS.map(({ repository }) => repository)).size).toBe(12);
+    expect(
+      new Set(FROZEN_SWE_BENCH_TASKS.map(({ repository }) => repository)).size,
+    ).toBe(12);
 
     const report = summarizeEvaluation(evaluationRecord());
     expect(report.summary.capability).toMatchObject({

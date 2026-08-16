@@ -23,7 +23,9 @@ export function FormEnablementPage() {
             setValid(event.currentTarget.validity.valid);
           }}
         />
-        <button type="submit" disabled={!valid || email.includes("@")}>Submit</button>
+        <button type="submit" disabled={!valid || email.includes("@")}>
+          Submit
+        </button>
       </form>
     </main>
   );

@@ -20,7 +20,11 @@ export async function GET() {
       { headers: JSON_RESPONSE_HEADERS },
     );
   } catch {
-    return contractErrorResponse(500, "run_storage_error", "Prism could not read evaluation storage.");
+    return contractErrorResponse(
+      500,
+      "run_storage_error",
+      "Prism could not read evaluation storage.",
+    );
   }
 }
 

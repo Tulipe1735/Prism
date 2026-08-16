@@ -178,12 +178,30 @@ export function summarizeEvaluation(evaluation: EvaluationRecord): EvaluationRep
         completed: completedAttempts.length,
         passed: capabilityPassed,
         scenarios,
-        medianTokens: percentile(metrics.map(({ tokens }) => tokens), 50),
-        p95Tokens: percentile(metrics.map(({ tokens }) => tokens), 95),
-        medianCostUsd: percentile(metrics.map(({ costUsd }) => costUsd), 50),
-        p95CostUsd: percentile(metrics.map(({ costUsd }) => costUsd), 95),
-        medianWallTimeMs: percentile(metrics.map(({ wallTimeMs }) => wallTimeMs), 50),
-        p95WallTimeMs: percentile(metrics.map(({ wallTimeMs }) => wallTimeMs), 95),
+        medianTokens: percentile(
+          metrics.map(({ tokens }) => tokens),
+          50,
+        ),
+        p95Tokens: percentile(
+          metrics.map(({ tokens }) => tokens),
+          95,
+        ),
+        medianCostUsd: percentile(
+          metrics.map(({ costUsd }) => costUsd),
+          50,
+        ),
+        p95CostUsd: percentile(
+          metrics.map(({ costUsd }) => costUsd),
+          95,
+        ),
+        medianWallTimeMs: percentile(
+          metrics.map(({ wallTimeMs }) => wallTimeMs),
+          50,
+        ),
+        p95WallTimeMs: percentile(
+          metrics.map(({ wallTimeMs }) => wallTimeMs),
+          95,
+        ),
       },
       coding: {
         directResolved,
@@ -223,9 +241,10 @@ async function codingResults(): Promise<EvaluationRecord["coding"]["results"]> {
   const configured = process.env.PRISM_SWE_BENCH_RESULTS_PATH?.trim();
   if (!configured) return defaultCodingResults();
   try {
-    const parsed = sweBenchResultSchema.array().length(24).parse(
-      JSON.parse(await readFile(path.resolve(configured), "utf8")),
-    );
+    const parsed = sweBenchResultSchema
+      .array()
+      .length(24)
+      .parse(JSON.parse(await readFile(path.resolve(configured), "utf8")));
     const expected = new Set(
       FROZEN_SWE_BENCH_TASKS.flatMap(({ instanceId }) => [
         `${instanceId}:direct`,
@@ -233,7 +252,9 @@ async function codingResults(): Promise<EvaluationRecord["coding"]["results"]> {
       ]),
     );
     if (
-      parsed.some(({ instanceId, mode }) => !expected.delete(`${instanceId}:${mode}`)) ||
+      parsed.some(
+        ({ instanceId, mode }) => !expected.delete(`${instanceId}:${mode}`),
+      ) ||
       expected.size > 0
     ) {
       throw new Error("SWE-bench results do not match the frozen paired manifest.");
@@ -271,7 +292,8 @@ async function usageMetrics(
       if (
         !Array.isArray(trajectory.events) ||
         !trajectory.events.every(
-          (event) => typeof event === "object" && event !== null && !Array.isArray(event),
+          (event) =>
+            typeof event === "object" && event !== null && !Array.isArray(event),
         )
       ) {
         throw new TypeError("events missing");
@@ -350,7 +372,12 @@ async function analyzeAttempt(
 ): Promise<CapabilityAttempt> {
   const { metrics, trajectoryArtifactsValid } = await usageMetrics(dossier);
   const diagnostics = [
-    `route:${dossier.dagRevisions.at(-1)?.nodes.map(({ nodeType }) => nodeType).join(" → ") || "none"}`,
+    `route:${
+      dossier.dagRevisions
+        .at(-1)
+        ?.nodes.map(({ nodeType }) => nodeType)
+        .join(" → ") || "none"
+    }`,
     `patches:${dossier.workspaceEvidence.filter(({ evidence }) => evidence.operation === "patch" && evidence.status === "succeeded").length}`,
     `tests:${dossier.workspaceEvidence.filter(({ evidence }) => evidence.operation === "test" && evidence.status === "succeeded").length}`,
   ];
@@ -406,9 +433,19 @@ async function refresh(record: EvaluationRecord): Promise<EvaluationRecord> {
     record.capability.attempts.map(async (attempt) => {
       if (attempt.passed !== null || attempt.status === "planned") return attempt;
       const dossier = await getRunDossier(attempt.runId);
-      if (!dossier) return { ...attempt, status: "failed" as const, passed: false, failureClass: "invalid-replay" as const, failureDetail: "Run dossier is missing." };
-      if (dossier.status === "awaiting_approval") return { ...attempt, status: "awaiting_approval" as const };
-      if (["completed", "blocked", "cancelled", "terminal_error"].includes(dossier.status)) {
+      if (!dossier)
+        return {
+          ...attempt,
+          status: "failed" as const,
+          passed: false,
+          failureClass: "invalid-replay" as const,
+          failureDetail: "Run dossier is missing.",
+        };
+      if (dossier.status === "awaiting_approval")
+        return { ...attempt, status: "awaiting_approval" as const };
+      if (
+        ["completed", "blocked", "cancelled", "terminal_error"].includes(dossier.status)
+      ) {
         return analyzeAttempt(attempt, dossier, record.capability.caps);
       }
       const { metrics, trajectoryArtifactsValid } = await usageMetrics(dossier);
@@ -439,18 +476,26 @@ async function refresh(record: EvaluationRecord): Promise<EvaluationRecord> {
     }),
   );
   const completed = attempts.every(({ passed }) => passed !== null);
-  const awaitingApproval = attempts.some(({ status }) => status === "awaiting_approval");
+  const awaitingApproval = attempts.some(
+    ({ status }) => status === "awaiting_approval",
+  );
   return evaluationRecordSchema.parse({
     ...record,
     updatedAt: new Date().toISOString(),
-    status: completed ? "completed" : awaitingApproval ? "awaiting_approval" : "running",
+    status: completed
+      ? "completed"
+      : awaitingApproval
+        ? "awaiting_approval"
+        : "running",
     capability: { ...record.capability, attempts },
   });
 }
 
 export async function createEvaluation(): Promise<EvaluationReport> {
   const root = fixtureRoot();
-  const manifests = await Promise.all(SCENARIOS.map(({ create }) => create({ fixtureRoot: root })));
+  const manifests = await Promise.all(
+    SCENARIOS.map(({ create }) => create({ fixtureRoot: root })),
+  );
   const attempts: CapabilityAttempt[] = [];
   for (const [scenarioIndex, scenario] of SCENARIOS.entries()) {
     const manifest = manifests[scenarioIndex]!;
@@ -501,14 +546,18 @@ export async function createEvaluation(): Promise<EvaluationReport> {
       settings: {
         dataset: "princeton-nlp/SWE-bench_Verified",
         split: "test",
-        selectionRule: "First lexicographic instance_id per repository in the official Verified test split.",
+        selectionRule:
+          "First lexicographic instance_id per repository in the official Verified test split.",
         model: process.env.PRISM_PI_MODEL?.trim() || "setup-excluded:not-configured",
-        promptTemplate: "Official SWE-bench problem statement, unchanged for both modes.",
+        promptTemplate:
+          "Official SWE-bench problem statement, unchanged for both modes.",
         tools: ["repository-read", "repository-patch", "test"],
         tokenBudget: 120_000,
         modelCallBudget: 12,
         timeoutMs: 900_000,
-        environment: process.env.PRISM_SWE_BENCH_ENVIRONMENT?.trim() || "official Docker harness (not configured)",
+        environment:
+          process.env.PRISM_SWE_BENCH_ENVIRONMENT?.trim() ||
+          "official Docker harness (not configured)",
       },
       tasks: FROZEN_SWE_BENCH_TASKS,
       results: await codingResults(),
@@ -517,7 +566,9 @@ export async function createEvaluation(): Promise<EvaluationReport> {
   return resumeEvaluation(record.evaluationId);
 }
 
-export async function getEvaluation(evaluationId: string): Promise<EvaluationReport | null> {
+export async function getEvaluation(
+  evaluationId: string,
+): Promise<EvaluationReport | null> {
   const record = await load(evaluationId);
   if (!record) return null;
   const refreshed = await persist(await refresh(record));
@@ -534,24 +585,32 @@ export async function listEvaluations(): Promise<EvaluationReport[]> {
     );
     return reports
       .filter((report): report is EvaluationReport => report !== null)
-      .sort((left, right) => right.evaluation.createdAt.localeCompare(left.evaluation.createdAt));
+      .sort((left, right) =>
+        right.evaluation.createdAt.localeCompare(left.evaluation.createdAt),
+      );
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw error;
   }
 }
 
-export async function resumeEvaluation(evaluationId: string): Promise<EvaluationReport> {
+export async function resumeEvaluation(
+  evaluationId: string,
+): Promise<EvaluationReport> {
   const existing = await load(evaluationId);
   if (!existing) throw new Error("Evaluation does not exist.");
   let record = await refresh(existing);
   if (record.capability.attempts.some(({ status }) => status === "awaiting_approval")) {
     return summarizeEvaluation(await persist(record));
   }
-  const attemptIndex = record.capability.attempts.findIndex(({ status }) => status === "planned");
+  const attemptIndex = record.capability.attempts.findIndex(
+    ({ status }) => status === "planned",
+  );
   if (attemptIndex < 0) return summarizeEvaluation(await persist(record));
   const attempt = record.capability.attempts[attemptIndex]!;
-  const scenario = await SCENARIOS.find(({ id }) => id === attempt.scenarioId)!.create({ fixtureRoot: fixtureRoot() });
+  const scenario = await SCENARIOS.find(({ id }) => id === attempt.scenarioId)!.create({
+    fixtureRoot: fixtureRoot(),
+  });
   const reset = await resetKnownBadSource(
     fixtureRoot(),
     scenario.knownBad.revision,
@@ -566,7 +625,9 @@ export async function resumeEvaluation(evaluationId: string): Promise<Evaluation
     status: reset.hashesVerified ? "running" : "failed",
     passed: reset.hashesVerified ? null : false,
     failureClass: reset.hashesVerified ? null : "reset",
-    failureDetail: reset.hashesVerified ? null : "Known-bad source hashes did not match after reset.",
+    failureDetail: reset.hashesVerified
+      ? null
+      : "Known-bad source hashes did not match after reset.",
   };
   record = await persist({
     ...record,
@@ -583,7 +644,10 @@ export async function resumeEvaluation(evaluationId: string): Promise<Evaluation
         status: "failed",
         passed: false,
         failureClass: "setup",
-        failureDetail: error instanceof Error ? error.message.slice(0, 500) : "Evaluation runtime setup failed.",
+        failureDetail:
+          error instanceof Error
+            ? error.message.slice(0, 500)
+            : "Evaluation runtime setup failed.",
       };
       record = await persist({
         ...record,

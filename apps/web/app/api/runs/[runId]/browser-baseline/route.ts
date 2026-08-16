@@ -16,7 +16,10 @@ import {
   BrowserBaselineConfigurationError,
   captureBrowserBaseline,
 } from "../../../../../lib/server/run-repository";
-import { contractErrorResponse, JSON_RESPONSE_HEADERS } from "../../../contract-response";
+import {
+  contractErrorResponse,
+  JSON_RESPONSE_HEADERS,
+} from "../../../contract-response";
 
 /** 浏览器基线请求体的体积上限（字节）。 */
 const MAX_BROWSER_BASELINE_REQUEST_BYTES = 65_536;
@@ -35,7 +38,9 @@ export async function POST(
   }
 
   const rawBody = await request.text();
-  if (new TextEncoder().encode(rawBody).byteLength > MAX_BROWSER_BASELINE_REQUEST_BYTES) {
+  if (
+    new TextEncoder().encode(rawBody).byteLength > MAX_BROWSER_BASELINE_REQUEST_BYTES
+  ) {
     return contractErrorResponse(
       413,
       "payload_too_large",
@@ -77,7 +82,11 @@ export async function POST(
   try {
     const baseline = await captureBrowserBaseline(runId, parsed.data);
     if (!baseline) {
-      return contractErrorResponse(404, "run_not_found", "The requested Run does not exist.");
+      return contractErrorResponse(
+        404,
+        "run_not_found",
+        "The requested Run does not exist.",
+      );
     }
 
     return Response.json(

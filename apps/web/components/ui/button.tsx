@@ -21,7 +21,7 @@ const buttonVariants = cva(
         quiet: "px-2 text-stone-600 hover:text-stone-950",
       },
       size: {
-        default: "min-h-10",
+        default: "min-h-11",
         compact: "min-h-8",
       },
     },

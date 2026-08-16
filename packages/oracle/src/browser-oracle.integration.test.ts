@@ -128,6 +128,11 @@ describe("BrowserOracle integration (real Chromium + built fixture)", () => {
       route: "/round-button",
       viewport,
       target,
+      beforeMeasure: async (page) => {
+        await page.addStyleTag({
+          content: ".save-button { border-radius: 0 !important; }",
+        });
+      },
     });
     const knownBad = await before.observe();
     expect(knownBad.borderRadiusPx).toBe(0);

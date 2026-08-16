@@ -6,11 +6,7 @@ import type {
   SweBenchResult,
 } from "@prism/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  createColumnHelper,
-  tableFeatures,
-  useTable,
-} from "@tanstack/react-table";
+import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowRight, Play, RefreshCw, ShieldAlert } from "lucide-react";
 import Link from "next/link";
@@ -128,10 +124,15 @@ function CodingGuard({ report }: { report: EvaluationReport }) {
         </p>
       </div>
       {exclusions.length > 0 && (
-        <div className="mt-6 flex gap-3 border-2 border-amber-700 bg-amber-50 p-5 text-amber-950" role="status">
+        <div
+          className="mt-6 flex gap-3 border-2 border-amber-700 bg-amber-50 p-5 text-amber-950"
+          role="status"
+        >
           <ShieldAlert aria-hidden className="mt-0.5 shrink-0" size={20} />
           <p className="text-sm leading-6">
-            <strong className="block">Setup exclusions are reported before scores.</strong>
+            <strong className="block">
+              Setup exclusions are reported before scores.
+            </strong>
             {exclusions[0]?.setupExclusion} ({exclusions.length}/24 paired attempts)
           </p>
         </div>
@@ -140,15 +141,19 @@ function CodingGuard({ report }: { report: EvaluationReport }) {
         <table className="w-full min-w-[48rem] border-collapse text-left text-sm">
           <thead className="font-mono text-[0.62rem] uppercase tracking-[0.08em]">
             <tr>
-              <th className="p-3">Repository</th><th className="p-3">Instance</th>
-              <th className="p-3">Direct</th><th className="p-3">Embedded</th>
+              <th className="p-3">Repository</th>
+              <th className="p-3">Instance</th>
+              <th className="p-3">Direct</th>
+              <th className="p-3">Embedded</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-300">
             {grouped.map((row) => (
               <tr key={row.instanceId}>
-                <td className="p-3">{row.repository}</td><td className="p-3 font-mono text-xs">{row.instanceId}</td>
-                <td className="p-3">{verdict(row.direct)}</td><td className="p-3">{verdict(row.embedded)}</td>
+                <td className="p-3">{row.repository}</td>
+                <td className="p-3 font-mono text-xs">{row.instanceId}</td>
+                <td className="p-3">{verdict(row.direct)}</td>
+                <td className="p-3">{verdict(row.embedded)}</td>
               </tr>
             ))}
           </tbody>
@@ -158,9 +163,15 @@ function CodingGuard({ report }: { report: EvaluationReport }) {
   );
 }
 
-export function EvaluationDashboard({ initialReports }: { initialReports: EvaluationReport[] }) {
+export function EvaluationDashboard({
+  initialReports,
+}: {
+  initialReports: EvaluationReport[];
+}) {
   const queryClient = useQueryClient();
-  const [selectedId, setSelectedId] = useState(initialReports[0]?.evaluation.evaluationId);
+  const [selectedId, setSelectedId] = useState(
+    initialReports[0]?.evaluation.evaluationId,
+  );
   const listQuery = useQuery({
     queryKey: ["evaluations"],
     queryFn: fetchEvaluations,
@@ -172,15 +183,21 @@ export function EvaluationDashboard({ initialReports }: { initialReports: Evalua
     queryKey: ["evaluation", selected],
     queryFn: () => fetchEvaluation(selected!),
     enabled: Boolean(selected),
-    initialData: listQuery.data.find(({ evaluation }) => evaluation.evaluationId === selected),
-    refetchInterval: (query) => query.state.data?.evaluation.status === "running" ? 2_000 : false,
+    initialData: listQuery.data.find(
+      ({ evaluation }) => evaluation.evaluationId === selected,
+    ),
+    refetchInterval: (query) =>
+      query.state.data?.evaluation.status === "running" ? 2_000 : false,
   });
   const syncReport = (report: EvaluationReport) => {
     setSelectedId(report.evaluation.evaluationId);
     queryClient.setQueryData(["evaluation", report.evaluation.evaluationId], report);
     void queryClient.invalidateQueries({ queryKey: ["evaluations"] });
   };
-  const createMutation = useMutation({ mutationFn: startEvaluation, onSuccess: syncReport });
+  const createMutation = useMutation({
+    mutationFn: startEvaluation,
+    onSuccess: syncReport,
+  });
   const resumeMutation = useMutation({
     mutationFn: (evaluationId: string) => resumeEvaluation(evaluationId),
     onSuccess: syncReport,
@@ -192,9 +209,11 @@ export function EvaluationDashboard({ initialReports }: { initialReports: Evalua
     features: attemptTableFeatures,
   });
   const chartData = useMemo(
-    () => report?.summary.capability.scenarios.map((scenario) => ({
-      name: scenarioLabels[scenario.scenarioId], successes: scenario.successes,
-    })) ?? [],
+    () =>
+      report?.summary.capability.scenarios.map((scenario) => ({
+        name: scenarioLabels[scenario.scenarioId],
+        successes: scenario.successes,
+      })) ?? [],
     [report],
   );
   const busy = createMutation.isPending || resumeMutation.isPending;
@@ -209,7 +228,8 @@ export function EvaluationDashboard({ initialReports }: { initialReports: Evalua
           onClick={() => createMutation.mutate()}
           type="button"
         >
-          <Play aria-hidden size={16} /> {busy ? "PREPARING 42 ATTEMPTS…" : "START RELEASE EVALUATION"}
+          <Play aria-hidden size={16} />{" "}
+          {busy ? "PREPARING 42 ATTEMPTS…" : "START RELEASE EVALUATION"}
         </button>
       </div>
     );
@@ -239,25 +259,48 @@ export function EvaluationDashboard({ initialReports }: { initialReports: Evalua
           type="button"
         >
           <RefreshCw aria-hidden className={busy ? "animate-spin" : ""} size={16} />
-          {busy ? "CHECKING EVIDENCE…" : report.evaluation.status === "awaiting_approval" ? "CHECK AFTER APPROVAL" : "RESUME NEXT ATTEMPT"}
+          {busy
+            ? "CHECKING EVIDENCE…"
+            : report.evaluation.status === "awaiting_approval"
+              ? "CHECK AFTER APPROVAL"
+              : "RESUME NEXT ATTEMPT"}
         </button>
       </div>
       <p className="mt-3 min-h-6 text-sm text-stone-600" aria-live="polite">
-        {report.evaluation.status} · updated {formatDistanceToNow(new Date(report.evaluation.updatedAt), { addSuffix: true })}
+        {report.evaluation.status} · updated{" "}
+        {formatDistanceToNow(new Date(report.evaluation.updatedAt), {
+          addSuffix: true,
+        })}
         {resumeMutation.isError ? ` · ${resumeMutation.error.message}` : ""}
       </p>
 
       <dl className="mt-8 grid gap-x-7 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="CAPABILITY" value={`${report.summary.capability.successes}/18`} />
-        <MetricCard label="MEDIAN / P95 TOKENS" value={`${report.summary.capability.medianTokens} / ${report.summary.capability.p95Tokens}`} />
-        <MetricCard label="MEDIAN / P95 COST" value={`$${report.summary.capability.medianCostUsd.toFixed(2)} / $${report.summary.capability.p95CostUsd.toFixed(2)}`} />
-        <MetricCard label="MEDIAN / P95 WALL TIME" value={`${(report.summary.capability.medianWallTimeMs / 1000).toFixed(1)}s / ${(report.summary.capability.p95WallTimeMs / 1000).toFixed(1)}s`} />
+        <MetricCard
+          label="CAPABILITY"
+          value={`${report.summary.capability.successes}/18`}
+        />
+        <MetricCard
+          label="MEDIAN / P95 TOKENS"
+          value={`${report.summary.capability.medianTokens} / ${report.summary.capability.p95Tokens}`}
+        />
+        <MetricCard
+          label="MEDIAN / P95 COST"
+          value={`$${report.summary.capability.medianCostUsd.toFixed(2)} / $${report.summary.capability.p95CostUsd.toFixed(2)}`}
+        />
+        <MetricCard
+          label="MEDIAN / P95 WALL TIME"
+          value={`${(report.summary.capability.medianWallTimeMs / 1000).toFixed(1)}s / ${(report.summary.capability.p95WallTimeMs / 1000).toFixed(1)}s`}
+        />
       </dl>
 
       <section className="mt-10 grid gap-8 lg:grid-cols-[minmax(20rem,0.7fr)_minmax(0,1.3fr)]">
         <div>
           <h2 className="font-serif text-3xl">Successes by scenario</h2>
-          <div className="mt-5 h-72" role="img" aria-label="Bar chart of successful attempts per scenario, out of three">
+          <div
+            className="mt-5 h-72"
+            role="img"
+            aria-label="Bar chart of successful attempts per scenario, out of three"
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ left: -18, bottom: 58 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -274,12 +317,26 @@ export function EvaluationDashboard({ initialReports }: { initialReports: Evalua
           <table className="mt-5 w-full min-w-[70rem] border-y-2 border-stone-900 text-left text-sm">
             <thead className="font-mono text-[0.6rem] uppercase tracking-[0.08em]">
               {table.getHeaderGroups().map((group) => (
-                <tr key={group.id}>{group.headers.map((header) => <th className="p-3" key={header.id}>{header.isPlaceholder ? null : <table.FlexRender header={header} />}</th>)}</tr>
+                <tr key={group.id}>
+                  {group.headers.map((header) => (
+                    <th className="p-3" key={header.id}>
+                      {header.isPlaceholder ? null : (
+                        <table.FlexRender header={header} />
+                      )}
+                    </th>
+                  ))}
+                </tr>
               ))}
             </thead>
             <tbody className="divide-y divide-stone-300">
               {table.getRowModel().rows.map((row) => (
-                <tr key={row.id}>{row.getAllCells().map((cell) => <td className="max-w-xs p-3 align-top" key={cell.id}><table.FlexRender cell={cell} /></td>)}</tr>
+                <tr key={row.id}>
+                  {row.getAllCells().map((cell) => (
+                    <td className="max-w-xs p-3 align-top" key={cell.id}>
+                      <table.FlexRender cell={cell} />
+                    </td>
+                  ))}
+                </tr>
               ))}
             </tbody>
           </table>

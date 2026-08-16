@@ -4,8 +4,8 @@ import { expect, it } from "vitest";
 
 import {
   EVALUATION_SCHEMA_VERSION,
-  evaluationRecordSchema,
   type EvaluationMetrics,
+  evaluationRecordSchema,
 } from "./evaluation";
 
 const metrics: EvaluationMetrics = {

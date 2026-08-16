@@ -57,7 +57,7 @@ async function waitForHeartbeat(filePath: string) {
 }
 
 beforeEach(async () => {
-  root = await mkdtemp(path.join(tmpdir(), "prism-workspace-"));
+  root = await mkdtemp(path.join(tmpdir(), "prism workspace "));
   outside = await mkdtemp(path.join(tmpdir(), "prism-outside-"));
   await mkdir(path.join(root, "src"));
   await mkdir(path.join(root, "nested"));

@@ -4,7 +4,10 @@ import {
 } from "@prism/contracts";
 
 import { resumeEvaluation } from "../../../../../lib/server/evaluation-repository";
-import { contractErrorResponse, JSON_RESPONSE_HEADERS } from "../../../contract-response";
+import {
+  contractErrorResponse,
+  JSON_RESPONSE_HEADERS,
+} from "../../../contract-response";
 
 export async function POST(
   _request: Request,
@@ -23,6 +26,10 @@ export async function POST(
     if (error instanceof Error && error.message === "Evaluation does not exist.") {
       return contractErrorResponse(404, "run_not_found", error.message);
     }
-    return contractErrorResponse(500, "run_storage_error", "Prism could not resume the evaluation.");
+    return contractErrorResponse(
+      500,
+      "run_storage_error",
+      "Prism could not resume the evaluation.",
+    );
   }
 }
