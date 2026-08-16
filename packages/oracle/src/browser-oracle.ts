@@ -80,6 +80,21 @@ export interface RenderedTargetObservation {
     keyboardFocusReachedTarget: boolean;
     consoleErrors: string[];
   };
+  /** 可选菜单交互：记录 trigger/menu/item 几何、中心命中与真实指针点击结果。 */
+  menu?: {
+    triggerName: string;
+    trigger: RenderedRectangle;
+    menu: RenderedRectangle;
+    item: RenderedRectangle;
+    hitPoint: { x: number; y: number };
+    clipped: boolean;
+    unoccluded: boolean;
+    menuZIndex: string;
+    hitTargetName: string;
+    clickReceived: boolean;
+    successText: string;
+    consoleErrors: string[];
+  };
   /** 目标元素的可访问名/文本。 */
   text: string;
   /** 元素是否可用（非 disabled）。 */
@@ -154,6 +169,8 @@ export interface BrowserOracleOptions {
     invalidValue: string;
     validValue: string;
   };
+  /** 需要验证的已打开菜单；以菜单项中心的真实指针点击为准。 */
+  menu?: { triggerName: string; successText: string };
 }
 
 /** 校验并解析本地基础 URL（必须为显式本地 HTTP origin）。 */
@@ -240,13 +257,15 @@ function renderFacts(element: HTMLElement): {
     candidate.x + candidate.width <= window.innerWidth &&
     candidate.y + candidate.height <= window.innerHeight;
   const actionsOverlap = actionRectangles.some((left, index) =>
-    actionRectangles.slice(index + 1).some(
-      (right) =>
-        left.x < right.x + right.width &&
-        left.x + left.width > right.x &&
-        left.y < right.y + right.height &&
-        left.y + left.height > right.y,
-    ),
+    actionRectangles
+      .slice(index + 1)
+      .some(
+        (right) =>
+          left.x < right.x + right.width &&
+          left.x + left.width > right.x &&
+          left.y < right.y + right.height &&
+          left.y + left.height > right.y,
+      ),
   );
   const documentWidthPx = Math.max(
     document.documentElement.scrollWidth,
@@ -401,6 +420,97 @@ export class BrowserOracle {
         };
       }
 
+      let menu: RenderedTargetObservation["menu"];
+      if (this.options.menu) {
+        const trigger = page.getByRole("button", {
+          name: this.options.menu.triggerName,
+          exact: true,
+        });
+        const triggerRectangle = await trigger.evaluate((element) => {
+          const rectangle = element.getBoundingClientRect();
+          return {
+            x: rectangle.x,
+            y: rectangle.y,
+            width: rectangle.width,
+            height: rectangle.height,
+          };
+        });
+        const menuFacts = await locator.evaluate((element) => {
+          const menuElement = element.closest("[role='menu']");
+          if (!menuElement) throw new TypeError("The menu item has no menu ancestor.");
+          const rectangleOf = (candidate: Element): RenderedRectangle => {
+            const rectangle = candidate.getBoundingClientRect();
+            return {
+              x: rectangle.x,
+              y: rectangle.y,
+              width: rectangle.width,
+              height: rectangle.height,
+            };
+          };
+          const item = rectangleOf(element);
+          const menuRectangle = rectangleOf(menuElement);
+          const hitPoint = {
+            x: item.x + item.width / 2,
+            y: item.y + item.height / 2,
+          };
+          const hitTarget = document.elementFromPoint(hitPoint.x, hitPoint.y);
+          let clippedByAncestor = false;
+          for (
+            let ancestor = menuElement.parentElement;
+            ancestor;
+            ancestor = ancestor.parentElement
+          ) {
+            const style = getComputedStyle(ancestor);
+            const clips = ["auto", "clip", "hidden", "scroll"].some(
+              (value) => style.overflowX === value || style.overflowY === value,
+            );
+            if (!clips) continue;
+            const rectangle = rectangleOf(ancestor);
+            clippedByAncestor =
+              menuRectangle.x < rectangle.x ||
+              menuRectangle.y < rectangle.y ||
+              menuRectangle.x + menuRectangle.width > rectangle.x + rectangle.width ||
+              menuRectangle.y + menuRectangle.height > rectangle.y + rectangle.height;
+            if (clippedByAncestor) break;
+          }
+          return {
+            menu: menuRectangle,
+            item,
+            hitPoint,
+            clipped:
+              menuRectangle.x < 0 ||
+              menuRectangle.y < 0 ||
+              menuRectangle.x + menuRectangle.width > window.innerWidth ||
+              menuRectangle.y + menuRectangle.height > window.innerHeight ||
+              clippedByAncestor,
+            unoccluded:
+              hitTarget !== null &&
+              (hitTarget === element || element.contains(hitTarget)),
+            menuZIndex: getComputedStyle(menuElement).zIndex,
+            hitTargetName: (
+              hitTarget?.getAttribute("aria-label") ??
+              hitTarget?.textContent ??
+              hitTarget?.tagName ??
+              ""
+            ).trim(),
+          };
+        });
+        await page.mouse.click(menuFacts.hitPoint.x, menuFacts.hitPoint.y);
+        const clickReceived =
+          (await locator.getAttribute("data-activated")) === "true" &&
+          (await page
+            .getByText(this.options.menu.successText, { exact: true })
+            .count()) > 0;
+        menu = {
+          triggerName: this.options.menu.triggerName,
+          trigger: triggerRectangle,
+          ...menuFacts,
+          clickReceived,
+          successText: this.options.menu.successText,
+          consoleErrors,
+        };
+      }
+
       const facts = await locator.evaluate(renderFacts);
       // 阴影绘制在元素边界外；局部证据需保留一圈固定上下文。
       const padding = 32;
@@ -439,6 +549,7 @@ export class BrowserOracle {
         layout: facts.layout,
         ...(dialog ? { dialog } : {}),
         ...(form ? { form } : {}),
+        ...(menu ? { menu } : {}),
         text: facts.text,
         enabled: !facts.disabled,
         visible: facts.visible,
@@ -585,6 +696,29 @@ export class BrowserOracle {
           assertion: passed
             ? `Mobile horizontal overflow was removed, every checkout action is visible and non-overlapping, and desktop target geometry stayed within ${predicate.tolerancePx}px.`
             : `Responsive layout failed its mobile or desktop invariants: mobile=${JSON.stringify(afterLayout ?? null)}, desktop=${JSON.stringify(afterDesktop ?? null)}.`,
+          predicate,
+          status: passed ? "passed" : "failed",
+        };
+      }
+      case "menu-behavior": {
+        const beforeMenu = before.menu;
+        const afterMenu = after.menu;
+        const passed =
+          beforeMenu?.triggerName === predicate.triggerName &&
+          beforeMenu.clipped === false &&
+          beforeMenu.unoccluded === false &&
+          beforeMenu.clickReceived === false &&
+          afterMenu?.triggerName === predicate.triggerName &&
+          afterMenu.successText === predicate.successText &&
+          afterMenu.clipped === false &&
+          afterMenu.unoccluded &&
+          afterMenu.clickReceived &&
+          afterMenu.hitTargetName === after.text &&
+          afterMenu.consoleErrors.length === 0;
+        return {
+          assertion: passed
+            ? `Menu item "${after.text}" is visible, unclipped, topmost at its center, and received the pointer click with no console error.`
+            : `Menu interaction failed its clipping, hit-test, or click invariants: ${JSON.stringify(afterMenu ?? null)}.`,
           predicate,
           status: passed ? "passed" : "failed",
         };

@@ -38,6 +38,15 @@ describe("Router", () => {
 
     expect(decision.classification).toBe("hybrid");
   });
+
+  it("routes an occluded menu report through both source and browser runtimes", () => {
+    const decision = new Router().route({
+      runId: "run_6dbf6f33-69c4-4e5f-9898-3f693735f5f0",
+      prompt: "The account menu opens behind the header and cannot be clicked.",
+    });
+
+    expect(decision.classification).toBe("hybrid");
+  });
 });
 
 describe("DagScheduler", () => {

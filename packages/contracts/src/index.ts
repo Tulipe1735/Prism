@@ -409,6 +409,14 @@ export const frontendRepairPredicateSchema = z.discriminatedUnion("kind", [
       tolerancePx: z.number().nonnegative(),
     })
     .strict(),
+  // 交互谓词：菜单项不被裁切/遮挡，其中心命中目标并接收真实指针点击
+  z
+    .object({
+      kind: z.literal("menu-behavior"),
+      triggerName: z.string().trim().min(1).max(200),
+      successText: z.string().trim().min(1).max(200),
+    })
+    .strict(),
   // 关系谓词：局部目标区域的 before/after 渲染必须实际发生改变
   z.object({ kind: z.literal("region-clip-differs") }).strict(),
   // 不变式：目标标签文本保持不变

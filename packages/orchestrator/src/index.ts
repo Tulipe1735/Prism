@@ -78,6 +78,7 @@ function classify(prompt: string): RouterClassification {
     "submit",
     "overflow",
     "layout",
+    "menu",
     "radius",
   ]);
   const browser = includesAny(normalized, [
@@ -91,6 +92,7 @@ function classify(prompt: string): RouterClassification {
     "ui",
     "submit",
     "overflow",
+    "menu",
   ]);
 
   if (coding && browser) return "hybrid";

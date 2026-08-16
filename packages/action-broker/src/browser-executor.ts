@@ -272,26 +272,31 @@ export class BrowserExecutor {
           const actionRectangles = Array.from(
             element.querySelectorAll("button,a,input,select,textarea"),
           ).map(rectangleOf);
-          const insideViewport = (
-            candidate: ReturnType<typeof rectangleOf>,
-          ): boolean =>
+          const insideViewport = (candidate: ReturnType<typeof rectangleOf>): boolean =>
             candidate.x >= 0 &&
             candidate.y >= 0 &&
             candidate.x + candidate.width <= window.innerWidth &&
             candidate.y + candidate.height <= window.innerHeight;
           const actionsOverlap = actionRectangles.some((left, index) =>
-            actionRectangles.slice(index + 1).some(
-              (right) =>
-                left.x < right.x + right.width &&
-                left.x + left.width > right.x &&
-                left.y < right.y + right.height &&
-                left.y + left.height > right.y,
-            ),
+            actionRectangles
+              .slice(index + 1)
+              .some(
+                (right) =>
+                  left.x < right.x + right.width &&
+                  left.x + left.width > right.x &&
+                  left.y < right.y + right.height &&
+                  left.y + left.height > right.y,
+              ),
           );
           const documentWidth = Math.max(
             document.documentElement.scrollWidth,
             document.body.scrollWidth,
           );
+          const hitPoint = {
+            x: rectangle.x + rectangle.width / 2,
+            y: rectangle.y + rectangle.height / 2,
+          };
+          const hitTarget = document.elementFromPoint(hitPoint.x, hitPoint.y);
           return {
             rectangle,
             parentRectangle: parent ? rectangleOf(parent) : null,
@@ -319,6 +324,25 @@ export class BrowserExecutor {
               actionRectangles,
               actionsInsideViewport: actionRectangles.every(insideViewport),
               actionsOverlap,
+            },
+            hitTest: {
+              point: hitPoint,
+              targetContainsPoint:
+                hitTarget !== null &&
+                (hitTarget === element || element.contains(hitTarget)),
+              targetClipped:
+                rectangle.x < 0 ||
+                rectangle.y < 0 ||
+                rectangle.x + rectangle.width > window.innerWidth ||
+                rectangle.y + rectangle.height > window.innerHeight,
+              topElement: {
+                tagName: hitTarget?.tagName ?? "",
+                name: (
+                  hitTarget?.getAttribute("aria-label") ??
+                  hitTarget?.textContent ??
+                  ""
+                ).trim(),
+              },
             },
             dialogs: Array.from(
               document.querySelectorAll("dialog, [role='dialog']"),

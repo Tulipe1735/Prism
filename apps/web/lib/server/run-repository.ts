@@ -54,6 +54,7 @@ import {
   createCardShadowScenario,
   createFormEnablementScenario,
   createMobileOverflowScenario,
+  createOccludedMenuScenario,
   createProfileDialogScenario,
   createRoundButtonScenario,
   type RenderedTargetObservation,
@@ -267,6 +268,8 @@ async function scenarioFor(run: DurableRun): Promise<ScenarioManifest | null> {
       return createFormEnablementScenario(options);
     case "Checkout actions overflow off-screen on mobile.":
       return createMobileOverflowScenario(options);
+    case "The account menu opens behind the header and cannot be clicked.":
+      return createOccludedMenuScenario(options);
     default:
       return null;
   }
@@ -561,6 +564,7 @@ async function reconcileInterruptedBrowserEffect(
       target: scenario.browserOracle.target,
       dialogName: scenario.browserOracle.dialogName,
       form: formVerification(scenario),
+      menu: scenario.browserOracle.menu,
       executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
     });
     const mobile = await oracle.observe();
@@ -572,8 +576,7 @@ async function reconcileInterruptedBrowserEffect(
         route: scenario.route,
         viewport: responsive.desktopViewport,
         target: scenario.browserOracle.target,
-        executablePath:
-          process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
+        executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
       }).observe();
       observation = { ...mobile, desktop: desktopEvidence(desktop) };
     }
@@ -832,6 +835,7 @@ export async function startHybridRun(
         target: scenario.browserOracle.target,
         dialogName: scenario.browserOracle.dialogName,
         form: formVerification(scenario),
+        menu: scenario.browserOracle.menu,
         executablePath: process.env.PRISM_BROWSER_EXECUTABLE_PATH?.trim() || undefined,
       })
     : null;

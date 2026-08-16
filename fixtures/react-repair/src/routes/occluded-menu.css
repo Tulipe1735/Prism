@@ -1,0 +1,49 @@
+.account-page {
+  min-height: 100vh;
+}
+
+.account-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 96px;
+  padding: 0 24px;
+  background: #172033;
+  color: #ffffff;
+}
+
+.account-menu-trigger,
+.account-menu button {
+  min-height: 44px;
+  font: inherit;
+}
+
+.account-menu-trigger {
+  padding: 0 16px;
+}
+
+.account-menu {
+  position: absolute;
+  z-index: 1;
+  top: 56px;
+  right: 24px;
+  display: grid;
+  width: 220px;
+  padding: 8px;
+  border: 1px solid #d9dee8;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgb(31 36 48 / 20%);
+}
+
+.account-menu button {
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.account-content {
+  padding: 48px 32px;
+}

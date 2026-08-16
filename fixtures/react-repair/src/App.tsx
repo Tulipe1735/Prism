@@ -1,6 +1,7 @@
 import { CardShadowPage } from "./routes/card-shadow";
 import { FormEnablementPage } from "./routes/form-enablement";
 import { MobileOverflowPage } from "./routes/mobile-overflow";
+import { OccludedMenuPage } from "./routes/occluded-menu";
 import { ProfileDialogPage } from "./routes/profile-dialog";
 import { RoundButtonPage } from "./routes/round-button";
 
@@ -13,6 +14,7 @@ import { RoundButtonPage } from "./routes/round-button";
  *  - /profile-dialog —— “修复 Edit profile Dialog”（已知缺陷：按钮无响应）
  *  - /form-enablement —— “修复有效邮箱仍无法提交”（已知缺陷：Submit 始终禁用）
  *  - /mobile-overflow —— “修复移动端结账操作溢出”（已知缺陷：操作区宽于视口）
+ *  - /occluded-menu —— “修复被 header 遮挡的账户菜单”（已知缺陷：菜单无法点击）
  */
 export function App() {
   const pathname = window.location.pathname;
@@ -37,6 +39,10 @@ export function App() {
     return <MobileOverflowPage />;
   }
 
+  if (pathname === "/occluded-menu") {
+    return <OccludedMenuPage />;
+  }
+
   return (
     <main className="page">
       <h1>react-repair fixture</h1>
@@ -55,6 +61,9 @@ export function App() {
         </li>
         <li>
           <a href="/mobile-overflow">Repair mobile checkout overflow</a>
+        </li>
+        <li>
+          <a href="/occluded-menu">Repair the occluded account menu</a>
         </li>
       </ul>
     </main>

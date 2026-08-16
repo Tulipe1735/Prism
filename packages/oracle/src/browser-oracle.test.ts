@@ -180,7 +180,12 @@ describe("BrowserOracle.evaluateSpec", () => {
     const responsiveSpec: FrontendRepairSpec = {
       schemaVersion: "prism.frontend-repair-spec/v1",
       prompt: "Checkout actions overflow off-screen on mobile.",
-      target: { kind: "semantic", role: "region", name: "Checkout actions", exact: true },
+      target: {
+        kind: "semantic",
+        role: "region",
+        name: "Checkout actions",
+        exact: true,
+      },
       predicates: [
         {
           kind: "responsive-layout",
@@ -232,6 +237,56 @@ describe("BrowserOracle.evaluateSpec", () => {
     expect(BrowserOracle.evaluateSpec(responsiveSpec, before, before).verdict).toBe(
       "failed",
     );
+  });
+
+  it("passes only when the menu item becomes the pointer hit target", () => {
+    const menuTarget = {
+      kind: "semantic" as const,
+      role: "menuitem",
+      name: "Profile",
+      exact: true,
+    };
+    const menuSpec: FrontendRepairSpec = {
+      schemaVersion: "prism.frontend-repair-spec/v1",
+      prompt: "The account menu opens behind the header and cannot be clicked.",
+      target: menuTarget,
+      predicates: [
+        {
+          kind: "menu-behavior",
+          triggerName: "Account menu",
+          successText: "Profile selected",
+        },
+      ],
+    };
+    const menu = {
+      triggerName: "Account menu",
+      trigger: { x: 1120, y: 26, width: 136, height: 44 },
+      menu: { x: 1036, y: 56, width: 220, height: 106 },
+      item: { x: 1044, y: 64, width: 204, height: 44 },
+      hitPoint: { x: 1146, y: 86 },
+      clipped: false,
+      unoccluded: false,
+      menuZIndex: "1",
+      hitTargetName: "Prism account Account menu",
+      clickReceived: false,
+      successText: "Profile selected",
+      consoleErrors: [],
+    };
+    const before = observation({ target: menuTarget, text: "Profile", menu });
+    const after = observation({
+      target: menuTarget,
+      text: "Profile",
+      menu: {
+        ...menu,
+        unoccluded: true,
+        menuZIndex: "3",
+        hitTargetName: "Profile",
+        clickReceived: true,
+      },
+    });
+
+    expect(BrowserOracle.evaluateSpec(menuSpec, before, after).verdict).toBe("passed");
+    expect(BrowserOracle.evaluateSpec(menuSpec, before, before).verdict).toBe("failed");
   });
 });
 

@@ -751,6 +751,138 @@ it("repairs mobile checkout overflow without moving the desktop layout", async (
   });
 }, 60_000);
 
+it("repairs the occluded account menu with hit-test and click evidence", async () => {
+  const menuPrompt = "The account menu opens behind the header and cannot be clicked.";
+  const creation = await createRun({
+    schemaVersion: "prism.repair-request/v1",
+    prompt: menuPrompt,
+    workspace: {
+      kind: "local",
+      path: fixtureDirectory,
+      displayName: "occluded-menu-fixture",
+    },
+    viewport: { width: 1280, height: 720, deviceScaleFactor: 1 },
+  });
+  const browserConfig = {
+    route: "/occluded-menu",
+    target: {
+      kind: "semantic" as const,
+      role: "menuitem",
+      name: "Profile",
+      exact: true,
+    },
+  };
+
+  await startHybridRun(creation.runId, {
+    piSessionFactory: occludedMenuPiSessionFactory(),
+    browserSessionFactory: occludedMenuBrowserSessionFactory(),
+    browserConfig,
+  });
+  const paused = await waitForHybridRun(creation.runId);
+  expect(paused).toMatchObject({
+    status: "awaiting_approval",
+    browserBaselines: [expect.objectContaining({ route: "/occluded-menu" })],
+    browserActions: expect.arrayContaining([
+      expect.objectContaining({
+        proposal: expect.objectContaining({ action: { kind: "click" } }),
+        execution: expect.objectContaining({ status: "executed" }),
+      }),
+    ]),
+  });
+  const baseline = paused?.browserBaselines[0];
+  if (!baseline) throw new Error("Missing occluded-menu baseline");
+  const store = new FileTrajectoryStore({ dataDirectory });
+  const computed = JSON.parse(
+    Buffer.from(await store.readArtifact(baseline.computed)).toString("utf8"),
+  );
+  expect(computed).toMatchObject({
+    rectangle: expect.objectContaining({ height: 44 }),
+    hitTest: {
+      targetContainsPoint: false,
+      targetClipped: false,
+      topElement: expect.objectContaining({ tagName: "HEADER" }),
+    },
+  });
+
+  const proposal = paused?.effectControls.find(
+    (control) => control.kind === "proposal",
+  );
+  if (!proposal || proposal.kind !== "proposal") throw new Error("Missing proposal");
+  await decideRunEffect(creation.runId, {
+    schemaVersion: "prism.effect-decision-request/v1",
+    proposalId: proposal.proposalId,
+    proposalDigest: proposal.proposalDigest,
+    decision: "approved",
+  });
+  await startHybridRun(creation.runId, {
+    piSessionFactory: occludedMenuPiSessionFactory(),
+    browserSessionFactory: occludedMenuBrowserSessionFactory(),
+    browserConfig,
+  });
+  const dossier = await waitForHybridRun(creation.runId);
+
+  expect(dossier).toMatchObject({
+    status: "completed",
+    prompt: menuPrompt,
+    repairSpec: {
+      spec: {
+        predicates: expect.arrayContaining([
+          expect.objectContaining({
+            kind: "menu-behavior",
+            triggerName: "Account menu",
+          }),
+          { kind: "layout-within", tolerancePx: 2 },
+        ]),
+      },
+    },
+    browserVerificationReports: [expect.objectContaining({ verdict: "passed" })],
+    completion: {
+      approvals: ["source_effect"],
+      codeOracle: expect.objectContaining({
+        mediaType: "application/vnd.prism.code-oracle-report+json",
+      }),
+      browserVerificationReportId: expect.any(String),
+      verificationRefs: expect.any(Array),
+    },
+  });
+  const evaluationRef = dossier?.artifacts.find(
+    ({ mediaType }) =>
+      mediaType === "application/vnd.prism.browser-oracle-evaluation+json",
+  );
+  if (!evaluationRef) throw new Error("Missing menu Oracle evidence");
+  const evaluation = JSON.parse(
+    Buffer.from(await store.readArtifact(evaluationRef)).toString("utf8"),
+  );
+  expect(evaluation).toMatchObject({
+    before: {
+      menu: {
+        clipped: false,
+        unoccluded: false,
+        menuZIndex: "1",
+        clickReceived: false,
+      },
+    },
+    after: {
+      menu: {
+        clipped: false,
+        unoccluded: true,
+        menuZIndex: "3",
+        hitTargetName: "Profile",
+        clickReceived: true,
+        consoleErrors: [],
+      },
+    },
+    evaluation: { verdict: "passed" },
+  });
+  const replayed = await store.loadRun(creation.runId);
+  expect(replayed.snapshot).toMatchObject({
+    status: dossier?.status,
+    browserActions: dossier?.browserActions,
+    browserVerificationReports: dossier?.browserVerificationReports,
+    completion: dossier?.completion,
+  });
+}, 60_000);
+
 function roundButtonPiSessionFactory(): PiSessionFactory {
   const usage = {
     model: { provider: "scripted", id: "round-button" },
@@ -1084,6 +1216,71 @@ function mobileOverflowPiSessionFactory(): PiSessionFactory {
   };
 }
 
+function occludedMenuPiSessionFactory(): PiSessionFactory {
+  const usage = {
+    model: { provider: "scripted", id: "occluded-menu" },
+    modelCalls: 1,
+    inputTokens: 10,
+    outputTokens: 2,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    totalTokens: 12,
+    costUsd: 0,
+    durationMs: 1,
+  };
+
+  return {
+    model: usage.model,
+    create: async ({ handlers }) => ({
+      prompt: async () => {
+        const inspected = await handlers.inspect?.({
+          paths: ["src/routes/occluded-menu.css"],
+          patterns: [],
+        });
+        if (handlers.patch && handlers.test) {
+          const details =
+            workspaceEvidenceRecordSchema.parse(inspected).evidence.details;
+          if (details?.operation !== "inspect")
+            throw new Error("Menu stacking inspection failed.");
+          const read = details.reads.find(
+            ({ path: file }) => file === "src/routes/occluded-menu.css",
+          );
+          if (!read) throw new Error("Menu stacking source evidence is missing.");
+          await handlers.patch({
+            files: [
+              {
+                path: "src/routes/occluded-menu.css",
+                expectedSha256: createHash("sha256").update(read.content).digest("hex"),
+                content: read.content.replace("z-index: 1;", "z-index: 3;"),
+              },
+            ],
+          });
+          await handlers.test({
+            command: { executable: "pnpm", arguments: ["test"] },
+            workingDirectory: ".",
+            timeoutMs: 120_000,
+          });
+          await handlers.submit({
+            state: "succeeded",
+            summary: "The scoped occluded-menu repair passed its relevant test.",
+            request: { kind: "successor", nodeType: "browser.verify" },
+          });
+          return;
+        }
+
+        await handlers.submit({
+          state: "succeeded",
+          summary: "The occluded-menu source was inspected.",
+          request: { kind: "successor", nodeType: "workspace.patch" },
+        });
+      },
+      abort: async () => undefined,
+      dispose: () => undefined,
+      getUsage: () => usage,
+    }),
+  };
+}
+
 function profileDialogBrowserSessionFactory(): BrowserSessionFactory {
   const usage: BrowserResourceUsage = {
     model: { provider: "scripted-browser-model", id: "profile-dialog" },
@@ -1104,6 +1301,34 @@ function profileDialogBrowserSessionFactory(): BrowserSessionFactory {
         await operator.execute({
           action: "finished",
           judgment: "The named profile Dialog opened and accepted keyboard focus.",
+        });
+      },
+      abort: async () => undefined,
+      dispose: () => undefined,
+      getUsage: () => usage,
+    }),
+  };
+}
+
+function occludedMenuBrowserSessionFactory(): BrowserSessionFactory {
+  const usage: BrowserResourceUsage = {
+    model: { provider: "scripted-browser-model", id: "occluded-menu" },
+    modelCalls: 1,
+    loopCount: 1,
+    actionsProposed: 1,
+    actionsExecuted: 1,
+    costUsd: 0,
+    durationMs: 1,
+  };
+  return {
+    model: usage.model,
+    create: async ({ operator }) => ({
+      run: async () => {
+        await operator.screenshot();
+        await operator.execute({ action: "click", x: 1137, y: 86 });
+        await operator.execute({
+          action: "finished",
+          judgment: "The Profile menu item received the intended pointer click.",
         });
       },
       abort: async () => undefined,
