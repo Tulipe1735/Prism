@@ -1145,6 +1145,18 @@ export async function waitForHybridRun(runIdInput: string): Promise<RunDossier |
   return getRunDossier(parsedRunId.data);
 }
 
+/** 中止本进程内的活动编排；评估预算看门狗使用，终态仍由 Run 日志记录。 */
+export function abortHybridRun(runIdInput: string): boolean {
+  const parsedRunId = runIdSchema.safeParse(runIdInput);
+  if (!parsedRunId.success) return false;
+  const active = activeHybridRuns.get(
+    hybridRunKey(getStore().dataDirectory, parsedRunId.data),
+  );
+  if (!active) return false;
+  active.controller.abort("evaluation_budget_exhausted");
+  return true;
+}
+
 /** 提交一次绑定 proposal digest 的人类裁决；批准后从持久化节点边界继续。 */
 export async function decideRunEffect(
   runIdInput: string,

@@ -9,7 +9,7 @@ import path from "node:path";
 import { execa } from "execa";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { resetFixture, verifyKnownBadHashes } from "./reset";
+import { resetFixture, resetKnownBadSource, verifyKnownBadHashes } from "./reset";
 
 const roots: string[] = [];
 
@@ -130,5 +130,23 @@ describe("resetFixture", () => {
 
     expect(result.verified).toBe(false);
     expect(result.mismatchedFiles).toEqual(["global.css"]);
+  });
+
+  it("restores source without opening a browser so an evaluation Run can capture baseline", async () => {
+    const knownBadContent =
+      ".save-button { border-radius: 0; width: 96px; height: 44px; }";
+    await writeFile(path.join(root, "global.css"), ".save-button { border-radius: 9px; }\n");
+    const result = await resetKnownBadSource(
+      root,
+      revision,
+      { "global.css": await sha256(knownBadContent) },
+      ["global.css"],
+    );
+    expect(result).toEqual({
+      restoredFiles: ["global.css"],
+      hashesVerified: true,
+      mismatchedFiles: [],
+    });
+    expect(await readFile(path.join(root, "global.css"), "utf8")).toBe(knownBadContent);
   });
 });

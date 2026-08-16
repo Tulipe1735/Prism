@@ -758,6 +758,7 @@ export class PiCodingRuntime {
         total: usage.totalTokens,
       },
       costUsd: usage.costUsd,
+      durationMs: usage.durationMs,
     });
     const trajectoryArtifact = await this.options.artifacts.commit(
       `${JSON.stringify({

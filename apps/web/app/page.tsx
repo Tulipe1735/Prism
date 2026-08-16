@@ -57,9 +57,12 @@ export default async function FieldDeskPage() {
           >
             RUNS
           </Link>
-          <span className="py-2 font-mono text-[0.67rem] font-bold tracking-[0.14em] text-stone-400">
+          <Link
+            className="py-2 font-mono text-[0.67rem] font-bold tracking-[0.14em] text-stone-500 transition hover:text-stone-900"
+            href="/evaluations"
+          >
             EVALUATIONS
-          </span>
+          </Link>
         </nav>
         <div className="flex items-center justify-end gap-3">
           <span className="inline-flex items-center gap-2 font-mono text-[0.65rem] font-bold tracking-[0.13em] text-stone-600">

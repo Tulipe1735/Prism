@@ -46,6 +46,25 @@ export interface ResetConfig {
   browserOracle: BrowserOracle;
 }
 
+/** 只恢复并校验已知缺陷源码；渲染基线由随后创建的 Run 采集。 */
+export async function resetKnownBadSource(
+  workspaceRoot: string,
+  knownBadRevision: string,
+  knownBadFileHashes: Readonly<Record<string, string>>,
+  restorePaths: readonly string[],
+): Promise<Pick<ResetResult, "restoredFiles" | "hashesVerified" | "mismatchedFiles">> {
+  await gitRestore(workspaceRoot, knownBadRevision, restorePaths);
+  const { mismatchedFiles } = await verifyKnownBadHashes(
+    workspaceRoot,
+    knownBadFileHashes,
+  );
+  return {
+    restoredFiles: [...restorePaths],
+    hashesVerified: mismatchedFiles.length === 0,
+    mismatchedFiles,
+  };
+}
+
 /**
  * 重置 fixture：git 恢复已知缺陷源文件 → 校验哈希 → 渲染 Oracle 证明基线。
  *

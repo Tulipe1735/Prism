@@ -875,6 +875,20 @@ export class BrowserRuntime {
       costUsd: 0,
       durationMs: 0,
     };
+    const measuredUsage = browserResourceUsageSchema.parse({
+      ...usage,
+      durationMs: Math.max(0, this.clock().getTime() - startedAt.getTime()),
+    });
+    trajectory.push({
+      type: "model.usage",
+      model: measuredUsage.model,
+      modelCalls: measuredUsage.modelCalls,
+      loopCount: measuredUsage.loopCount,
+      actionsProposed: measuredUsage.actionsProposed,
+      actionsExecuted: measuredUsage.actionsExecuted,
+      costUsd: measuredUsage.costUsd,
+      durationMs: measuredUsage.durationMs,
+    });
     const trajectoryArtifact = await this.options.artifacts.commit(
       `${JSON.stringify({
         schemaVersion: "prism.browser-trajectory/v1",
@@ -896,10 +910,7 @@ export class BrowserRuntime {
       artifacts,
       browserActions,
       verificationReport,
-      usage: browserResourceUsageSchema.parse({
-        ...usage,
-        durationMs: Math.max(0, this.clock().getTime() - startedAt.getTime()),
-      }),
+      usage: measuredUsage,
     });
   }
 
