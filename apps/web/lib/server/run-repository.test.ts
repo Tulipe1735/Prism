@@ -19,6 +19,7 @@ import {
   executeWorkspaceRequest,
   getRunDossier,
   listRecentRuns,
+  settledNodeIdsForResume,
   startHybridRun,
   waitForHybridRun,
 } from "./run-repository";
@@ -65,6 +66,17 @@ afterEach(async () => {
 });
 
 describe("Run repository", () => {
+  it("does not rerun a terminal blocked browser observation after process resume", () => {
+    expect(
+      settledNodeIdsForResume([
+        { nodeId: "inspect", nodeType: "workspace.inspect", state: "succeeded" },
+        { nodeId: "observe", nodeType: "browser.observe", state: "blocked" },
+        { nodeId: "patch", nodeType: "workspace.patch", state: "failed" },
+        { nodeId: "verify", nodeType: "browser.verify", state: "running" },
+      ]),
+    ).toEqual(["inspect", "observe"]);
+  });
+
   it("creates, lists, and reopens one durable Run without changing its prompt", async () => {
     const creation = runCreationSchema.parse(await createRun(request));
 

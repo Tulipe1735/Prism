@@ -127,6 +127,44 @@ describe("DagScheduler", () => {
       "released:2:node-1-browser-verify",
     ]);
   });
+
+  it("does not hide a dependency by waiting for an unrelated read before an effect", async () => {
+    const scheduler = new DagScheduler();
+    const events: string[] = [];
+    let releaseRead!: () => void;
+    const slowRead = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    const nodes: RunDagNode[] = [
+      {
+        nodeId: "node-browser-retry",
+        nodeType: "browser.observe",
+        runtime: "browser",
+        effectClass: "read_only",
+        predecessorIds: [],
+        maxAttempts: 2,
+      },
+      {
+        nodeId: "node-approved-patch",
+        nodeType: "workspace.patch",
+        runtime: "coding",
+        effectClass: "source_effect",
+        predecessorIds: [],
+        maxAttempts: 1,
+      },
+    ];
+
+    const completion = scheduler.run(nodes, async (node) => {
+      events.push(`start:${node.nodeId}`);
+      if (node.effectClass === "read_only") await slowRead;
+      events.push(`end:${node.nodeId}`);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(events).toContain("start:node-approved-patch");
+    releaseRead();
+    await completion;
+  });
 });
 
 describe("Orchestrator", () => {

@@ -96,6 +96,23 @@ export class BrowserBaselineConfigurationError extends Error {}
 export type RecentRun = RunSummary;
 export type { RunDossier };
 
+/** Do not repeat a successful node or a terminal blocked browser observation. */
+export function settledNodeIdsForResume(
+  progress: readonly { nodeId: string; nodeType: string; state: string }[],
+): string[] {
+  return Array.from(
+    new Set(
+      progress
+        .filter(
+          ({ nodeType, state }) =>
+            state === "succeeded" ||
+            (nodeType === "browser.observe" && state === "blocked"),
+        )
+        .map(({ nodeId }) => nodeId),
+    ),
+  );
+}
+
 /** 惰性初始化的全局轨迹存储单例。 */
 let activeStore: { dataDirectory: string; store: FileTrajectoryStore } | undefined;
 /** 进程内一次 live 混合运行的活动句柄。 */
@@ -726,12 +743,8 @@ export async function startHybridRun(
   const resume = latestRevision
     ? {
         revision: latestRevision,
-        completedNodeIds: Array.from(
-          new Set(
-            resumedRun.snapshot.nodeProgress
-              .filter(({ state }) => state === "succeeded")
-              .map(({ nodeId }) => nodeId),
-          ),
+        completedNodeIds: settledNodeIdsForResume(
+          resumedRun.snapshot.nodeProgress,
         ),
         artifacts: resumedRun.snapshot.artifacts,
         latestVerificationReport:
@@ -758,6 +771,18 @@ export async function startHybridRun(
       guidance: {
         allowedReadPatterns: RUN_WORKSPACE_READ_PATTERNS,
         allowedDiscoveryPatterns: RUN_WORKSPACE_DISCOVERY_PATTERNS,
+        allowedTestCommands: [
+          {
+            executable: "pnpm",
+            arguments: ["test"],
+            workingDirectory: ".",
+          },
+          {
+            executable: "pnpm",
+            arguments: ["build"],
+            workingDirectory: ".",
+          },
+        ],
       },
       execute: (request, signal) =>
         store.recordWorkspaceEffect(parsedRunId.data, async () => {

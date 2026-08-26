@@ -31,6 +31,11 @@ export interface PiWorkspaceGateway {
   guidance?: {
     allowedReadPatterns: readonly string[];
     allowedDiscoveryPatterns: readonly string[];
+    allowedTestCommands?: readonly {
+      executable: string;
+      arguments: readonly string[];
+      workingDirectory: string;
+    }[];
   };
   execute: (
     request: WorkspaceRequest,
@@ -440,6 +445,17 @@ function systemPrompt(
           `Exact reads must match one of: ${guidance.allowedReadPatterns.join(", ")}.`,
           `Discovery patterns must be copied exactly from: ${guidance.allowedDiscoveryPatterns.join(", ")}.`,
           "Discover with a registered pattern, then read returned paths. Do not guess directory paths or unregistered globs.",
+          ...(guidance.allowedTestCommands?.length
+            ? [
+                `Exact test commands: ${guidance.allowedTestCommands
+                  .map(
+                    ({ executable, arguments: commandArguments, workingDirectory }) =>
+                      `${executable} ${JSON.stringify(commandArguments)} in ${JSON.stringify(workingDirectory)}`,
+                  )
+                  .join("; ")}.`,
+                "Copy one of those executable, arguments, and workingDirectory values exactly when calling prism_test.",
+              ]
+            : []),
         ]
       : []),
     `Run: ${envelope.runId}`,
@@ -638,7 +654,6 @@ export class PiCodingRuntime {
       if (abortReason) return;
       abortReason = reason;
       executionController.abort(reason);
-      void session?.abort().catch(() => undefined);
     };
     const onExternalAbort = (): void => {
       stopExecution("cancelled");
@@ -653,18 +668,67 @@ export class PiCodingRuntime {
         timeoutMs,
       );
       try {
-        session = await this.options.sessionFactory.create({
-          systemPrompt: systemPrompt(envelope, this.options.workspace.guidance),
-          handlers,
-          signal: executionController.signal,
-        });
-        await session.prompt(envelope.prompt, (currentUsage) => {
-          if (!isWithinBudget(currentUsage, envelope)) {
-            stopExecution("budget_exhausted");
-            return false;
+        const waitForInterruption = () => {
+          let remove = (): void => undefined;
+          const promise = new Promise<{ kind: "interrupted" }>((resolve) => {
+            if (executionController.signal.aborted) {
+              resolve({ kind: "interrupted" });
+              return;
+            }
+            const onAbort = (): void => resolve({ kind: "interrupted" });
+            executionController.signal.addEventListener("abort", onAbort, {
+              once: true,
+            });
+            remove = () =>
+              executionController.signal.removeEventListener("abort", onAbort);
+          });
+          return { promise, remove: () => remove() };
+        };
+        const creationWait = waitForInterruption();
+        const creationResult = await Promise.race([
+          this.options.sessionFactory
+            .create({
+              systemPrompt: systemPrompt(envelope, this.options.workspace.guidance),
+              handlers,
+              signal: executionController.signal,
+            })
+            .then(
+              (createdSession) => ({ kind: "created" as const, createdSession }),
+              (error: unknown) => ({ kind: "failed" as const, error }),
+            ),
+          creationWait.promise,
+        ]);
+        creationWait.remove();
+        if (creationResult.kind === "failed") throw creationResult.error;
+        if (creationResult.kind === "created") session = creationResult.createdSession;
+
+        if (session && !abortReason) {
+          const promptWait = waitForInterruption();
+          const promptResult = await Promise.race([
+            session
+              .prompt(envelope.prompt, (currentUsage) => {
+                if (!isWithinBudget(currentUsage, envelope)) {
+                  stopExecution("budget_exhausted");
+                  return false;
+                }
+                return true;
+              })
+              .then(
+                () => ({ kind: "completed" as const }),
+                (error: unknown) => ({ kind: "failed" as const, error }),
+              ),
+            promptWait.promise,
+          ]);
+          promptWait.remove();
+          if (promptResult.kind === "failed") throw promptResult.error;
+          if (promptResult.kind === "interrupted") {
+            try {
+              await session.abort();
+            } catch {
+              cleanupFailed = true;
+            }
           }
-          return true;
-        });
+        }
       } catch (error) {
         if (error instanceof PiSessionCleanupError) cleanupFailed = true;
         else if (!abortReason) malformedOutput = true;

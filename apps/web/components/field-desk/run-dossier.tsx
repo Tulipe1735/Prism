@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { ArtifactPreview } from "@/components/field-desk/artifact-preview";
+import { effectAuthorityEmptyMessage } from "@/components/field-desk/run-dossier-status";
 import { Button } from "@/components/ui/button";
 import {
   decideEffect,
@@ -382,8 +383,7 @@ export function RunDossierView({
           </div>
         ) : (
           <p className="mt-4 text-sm text-stone-600">
-            No effect is awaiting authority. Decisions, consumption, and recovery stay
-            visible in the durable log below.
+            {effectAuthorityEmptyMessage(orchestrationActive)}
           </p>
         )}
         {effectDecisionMutation.isError && (

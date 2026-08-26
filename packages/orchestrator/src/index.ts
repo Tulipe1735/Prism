@@ -236,8 +236,10 @@ export class DagScheduler {
     );
     let nextReadOnlyIndex = 0;
 
-    // 用固定数量的 worker 轮流领取只读节点，实现并发但不失控
-    await Promise.all(
+    // 用固定数量的 worker 轮流领取只读节点，实现并发但不失控。
+    // 依赖顺序由 DAG predecessorIds 表达；不要在调度器里隐式阻塞
+    // 已就绪的副作用，否则一个无关的慢观察会耗尽一次性审批窗口。
+    const readWorkers = Promise.all(
       Array.from(
         { length: Math.min(this.maxReadOnlyConcurrency, readOnlyNodes.length) },
         async () => {
@@ -251,28 +253,32 @@ export class DagScheduler {
     );
 
     // 副作用节点串行执行，逐个持锁
-    for (const node of effectNodes) {
-      const token = ++this.nextFencingToken;
-      const activeLease: EffectLease = {
-        schemaVersion: "prism.effect-lease/v1",
-        token,
-        holderNodeId: node.nodeId,
-        effectClass: node.effectClass,
-        state: "active",
-        recordedAt: this.clock().toISOString(),
-      };
-      await callbacks.onLease?.(activeLease);
-      try {
-        results.set(node.nodeId, await execute(node, token));
-      } finally {
-        // 无论执行成败都释放租约
-        await callbacks.onLease?.({
-          ...activeLease,
-          state: "released",
+    const effectWorker = (async () => {
+      for (const node of effectNodes) {
+        const token = ++this.nextFencingToken;
+        const activeLease: EffectLease = {
+          schemaVersion: "prism.effect-lease/v1",
+          token,
+          holderNodeId: node.nodeId,
+          effectClass: node.effectClass,
+          state: "active",
           recordedAt: this.clock().toISOString(),
-        });
+        };
+        await callbacks.onLease?.(activeLease);
+        try {
+          results.set(node.nodeId, await execute(node, token));
+        } finally {
+          // 无论执行成败都释放租约
+          await callbacks.onLease?.({
+            ...activeLease,
+            state: "released",
+            recordedAt: this.clock().toISOString(),
+          });
+        }
       }
-    }
+    })();
+
+    await Promise.all([readWorkers, effectWorker]);
 
     return results;
   }

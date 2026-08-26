@@ -12,7 +12,11 @@ export function ProfileDialogPage() {
       <section className="profile-summary" aria-label="Profile summary">
         <h2>Ada Lovelace</h2>
         <p>ada@example.test</p>
-        <button className="edit-profile-button" type="button" onClick={() => undefined}>
+        <button
+          className="edit-profile-button"
+          type="button"
+          onClick={() => dialogRef.current?.showModal()}
+        >
           Edit profile
         </button>
       </section>

@@ -25,6 +25,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   PiCodingRuntime,
   PiSdkSessionFactory,
+  type PiWorkspaceGateway,
   type PiSessionFactory,
   type PiSessionHandlers,
 } from "./index";
@@ -41,6 +42,58 @@ afterEach(async () => {
 });
 
 describe("PiCodingRuntime", () => {
+  it("tells the model the exact allowlisted test commands", async () => {
+    let capturedSystemPrompt = "";
+    const sessionFactory: PiSessionFactory = {
+      model: runtimeUsageBase().model,
+      create: async ({ systemPrompt, handlers }) => {
+        capturedSystemPrompt = systemPrompt;
+        return {
+          prompt: async () => {
+            await handlers.submit({
+              state: "blocked",
+              summary: "Prompt guidance captured.",
+              request: { kind: "none" },
+            });
+          },
+          abort: async () => undefined,
+          dispose: () => undefined,
+          getUsage: runtimeUsageBase,
+        };
+      },
+    };
+    const runtime = new PiCodingRuntime({
+      workspace: {
+        guidance: {
+          allowedReadPatterns: ["src/**"],
+          allowedDiscoveryPatterns: ["src/**/*.ts"],
+          allowedTestCommands: [
+            {
+              executable: "pnpm",
+              arguments: ["test"],
+              workingDirectory: ".",
+            },
+            {
+              executable: "pnpm",
+              arguments: ["build"],
+              workingDirectory: ".",
+            },
+          ],
+        } as PiWorkspaceGateway["guidance"],
+        execute: async () => workspaceRecord("inspect", "succeeded"),
+      },
+      artifacts: { commit: commitArtifact },
+      sessionFactory,
+      clock: () => new Date("2026-08-05T09:00:00.000Z"),
+    });
+
+    await runtime.execute(patchEnvelope());
+
+    expect(capturedSystemPrompt).toContain(
+      'Exact test commands: pnpm ["test"] in "."; pnpm ["build"] in ".".',
+    );
+  });
+
   it("runs a real embedded Pi SDK session through the WorkspaceExecutor and commits a replayable repair trajectory", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "prism-pi-smoke-"));
     roots.push(root);
@@ -389,6 +442,36 @@ describe("PiCodingRuntime", () => {
     expect(result.outcome.failure).toEqual({
       code: "budget_exhausted",
       retryable: false,
+    });
+  });
+
+  it("returns a timed_out outcome when the Pi session ignores abort", async () => {
+    let abortCalls = 0;
+    const sessionFactory: PiSessionFactory = {
+      model: runtimeUsageBase().model,
+      create: async () => ({
+        prompt: () => new Promise<void>(() => undefined),
+        abort: async () => {
+          abortCalls += 1;
+        },
+        dispose: () => undefined,
+        getUsage: runtimeUsageBase,
+      }),
+    };
+    const runtime = new PiCodingRuntime({
+      workspace: { execute: async () => workspaceRecord("inspect", "succeeded") },
+      artifacts: { commit: commitArtifact },
+      sessionFactory,
+    });
+
+    const result = await runtime.execute(
+      inspectionEnvelope(30_000, new Date(Date.now() + 50).toISOString()),
+    );
+
+    expect(abortCalls).toBe(1);
+    expect(result.outcome).toMatchObject({
+      state: "failed",
+      failure: { code: "timed_out", retryable: true },
     });
   });
 

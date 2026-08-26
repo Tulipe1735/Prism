@@ -120,7 +120,7 @@ export async function gitDiffChangedFiles(
 ): Promise<string[]> {
   const result = await execa(
     "git",
-    ["diff", "--name-only", "--no-ext-diff", knownBadRevision],
+    ["diff", "--name-only", "--no-ext-diff", knownBadRevision, "--", "."],
     {
       cwd: workspaceRoot,
       reject: false,

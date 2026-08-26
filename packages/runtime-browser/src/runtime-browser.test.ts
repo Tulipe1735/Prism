@@ -266,6 +266,40 @@ describe("BrowserRuntime", () => {
       failure: { code: "cancelled" },
     });
   });
+
+  it("returns a timed_out outcome when a browser session ignores abort", async () => {
+    let abortCalls = 0;
+    const sessionFactory: BrowserSessionFactory = {
+      model: { provider: "scripted-browser-model", id: "ignores-abort" },
+      create: async () => ({
+        run: () => new Promise<void>(() => undefined),
+        abort: async () => {
+          abortCalls += 1;
+        },
+        dispose: () => undefined,
+        getUsage: () => usage(),
+      }),
+    };
+    const runtime = new BrowserRuntime({
+      baseUrl: "http://127.0.0.1:4173",
+      viewport,
+      browserPortFactory: { create: async () => scriptedPort() },
+      sessionFactory,
+      artifacts: { commit: commitArtifact },
+    });
+
+    const result = await runtime.execute({
+      ...observeEnvelope(),
+      budget: { maxActions: 8, maxDurationMs: 50, maxCostUsd: 1 },
+      deadline: new Date(Date.now() + 1_000).toISOString(),
+    });
+
+    expect(abortCalls).toBe(1);
+    expect(result.outcome).toMatchObject({
+      state: "failed",
+      failure: { code: "timed_out", retryable: true },
+    });
+  });
 });
 
 describe("PlaywrightBrowserPortFactory integration smoke", () => {

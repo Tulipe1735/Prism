@@ -800,10 +800,38 @@ export class BrowserRuntime {
           maxLoopCount: envelope.budget.maxActions,
         });
 
-        await session.run(envelope.prompt);
+        const sessionRun = session.run(envelope.prompt).then(
+          () => ({ kind: "completed" as const }),
+          (error: unknown) => ({ kind: "failed" as const, error }),
+        );
+        let removeAbortWaiter = (): void => undefined;
+        const interrupted = new Promise<{ kind: "interrupted" }>((resolve) => {
+          if (executionController.signal.aborted) {
+            resolve({ kind: "interrupted" });
+            return;
+          }
+          const onAbort = (): void => resolve({ kind: "interrupted" });
+          executionController.signal.addEventListener("abort", onAbort, {
+            once: true,
+          });
+          removeAbortWaiter = () =>
+            executionController.signal.removeEventListener("abort", onAbort);
+        });
+        const sessionResult = await Promise.race([sessionRun, interrupted]);
+        removeAbortWaiter();
 
-        if (executionController.signal.aborted) {
-          abortReason = "cancelled";
+        if (sessionResult.kind === "interrupted") {
+          abortReason =
+            executionController.signal.reason === "timed_out"
+              ? "timed_out"
+              : "cancelled";
+          try {
+            await session.abort();
+          } catch {
+            cleanupFailed = true;
+          }
+        } else if (sessionResult.kind === "failed") {
+          throw sessionResult.error;
         }
 
         browserActions = operator.records;

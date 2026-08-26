@@ -132,13 +132,13 @@ describe("CodeOracle.verify", () => {
 });
 
 describe("gitDiffChangedFiles", () => {
-  it("returns the changed paths relative to the known-bad revision", async () => {
+  it("only returns changes inside a nested workspace", async () => {
     const changed = await gitDiffChangedFiles(
       "/home/tulipe/projects/prism/fixtures/react-repair",
       "HEAD",
     );
 
-    // 当前工作区相对 HEAD 无未提交变更，应返回空清单（不抛错）
-    expect(Array.isArray(changed)).toBe(true);
+    expect(changed).toContain("src/global.css");
+    expect(changed.every((path) => !path.startsWith("../"))).toBe(true);
   });
 });
