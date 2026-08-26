@@ -311,7 +311,7 @@ describe("Durable Run contracts", () => {
           { path: "b.ts", expectedSha256: null, content: "b" },
         ],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("binds structured workspace evidence to its hashed artifact", () => {

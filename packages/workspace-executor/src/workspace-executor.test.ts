@@ -97,30 +97,6 @@ beforeEach(async () => {
 
   executor = await WorkspaceExecutor.create({
     workspaceRoot: root,
-    allowedReadPatterns: ["package.json", "src/**/*.ts", "**/*.txt"],
-    allowedDiscoveryPatterns: ["**/*.ts"],
-    allowedCommands: [
-      {
-        command: { executable: "node", arguments: ["pass.mjs"] },
-        workingDirectories: ["."],
-      },
-      {
-        command: { executable: "node", arguments: ["large.mjs"] },
-        workingDirectories: ["."],
-      },
-      {
-        command: { executable: "node", arguments: ["tree.mjs", "timeout-heartbeat"] },
-        workingDirectories: ["."],
-      },
-      {
-        command: { executable: "node", arguments: ["tree.mjs", "cancel-heartbeat"] },
-        workingDirectories: ["."],
-      },
-      {
-        command: { executable: "node", arguments: ["tree.mjs", "cleanup-heartbeat"] },
-        workingDirectories: ["."],
-      },
-    ],
     environment: { PRISM_TEST_SECRET: "inside-secret" },
     redactedValues: ["inside-secret", "outside-secret"],
     limits: { maxOutputBytes: 4_096, maxReadBytes: 4_096, maxDiscoveredFiles: 20 },
@@ -135,7 +111,7 @@ afterEach(async () => {
 });
 
 describe("WorkspaceExecutor", () => {
-  it("reads allowlisted files and discovers files through repository ignore rules", async () => {
+  it("reads workspace files and discovers files while excluding git, prism, and node_modules", async () => {
     const evidence = await executor.execute({
       schemaVersion: "prism.workspace-request/v1",
       requestId: requestId(1),
@@ -149,13 +125,13 @@ describe("WorkspaceExecutor", () => {
       status: "succeeded",
       details: {
         operation: "inspect",
-        discoveredPaths: ["src/visible.ts"],
+        discoveredPaths: ["nested/ignored.ts", "src/ignored.ts", "src/visible.ts"],
         reads: [{ path: "package.json", content: '{"name":"fixture"}\n' }],
       },
     });
   });
 
-  it("runs only an exact allowlisted test shape and redacts its bounded output", async () => {
+  it("runs any command within the workspace and redacts its bounded output", async () => {
     const evidence = await executor.execute(testRequest("pass.mjs"));
 
     expect(evidence).toMatchObject({
@@ -167,13 +143,13 @@ describe("WorkspaceExecutor", () => {
     );
     expect(JSON.stringify(evidence)).not.toContain("inside-secret");
 
-    const denied = await executor.execute({
+    const arbitrary = await executor.execute({
       ...testRequest("pass.mjs"),
       command: { executable: "node", arguments: ["-e", "process.exit(0)"] },
     });
-    expect(denied).toMatchObject({
-      status: "denied",
-      reasonCode: "command_not_allowlisted",
+    expect(arbitrary).toMatchObject({
+      status: "succeeded",
+      details: { exitCode: 0 },
     });
   });
 
@@ -182,14 +158,6 @@ describe("WorkspaceExecutor", () => {
     await mkdir(emptyPath);
     const pathBoundExecutor = await WorkspaceExecutor.create({
       workspaceRoot: root,
-      allowedReadPatterns: [],
-      allowedDiscoveryPatterns: [],
-      allowedCommands: [
-        {
-          command: { executable: "node", arguments: ["pass.mjs"] },
-          workingDirectories: ["."],
-        },
-      ],
       environment: { PATH: emptyPath },
     });
 
@@ -199,7 +167,7 @@ describe("WorkspaceExecutor", () => {
     });
   });
 
-  it("fails closed on traversal, symlink escape, and an unexpected working directory", async () => {
+  it("fails closed on traversal, symlink escape, and an excluded working directory", async () => {
     const traversal = await executor.execute({
       schemaVersion: "prism.workspace-request/v1",
       requestId: requestId(2),
@@ -223,13 +191,13 @@ describe("WorkspaceExecutor", () => {
       reasonCode: "symlink_escape",
     });
 
-    const wrongDirectory = await executor.execute({
+    const excludedDirectory = await executor.execute({
       ...testRequest("pass.mjs"),
-      workingDirectory: "src",
+      workingDirectory: "node_modules",
     });
-    expect(wrongDirectory).toMatchObject({
+    expect(excludedDirectory).toMatchObject({
       status: "denied",
-      reasonCode: "working_directory_not_allowlisted",
+      reasonCode: "path_not_allowlisted",
     });
   });
 

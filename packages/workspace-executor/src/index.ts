@@ -1,15 +1,13 @@
 /**
  * Prism 工作区执行器（workspace-executor）包
  *
- * 在受限（confined）环境内执行三类工作区操作：检查（inspect，只读读取
- * 允许列表内文件）、测试（test，运行精确允许列表内的命令）、补丁（patch，
- * 哈希守卫的局部写文件）。
+ * 在工作区根边界内执行三类工作区操作：检查（inspect，只读读取）、
+ * 测试（test，运行任意命令）、补丁（patch，哈希守卫的局部写文件）。
  *
  * 安全模型：
  *  - 路径校验两层：词法（lexical，基于 resolve 后的字符串前缀）与
  *    实际（actual，基于 realpath 解析后的真实路径），二者都必须落在
  *    工作区内，杜绝相对路径逃逸与符号链接逃逸；
- *  - 读/发现/命令都受允许列表约束，glob 与命令参数不做通配；
  *  - 输出有上限（maxOutputBytes），内容做脱敏（redactedValues 与
  *    常见密钥格式），读取有上限（maxReadBytes），发现文件数有上限；
  *  - 拒绝/失败都会返回结构化的 WorkspaceEvidence，绝不越权。
@@ -34,7 +32,6 @@ import process from "node:process";
 
 import {
   WORKSPACE_EVIDENCE_SCHEMA_VERSION,
-  type WorkspaceCommand,
   type WorkspaceEvidence,
   workspaceEvidenceSchema,
   type WorkspaceRequest,
@@ -43,7 +40,6 @@ import {
 import { createPatch } from "diff";
 import { execa } from "execa";
 import fg from "fast-glob";
-import createIgnore from "ignore";
 
 /** 工作区证据中的拒绝原因码类型。 */
 type WorkspaceReasonCode = NonNullable<WorkspaceEvidence["reasonCode"]>;
@@ -63,53 +59,9 @@ interface RedactedText {
 interface BoundedRedactedText extends BoundedText {
   redactionCount: number;
 }
-/** 一层忽略规则：某目录的 .gitignore 匹配器。 */
-interface IgnoreLayer {
-  directory: string;
-  matcher: ReturnType<typeof createIgnore>;
-}
 
-/**
- * 仓库忽略规则：模拟 git 的分层 ignore 语义。
- *
- * 按目录叠加规则层；对一条相对路径，从外层到内层依次应用各层匹配器，
- * 后一层"取消忽略"（unignored）可覆盖前一层（类似 git 的规则优先级）。
- */
-class RepositoryIgnoreRules {
-  private readonly layers: IgnoreLayer[] = [];
-
-  add(directory: string, patterns: string | readonly string[]): void {
-    const matcher = createIgnore({ ignorecase: process.platform === "win32" });
-    matcher.add(patterns);
-    this.layers.push({ directory, matcher });
-  }
-
-  /** 判断一条工作区相对路径是否被任意规则层忽略。 */
-  ignores(relativePath: string): boolean {
-    let ignored = false;
-    for (const layer of this.layers) {
-      // 先剥掉规则层所属目录前缀，得到该层视角下的局部路径
-      const localPath =
-        layer.directory === ""
-          ? relativePath
-          : relativePath.startsWith(`${layer.directory}/`)
-            ? relativePath.slice(layer.directory.length + 1)
-            : null;
-      if (!localPath) continue;
-
-      const result = layer.matcher.test(localPath);
-      if (result.ignored) ignored = true;
-      else if (result.unignored) ignored = false;
-    }
-    return ignored;
-  }
-}
-
-/** 一条允许执行的命令：精确命令 + 允许的工作目录集合。 */
-export interface AllowedWorkspaceCommand {
-  command: WorkspaceCommand;
-  workingDirectories: readonly string[];
-}
+/** 发现的排除目录：仓库元数据与依赖缓存不属于工作区内容。 */
+const EXCLUDED_DISCOVERY_DIRS = [".git/**", ".prism/**", "node_modules/**"];
 
 /** 工作区执行器的资源上限。 */
 export interface WorkspaceExecutorLimits {
@@ -125,12 +77,6 @@ export interface WorkspaceExecutorLimits {
 export interface WorkspaceExecutorOptions {
   /** 工作区根目录（会被 realpath 解析为规范路径）。 */
   workspaceRoot: string;
-  /** 允许被检查（读取）的相对路径模式。 */
-  allowedReadPatterns: readonly string[];
-  /** 允许用于发现文件的 glob 模式集合。 */
-  allowedDiscoveryPatterns: readonly string[];
-  /** 允许运行的测试命令清单。 */
-  allowedCommands: readonly AllowedWorkspaceCommand[];
   /** 注入命令的环境变量；未在继承白名单中的变量不会被透传。 */
   environment?: Readonly<Record<string, string>>;
   /** 需要脱敏的敏感值列表。 */
@@ -191,15 +137,6 @@ function toPosixPath(value: string): string {
   return value.split(path.sep).join("/");
 }
 
-/** 精确比较两条命令（可执行名 + 逐参数比较），不允许通配/近似匹配。 */
-function sameCommand(left: WorkspaceCommand, right: WorkspaceCommand): boolean {
-  return (
-    left.executable === right.executable &&
-    left.arguments.length === right.arguments.length &&
-    left.arguments.every((argument, index) => argument === right.arguments[index])
-  );
-}
-
 /**
  * 生成给定操作的"空"详情结构。
  *
@@ -211,7 +148,7 @@ function emptyDetails(
   input: unknown,
 ): WorkspaceEvidence["details"] {
   const candidate = input as {
-    command?: WorkspaceCommand;
+    command?: { executable: string; arguments: string[] };
     workingDirectory?: string;
   };
 
@@ -259,9 +196,6 @@ function looksLikeTraversal(input: unknown): boolean {
  */
 export class WorkspaceExecutor {
   readonly workspaceRoot: string;
-  private readonly allowedReadPatterns: readonly string[];
-  private readonly allowedDiscoveryPatterns: ReadonlySet<string>;
-  private readonly allowedCommands: readonly AllowedWorkspaceCommand[];
   private readonly environment: Readonly<Record<string, string>>;
   private readonly redactedValues: readonly string[];
   private readonly limits: WorkspaceExecutorLimits;
@@ -269,9 +203,6 @@ export class WorkspaceExecutor {
 
   private constructor(options: WorkspaceExecutorOptions, workspaceRoot: string) {
     this.workspaceRoot = workspaceRoot;
-    this.allowedReadPatterns = options.allowedReadPatterns;
-    this.allowedDiscoveryPatterns = new Set(options.allowedDiscoveryPatterns);
-    this.allowedCommands = options.allowedCommands;
     this.environment = options.environment ?? {};
     this.redactedValues = options.redactedValues ?? [];
     this.limits = { ...DEFAULT_LIMITS, ...options.limits };
@@ -366,8 +297,8 @@ export class WorkspaceExecutor {
   /**
    * 为不匹配契约的输入构造拒绝证据。
    *
-   * 猜测操作类型与原因：形似路径穿越判 path_escape，test 类判
-   * command_not_allowlisted，其余判 path_not_allowlisted。
+   * 猜测操作类型与原因：形似路径穿越判 path_escape，其余统一判
+   * path_not_allowlisted（无法解析为工作区内常规文件）。
    */
   private invalidRequestEvidence(input: unknown, startedAt: string): WorkspaceEvidence {
     const candidate = input as Partial<WorkspaceRequest>;
@@ -376,9 +307,7 @@ export class WorkspaceExecutor {
       : "inspect";
     const reasonCode: WorkspaceReasonCode = looksLikeTraversal(input)
       ? "path_escape"
-      : operation === "test"
-        ? "command_not_allowlisted"
-        : "path_not_allowlisted";
+      : "path_not_allowlisted";
 
     return workspaceEvidenceSchema.parse({
       schemaVersion: WORKSPACE_EVIDENCE_SCHEMA_VERSION,
@@ -395,42 +324,28 @@ export class WorkspaceExecutor {
   }
 
   /**
-   * 检查操作：按路径读取允许列表内的文件，并按 glob 发现文件。
+   * 检查操作：按路径读取工作区内文件，并按 glob 发现文件。
    *
-   * 先校验发现模式在允许集合内，再加载忽略规则与允许读取文件集合；
-   * 每个请求路径必须既不被忽略又在允许读取集合内，否则拒绝。
+   * 每个请求路径必须是工作区内未被排除的常规文件，否则拒绝。
    */
   private async inspect(
     request: Extract<WorkspaceRequest, { operation: "inspect" }>,
     startedAt: string,
     signal?: AbortSignal,
   ): Promise<WorkspaceEvidence> {
-    for (const pattern of request.patterns) {
-      if (!this.allowedDiscoveryPatterns.has(pattern)) {
-        throw new WorkspaceDeniedError(
-          "pattern_not_allowlisted",
-          `Discovery pattern ${pattern} is not registered for this workspace.`,
-        );
-      }
-    }
-
-    const ignoreRules = await this.loadIgnoreRules();
-    const allowlistedFiles = new Set(
-      await this.discover(this.allowedReadPatterns, ignoreRules, signal),
-    );
     const reads: InspectDetails["reads"] = [];
     for (const relativePath of request.paths) {
       const actualPath = await this.resolveExistingPath(relativePath);
-      if (ignoreRules.ignores(relativePath) || !allowlistedFiles.has(relativePath)) {
+      if (this.isExcluded(relativePath)) {
         throw new WorkspaceDeniedError(
           "path_not_allowlisted",
-          `File ${relativePath} is not allowlisted for inspection.`,
+          `File ${relativePath} is excluded from inspection.`,
         );
       }
       reads.push(await this.readEvidence(relativePath, actualPath));
     }
 
-    const discovered = await this.discover(request.patterns, ignoreRules, signal);
+    const discovered = await this.discover(request.patterns, signal);
     const discoveryTruncated = discovered.length > this.limits.maxDiscoveredFiles;
     const discoveredPaths = discovered.slice(0, this.limits.maxDiscoveredFiles);
 
@@ -445,14 +360,13 @@ export class WorkspaceExecutor {
   }
 
   /**
-   * 发现文件：用 fast-glob 按模式在工作区内列出文件，应用忽略规则。
+   * 发现文件：用 fast-glob 按模式在工作区内列出文件。
    *
    * 强制不跟随符号链接、排除 .git/.prism/node_modules；每个命中的条目
    * 都经过 resolveExistingPath 校验真实路径仍位于工作区内。
    */
   private async discover(
     patterns: readonly string[],
-    ignoreRules: RepositoryIgnoreRules,
     signal?: AbortSignal,
   ): Promise<string[]> {
     if (patterns.length === 0) return [];
@@ -464,58 +378,28 @@ export class WorkspaceExecutor {
       followSymbolicLinks: false,
       onlyFiles: true,
       unique: true,
-      ignore: [".git/**", ".prism/**", "node_modules/**"],
+      ignore: EXCLUDED_DISCOVERY_DIRS,
     });
     if (signal?.aborted) throw new DOMException("Discovery cancelled.", "AbortError");
 
     const results: string[] = [];
     for (const entry of entries.map(toPosixPath).sort()) {
-      if (ignoreRules.ignores(entry)) continue;
       await this.resolveExistingPath(entry);
       results.push(entry);
     }
     return results;
   }
 
-  /**
-   * 加载仓库忽略规则：根 .gitignore + 各层嵌套 .gitignore。
-   *
-   * 内层规则目录如果自身已被忽略则跳过；嵌套文件按目录深度升序加载，
-   * 保证外层先、内层后（内层可覆盖外层）。
-   */
-  private async loadIgnoreRules(): Promise<RepositoryIgnoreRules> {
-    const rules = new RepositoryIgnoreRules();
-    rules.add("", [".git/", ".prism/", "node_modules/"]);
-    try {
-      rules.add(
-        "",
-        await readFile(path.join(this.workspaceRoot, ".gitignore"), "utf8"),
-      );
-    } catch (error) {
-      if (!this.isMissing(error)) throw error;
-    }
-
-    const nestedIgnoreFiles = await fg("**/.gitignore", {
-      cwd: this.workspaceRoot,
-      absolute: false,
-      dot: true,
-      followSymbolicLinks: false,
-      onlyFiles: true,
-      unique: true,
-      ignore: [".git/**", ".prism/**", "node_modules/**"],
-    });
-    for (const ignoreFile of nestedIgnoreFiles
-      .map(toPosixPath)
-      .filter((ignoreFile) => ignoreFile !== ".gitignore")
-      .sort((left, right) => left.split("/").length - right.split("/").length)) {
-      const directory = path.posix.dirname(ignoreFile);
-      if (rules.ignores(`${directory}/`)) continue;
-      rules.add(
-        directory,
-        await readFile(path.join(this.workspaceRoot, ignoreFile), "utf8"),
-      );
-    }
-    return rules;
+  /** 判断一条工作区相对路径是否命中排除目录。 */
+  private isExcluded(relativePath: string): boolean {
+    return (
+      relativePath === ".git" ||
+      relativePath.startsWith(".git/") ||
+      relativePath === ".prism" ||
+      relativePath.startsWith(".prism/") ||
+      relativePath === "node_modules" ||
+      relativePath.startsWith("node_modules/")
+    );
   }
 
   /**
@@ -559,7 +443,7 @@ export class WorkspaceExecutor {
   /**
    * 补丁操作：哈希守卫的局部写文件。
    *
-   * 每个待改文件依次校验：未被忽略、词法与实际路径都在工作区内、
+   * 每个待改文件依次校验：未被排除、词法与实际路径都在工作区内、
    * 不是符号链接、是常规文件；磁盘当前摘要必须等于请求中的
    * expectedSha256（不一致即 patch_conflict，防止并发修改导致覆盖失配）。
    * 全部校验通过后，先写临时文件、再逐个 rename 提交。
@@ -568,11 +452,10 @@ export class WorkspaceExecutor {
     request: Extract<WorkspaceRequest, { operation: "patch" }>,
     startedAt: string,
   ): Promise<WorkspaceEvidence> {
-    const ignoreRules = await this.loadIgnoreRules();
     const prepared = [];
 
     for (const change of request.files) {
-      if (ignoreRules.ignores(change.path)) {
+      if (this.isExcluded(change.path)) {
         throw new WorkspaceDeniedError(
           "path_not_allowlisted",
           `File ${change.path} is excluded from workspace writes.`,
@@ -669,36 +552,26 @@ export class WorkspaceExecutor {
   }
 
   /**
-   * 测试操作：运行精确允许列表内的命令，带超时/取消与输出上限。
+   * 测试操作：在工作区内运行任意命令，带超时/取消与输出上限。
    *
-   * 命令必须与允许清单精确一致（含参数），工作目录必须在该命令
-   * 允许的集合内。执行期间：超时终止进程树、AbortSignal 取消终止、
-   * 超出 maxBuffer 立即终止。输出做脱敏与截断。
+   * 工作目录必须是工作区内已存在目录。执行期间：超时终止进程树、
+   * AbortSignal 取消终止、超出 maxBuffer 立即终止。输出做脱敏与截断。
    */
   private async test(
     request: Extract<WorkspaceRequest, { operation: "test" }>,
     startedAt: string,
     signal?: AbortSignal,
   ): Promise<WorkspaceEvidence> {
-    const policy = this.allowedCommands.find(({ command }) =>
-      sameCommand(command, request.command),
-    );
-    if (!policy) {
-      throw new WorkspaceDeniedError(
-        "command_not_allowlisted",
-        "The requested executable and argument vector are not registered.",
-      );
-    }
-    if (!policy.workingDirectories.includes(request.workingDirectory)) {
-      throw new WorkspaceDeniedError(
-        "working_directory_not_allowlisted",
-        `Working directory ${request.workingDirectory} is not registered for this command.`,
-      );
-    }
     const cwd = await this.resolveExistingPath(request.workingDirectory);
+    if (this.isExcluded(request.workingDirectory)) {
+      throw new WorkspaceDeniedError(
+        "path_not_allowlisted",
+        `Working directory ${request.workingDirectory} is excluded from workspace commands.`,
+      );
+    }
     if (!(await stat(cwd)).isDirectory()) {
       throw new WorkspaceDeniedError(
-        "working_directory_not_allowlisted",
+        "path_not_allowlisted",
         `${request.workingDirectory} is not a directory.`,
       );
     }
@@ -790,7 +663,7 @@ export class WorkspaceExecutor {
         request,
         "failed",
         "execution_failed",
-        `The allowlisted command exited with code ${result.exitCode ?? "unknown"}.`,
+        `The command exited with code ${result.exitCode ?? "unknown"}.`,
         details,
         startedAt,
       );
@@ -799,7 +672,7 @@ export class WorkspaceExecutor {
       request,
       "succeeded",
       null,
-      "The exact allowlisted test command completed successfully.",
+      "The command completed successfully.",
       details,
       startedAt,
     );

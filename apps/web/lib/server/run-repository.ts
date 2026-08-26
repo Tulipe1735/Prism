@@ -124,21 +124,6 @@ interface ActiveHybridRun {
   controller: AbortController;
 }
 
-const RUN_WORKSPACE_READ_PATTERNS = [
-  "package.json",
-  "README.md",
-  "apps/**/*.{ts,tsx,css,json,mjs}",
-  "packages/**/*.{ts,tsx,css,json,mjs}",
-  "src/**/*.{ts,tsx,css,json,mjs}",
-  "tests/**/*.{ts,tsx,css,json,mjs}",
-] as const;
-const RUN_WORKSPACE_DISCOVERY_PATTERNS = [
-  "apps/**/*.{ts,tsx}",
-  "packages/**/*.ts",
-  "src/**/*.{ts,tsx}",
-  "**/*.{test,spec}.{ts,tsx}",
-] as const;
-
 /** 进程内活动运行表，键为 dataDirectory:runId。 */
 const activeHybridRuns = new Map<string, ActiveHybridRun>();
 
@@ -743,9 +728,7 @@ export async function startHybridRun(
   const resume = latestRevision
     ? {
         revision: latestRevision,
-        completedNodeIds: settledNodeIdsForResume(
-          resumedRun.snapshot.nodeProgress,
-        ),
+        completedNodeIds: settledNodeIdsForResume(resumedRun.snapshot.nodeProgress),
         artifacts: resumedRun.snapshot.artifacts,
         latestVerificationReport:
           resumedRun.snapshot.browserVerificationReports.at(-1) ?? null,
@@ -768,22 +751,6 @@ export async function startHybridRun(
       commit: (content, mediaType) => store.writeArtifact(content, mediaType),
     },
     workspace: {
-      guidance: {
-        allowedReadPatterns: RUN_WORKSPACE_READ_PATTERNS,
-        allowedDiscoveryPatterns: RUN_WORKSPACE_DISCOVERY_PATTERNS,
-        allowedTestCommands: [
-          {
-            executable: "pnpm",
-            arguments: ["test"],
-            workingDirectory: ".",
-          },
-          {
-            executable: "pnpm",
-            arguments: ["build"],
-            workingDirectory: ".",
-          },
-        ],
-      },
       execute: (request, signal) =>
         store.recordWorkspaceEffect(parsedRunId.data, async () => {
           const evidence = await workspaceExecutor.execute(request, { signal });
@@ -1290,22 +1257,10 @@ export async function getRunDossier(runIdInput: string): Promise<RunDossier | nu
   return loadDossier(parsedRunId.data);
 }
 
-/** 为一个 Run 创建唯一的受限 WorkspaceExecutor 配置。 */
+/** 为一个 Run 创建唯一的工作区执行器配置。 */
 async function createRunWorkspaceExecutor(workspaceRoot: string) {
   return WorkspaceExecutor.create({
     workspaceRoot,
-    allowedReadPatterns: RUN_WORKSPACE_READ_PATTERNS,
-    allowedDiscoveryPatterns: RUN_WORKSPACE_DISCOVERY_PATTERNS,
-    allowedCommands: [
-      {
-        command: { executable: "pnpm", arguments: ["test"] },
-        workingDirectories: ["."],
-      },
-      {
-        command: { executable: "pnpm", arguments: ["build"] },
-        workingDirectories: ["."],
-      },
-    ],
   });
 }
 

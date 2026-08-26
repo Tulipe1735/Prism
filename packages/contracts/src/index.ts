@@ -1469,7 +1469,7 @@ const workspaceGlobSchema = z
   );
 
 /**
- * 工作区命令：由可执行名与参数数组构成，用于运行允许列表内的测试命令。
+ * 工作区命令：由可执行名与参数数组构成，用于运行工作区内的任意命令。
  */
 export const workspaceCommandSchema = z
   .object({
@@ -1477,7 +1477,7 @@ export const workspaceCommandSchema = z
       .string()
       .min(1)
       .max(120)
-      .regex(/^[\w.+-]+$/),
+      .regex(/^[\w.+\-/@]+$/),
     arguments: z
       .array(
         z
@@ -1485,7 +1485,7 @@ export const workspaceCommandSchema = z
           .max(500)
           .regex(/^[^\0\r\n]*$/),
       )
-      .max(32),
+      .max(64),
   })
   .strict();
 
@@ -1505,13 +1505,13 @@ export const workspaceInspectRequestSchema = z
   .object({
     ...workspaceRequestEnvelopeShape,
     operation: z.literal("inspect"),
-    paths: z.array(relativeWorkspacePathSchema).max(24),
-    patterns: z.array(workspaceGlobSchema).max(24),
+    paths: z.array(relativeWorkspacePathSchema).max(64),
+    patterns: z.array(workspaceGlobSchema).max(64),
   })
   .strict();
 
 /**
- * 工作区测试请求：在指定工作目录运行一条允许列表内的测试命令。
+ * 工作区测试请求：在指定工作目录运行一条命令。
  */
 export const workspaceTestRequestSchema = z
   .object({
@@ -1524,7 +1524,7 @@ export const workspaceTestRequestSchema = z
   .strict();
 
 /**
- * 工作区补丁请求：最多改一个文件，要求提供期望的原始 SHA-256（可空）。
+ * 工作区补丁请求：一次可改一个或多个文件，要求提供期望的原始 SHA-256（可空）。
  *
  * expectedSha256 用于哈希守卫：若磁盘内容与期望不符则拒绝应用，
  * 防止并发修改导致补丁失配。
@@ -1547,7 +1547,7 @@ export const workspacePatchRequestSchema = z
           .strict(),
       )
       .min(1)
-      .max(1),
+      .max(16),
   })
   .strict();
 
@@ -1632,7 +1632,7 @@ const workspacePatchDetailsSchema = z
  * 工作区证据：一次工作区操作的完整结果记录。
  *
  * status 区分成功 / 拒绝 / 失败 / 超时 / 取消；reasonCode 枚举具体拒绝
- * 原因（路径逃逸、未允许列表、补丁冲突、输出超限等）。
+ * 原因（路径逃逸、符号链接逃逸、排除路径、补丁冲突、输出超限等）。
  */
 export const workspaceEvidenceSchema = z
   .object({
@@ -1646,9 +1646,6 @@ export const workspaceEvidenceSchema = z
         "path_escape",
         "symlink_escape",
         "path_not_allowlisted",
-        "pattern_not_allowlisted",
-        "command_not_allowlisted",
-        "working_directory_not_allowlisted",
         "patch_conflict",
         "output_limit",
         "process_cleanup_failed",

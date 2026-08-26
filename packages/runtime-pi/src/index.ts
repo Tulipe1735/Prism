@@ -28,15 +28,6 @@ import {
 const PI_TRAJECTORY_MEDIA_TYPE = "application/vnd.prism.pi-trajectory+json";
 
 export interface PiWorkspaceGateway {
-  guidance?: {
-    allowedReadPatterns: readonly string[];
-    allowedDiscoveryPatterns: readonly string[];
-    allowedTestCommands?: readonly {
-      executable: string;
-      arguments: readonly string[];
-      workingDirectory: string;
-    }[];
-  };
   execute: (
     request: WorkspaceRequest,
     signal?: AbortSignal,
@@ -242,11 +233,11 @@ export class PiSdkSessionFactory implements PiSessionFactory {
           name: "prism_inspect",
           label: "Inspect scoped workspace",
           description:
-            "Read or discover only paths accepted by the Prism WorkspaceExecutor.",
+            "Read or discover any path accepted by the Prism WorkspaceExecutor.",
           parameters: Type.Object(
             {
-              paths: Type.Array(Type.String(), { maxItems: 24 }),
-              patterns: Type.Array(Type.String(), { maxItems: 24 }),
+              paths: Type.Array(Type.String()),
+              patterns: Type.Array(Type.String()),
             },
             { additionalProperties: false },
           ),
@@ -262,7 +253,7 @@ export class PiSdkSessionFactory implements PiSessionFactory {
           name: "prism_patch",
           label: "Apply scoped patch",
           description:
-            "Apply one hash-guarded source file replacement through the Prism WorkspaceExecutor.",
+            "Apply one or more hash-guarded source file replacements through the Prism WorkspaceExecutor.",
           parameters: Type.Object(
             {
               files: Type.Array(
@@ -274,7 +265,7 @@ export class PiSdkSessionFactory implements PiSessionFactory {
                   },
                   { additionalProperties: false },
                 ),
-                { minItems: 1, maxItems: 1 },
+                { minItems: 1 },
               ),
             },
             { additionalProperties: false },
@@ -290,14 +281,13 @@ export class PiSdkSessionFactory implements PiSessionFactory {
         defineTool({
           name: "prism_test",
           label: "Run scoped test",
-          description:
-            "Run an exact allowlisted command through the Prism WorkspaceExecutor.",
+          description: "Run an arbitrary command through the Prism WorkspaceExecutor.",
           parameters: Type.Object(
             {
               command: Type.Object(
                 {
                   executable: Type.String(),
-                  arguments: Type.Array(Type.String(), { maxItems: 32 }),
+                  arguments: Type.Array(Type.String()),
                 },
                 { additionalProperties: false },
               ),
@@ -431,33 +421,12 @@ function isWithinBudget(
   );
 }
 
-function systemPrompt(
-  envelope: RuntimeTaskEnvelope,
-  guidance: PiWorkspaceGateway["guidance"],
-): string {
+function systemPrompt(envelope: RuntimeTaskEnvelope): string {
   return [
     "You are the embedded Pi Coding Runtime inside Prism.",
     "Use only the available Prism tools. They are the complete authority for this attempt.",
     "Never claim a file, command, patch, test, artifact, approval, or DAG change that a tool did not confirm.",
     "Call prism_submit_outcome exactly once. Prism supplies identity, committed artifacts, resource usage, and failure typing.",
-    ...(guidance
-      ? [
-          `Exact reads must match one of: ${guidance.allowedReadPatterns.join(", ")}.`,
-          `Discovery patterns must be copied exactly from: ${guidance.allowedDiscoveryPatterns.join(", ")}.`,
-          "Discover with a registered pattern, then read returned paths. Do not guess directory paths or unregistered globs.",
-          ...(guidance.allowedTestCommands?.length
-            ? [
-                `Exact test commands: ${guidance.allowedTestCommands
-                  .map(
-                    ({ executable, arguments: commandArguments, workingDirectory }) =>
-                      `${executable} ${JSON.stringify(commandArguments)} in ${JSON.stringify(workingDirectory)}`,
-                  )
-                  .join("; ")}.`,
-                "Copy one of those executable, arguments, and workingDirectory values exactly when calling prism_test.",
-              ]
-            : []),
-        ]
-      : []),
     `Run: ${envelope.runId}`,
     `DAG revision: ${envelope.dagRevision}`,
     `Node: ${envelope.nodeId} (${envelope.nodeType}), attempt ${envelope.attempt}/${envelope.maxAttempts}`,
@@ -668,7 +637,10 @@ export class PiCodingRuntime {
         timeoutMs,
       );
       try {
-        const waitForInterruption = () => {
+        const waitForInterruption = (): {
+          promise: Promise<{ kind: "interrupted" }>;
+          remove: () => void;
+        } => {
           let remove = (): void => undefined;
           const promise = new Promise<{ kind: "interrupted" }>((resolve) => {
             if (executionController.signal.aborted) {
@@ -688,7 +660,7 @@ export class PiCodingRuntime {
         const creationResult = await Promise.race([
           this.options.sessionFactory
             .create({
-              systemPrompt: systemPrompt(envelope, this.options.workspace.guidance),
+              systemPrompt: systemPrompt(envelope),
               handlers,
               signal: executionController.signal,
             })

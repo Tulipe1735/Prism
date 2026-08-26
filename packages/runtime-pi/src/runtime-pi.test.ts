@@ -25,7 +25,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   PiCodingRuntime,
   PiSdkSessionFactory,
-  type PiWorkspaceGateway,
   type PiSessionFactory,
   type PiSessionHandlers,
 } from "./index";
@@ -42,7 +41,7 @@ afterEach(async () => {
 });
 
 describe("PiCodingRuntime", () => {
-  it("tells the model the exact allowlisted test commands", async () => {
+  it("does not restrict the model with allowlisted test commands", async () => {
     let capturedSystemPrompt = "";
     const sessionFactory: PiSessionFactory = {
       model: runtimeUsageBase().model,
@@ -64,22 +63,6 @@ describe("PiCodingRuntime", () => {
     };
     const runtime = new PiCodingRuntime({
       workspace: {
-        guidance: {
-          allowedReadPatterns: ["src/**"],
-          allowedDiscoveryPatterns: ["src/**/*.ts"],
-          allowedTestCommands: [
-            {
-              executable: "pnpm",
-              arguments: ["test"],
-              workingDirectory: ".",
-            },
-            {
-              executable: "pnpm",
-              arguments: ["build"],
-              workingDirectory: ".",
-            },
-          ],
-        } as PiWorkspaceGateway["guidance"],
         execute: async () => workspaceRecord("inspect", "succeeded"),
       },
       artifacts: { commit: commitArtifact },
@@ -89,9 +72,9 @@ describe("PiCodingRuntime", () => {
 
     await runtime.execute(patchEnvelope());
 
-    expect(capturedSystemPrompt).toContain(
-      'Exact test commands: pnpm ["test"] in "."; pnpm ["build"] in ".".',
-    );
+    expect(capturedSystemPrompt).not.toContain("Exact test commands");
+    expect(capturedSystemPrompt).not.toContain("must be copied exactly");
+    expect(capturedSystemPrompt).toContain("Use only the available Prism tools.");
   });
 
   it("runs a real embedded Pi SDK session through the WorkspaceExecutor and commits a replayable repair trajectory", async () => {
@@ -114,14 +97,6 @@ describe("PiCodingRuntime", () => {
 
     const executor = await WorkspaceExecutor.create({
       workspaceRoot: root,
-      allowedReadPatterns: ["src/**/*.ts"],
-      allowedDiscoveryPatterns: ["src/**/*.ts"],
-      allowedCommands: [
-        {
-          command: { executable: "node", arguments: ["verify.mjs"] },
-          workingDirectories: ["."],
-        },
-      ],
       redactedValues: ["fixture-secret"],
     });
     const artifactContent = new Map<string, string>();
