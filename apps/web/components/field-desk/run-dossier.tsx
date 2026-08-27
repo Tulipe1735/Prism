@@ -3,21 +3,34 @@
 import type {
   EffectApprovalProposal,
   EffectDecisionRequest,
+  RunDagNodeType,
   RunDossier,
   WorkspaceRequest,
 } from "@prism/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowRight,
+  BrainCircuit,
   Camera,
   CheckCircle2,
+  Eye,
   FileKey2,
   FlaskConical,
   FolderSearch2,
+  type LucideIcon,
+  ShieldCheck,
+  Wrench,
 } from "lucide-react";
 
 import { ArtifactPreview } from "@/components/field-desk/artifact-preview";
-import { effectAuthorityEmptyMessage } from "@/components/field-desk/run-dossier-status";
+import {
+  effectAuthorityEmptyMessage,
+  type RunSessionPhase,
+  type RunSessionPhaseState,
+  runSessionPhaseStates,
+} from "@/components/field-desk/run-dossier-status";
 import { Button } from "@/components/ui/button";
 import {
   decideEffect,
@@ -53,6 +66,59 @@ function shouldPollRunDossier(dossier: RunDossier | undefined): boolean {
 /** 构造产物下载 URL（按 Run ID + 产物哈希）。 */
 function artifactUrl(runId: string, artifactHash: string): string {
   return `/api/runs/${encodeURIComponent(runId)}/artifacts/${artifactHash}`;
+}
+const RUN_SESSION_PHASES: {
+  id: RunSessionPhase;
+  label: string;
+  description: string;
+  nodeTypes: RunDagNodeType[];
+  icon: LucideIcon;
+}[] = [
+  {
+    id: "observe",
+    label: "Observe",
+    description: "Read workspace and browser facts before any mutation.",
+    nodeTypes: ["workspace.inspect", "browser.observe"],
+    icon: Eye,
+  },
+  {
+    id: "reason",
+    label: "Reason",
+    description: "Use committed evidence to choose the next bounded node.",
+    nodeTypes: ["route.reclassify"],
+    icon: BrainCircuit,
+  },
+  {
+    id: "act",
+    label: "Act",
+    description: "Apply the approved source repair inside the workspace fence.",
+    nodeTypes: ["workspace.patch"],
+    icon: Wrench,
+  },
+  {
+    id: "verification",
+    label: "Verification",
+    description: "Prove the result in-browser, then close the task.",
+    nodeTypes: ["browser.verify", "task.complete"],
+    icon: ShieldCheck,
+  },
+];
+
+function phaseCardClass(state: RunSessionPhaseState): string {
+  const base = "min-h-full flex-1 border p-4 transition-colors";
+  if (state === "active") {
+    return `${base} border-prism-blue bg-blue-50 shadow-[inset_0_0_0_1px_#246bfe]`;
+  }
+  if (state === "complete") return `${base} border-emerald-700 bg-emerald-50`;
+  if (state === "blocked") return `${base} border-red-800 bg-red-50`;
+  return `${base} border-stone-300 bg-white/30 text-stone-500`;
+}
+
+function phaseDotClass(state: RunSessionPhaseState): string {
+  if (state === "active") return "bg-prism-blue animate-pulse";
+  if (state === "complete") return "bg-emerald-700";
+  if (state === "blocked") return "bg-red-800";
+  return "bg-stone-300";
 }
 
 /**
@@ -166,6 +232,9 @@ export function RunDossierView({
     dossier.nodeProgress.map((progress) => [progress.nodeId, progress]),
   );
   const orchestrationActive = shouldPollRunDossier(dossier);
+  const phaseStates = latestRevision
+    ? runSessionPhaseStates(latestRevision.nodes, dossier.nodeProgress)
+    : null;
   const pendingEffect = [...dossier.effectControls]
     .reverse()
     .find(
@@ -287,6 +356,183 @@ export function RunDossierView({
           </dl>
         </aside>
       </div>
+      <section className="mt-10 border-y-2 border-stone-900 py-7">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-stone-500">
+              RUN SESSION / LIVE AGENT LOOP
+            </p>
+            <h2 className="mt-2 font-serif text-3xl">
+              Observe → Reason → Act → Verification
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
+              Every card is driven by the canonical journal. The highlighted card is
+              what the agent is doing now.
+            </p>
+          </div>
+          <button
+            className="min-h-11 border border-stone-900 px-3 font-mono text-[0.62rem] font-bold disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={
+              orchestrationMutation.isPending ||
+              ["completed", "awaiting_approval", "blocked", "cancelled"].includes(
+                dossier.status,
+              )
+            }
+            onClick={() => orchestrationMutation.mutate()}
+            type="button"
+          >
+            {orchestrationMutation.isPending
+              ? "Starting durable Run…"
+              : dossier.status === "completed"
+                ? "Run completed"
+                : dossier.status === "awaiting_approval"
+                  ? "Approval required"
+                  : dossier.status === "blocked"
+                    ? "Run blocked"
+                    : dossier.status === "cancelled"
+                      ? "Run cancelled"
+                      : latestRevision
+                        ? "Resume Run"
+                        : "Start Run"}
+          </button>
+        </div>
+
+        {orchestrationMutation.isError && (
+          <p className="mt-5 border border-red-800 bg-red-50 p-4 text-sm text-red-900">
+            Prism could not start the live Run. No source or browser effect was
+            attempted.
+          </p>
+        )}
+
+        {!latestRevision || !phaseStates ? (
+          <p className="mt-6 border border-dashed border-stone-500 p-5 text-sm text-stone-600">
+            Start the Run to light up each durable phase as the agent moves through it.
+          </p>
+        ) : (
+          <>
+            <ol className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-stretch">
+              {RUN_SESSION_PHASES.map((phase, index) => {
+                const state = phaseStates[phase.id];
+                const PhaseIcon = phase.icon;
+                const phaseNodes = latestRevision.nodes.filter((node) =>
+                  phase.nodeTypes.includes(node.nodeType),
+                );
+
+                return (
+                  <li
+                    className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center"
+                    key={phase.id}
+                  >
+                    <article
+                      aria-current={state === "active" ? "step" : undefined}
+                      className={phaseCardClass(state)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="inline-flex size-9 items-center justify-center border border-current">
+                          <PhaseIcon aria-hidden size={17} />
+                        </span>
+                        <span className="font-mono text-[0.58rem] tracking-[0.12em]">
+                          0{index + 1}
+                        </span>
+                      </div>
+                      <div className="mt-5 flex items-center justify-between gap-2">
+                        <h3 className="font-serif text-2xl">{phase.label}</h3>
+                        <span className="inline-flex items-center gap-2 font-mono text-[0.56rem] font-bold tracking-[0.08em]">
+                          <span
+                            aria-hidden
+                            className={`size-2 rounded-full ${phaseDotClass(state)}`}
+                          />
+                          {state.toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="mt-2 min-h-12 text-xs leading-5 text-stone-600">
+                        {phase.description}
+                      </p>
+
+                      {phaseNodes.length === 0 ? (
+                        <div className="mt-4 border-t border-stone-300 pt-3">
+                          <p className="font-mono text-[0.58rem] uppercase tracking-[0.08em]">
+                            {phase.id === "reason"
+                              ? `${latestRevision.classification} route / revision ${latestRevision.revision}`
+                              : "Waiting for predecessor"}
+                          </p>
+                          {phase.id === "reason" && (
+                            <p className="mt-2 text-xs text-stone-600">
+                              The journal exposes the routing result, not private model
+                              chain-of-thought.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <ul className="mt-4 space-y-2 border-t border-stone-300 pt-3">
+                          {phaseNodes.map((node) => {
+                            const progress = nodeProgressByNode.get(node.nodeId);
+                            return (
+                              <li key={node.nodeId}>
+                                <div className="flex items-center justify-between gap-2 font-mono text-[0.58rem]">
+                                  <span className="break-all font-bold">
+                                    {node.nodeType}
+                                  </span>
+                                  <span>{progress?.state ?? "ready"}</span>
+                                </div>
+                                <p className="mt-1 text-xs leading-5 text-stone-600">
+                                  {progress?.summary ??
+                                    "Queued at the durable node boundary."}
+                                </p>
+                                {progress && (
+                                  <p className="mt-1 font-mono text-[0.54rem] text-stone-500">
+                                    attempt {progress.attempt} / journal #
+                                    {progress.journalPosition}
+                                  </p>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </article>
+
+                    {index < RUN_SESSION_PHASES.length - 1 && (
+                      <>
+                        <ArrowDown
+                          aria-hidden
+                          className="mx-auto shrink-0 text-stone-400 lg:hidden"
+                          size={18}
+                        />
+                        <ArrowRight
+                          aria-hidden
+                          className={
+                            state === "complete"
+                              ? "hidden shrink-0 text-emerald-700 lg:block"
+                              : state === "active"
+                                ? "hidden shrink-0 animate-pulse text-prism-blue lg:block"
+                                : "hidden shrink-0 text-stone-300 lg:block"
+                          }
+                          size={18}
+                        />
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+            <p className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[0.58rem] text-stone-600">
+              <span>
+                {orchestrationActive
+                  ? "LIVE JOURNAL POLL ACTIVE"
+                  : "DURABLE RUN SETTLED"}
+              </span>
+              <span>DAG REVISION {latestRevision.revision}</span>
+              <span>
+                EFFECT FENCE{" "}
+                {dossier.effectLease
+                  ? `#${dossier.effectLease.token} / ${dossier.effectLease.state}`
+                  : "none"}
+              </span>
+            </p>
+          </>
+        )}
+      </section>
 
       {dossier.completion && (
         <section className="mt-10 border-2 border-emerald-800 bg-emerald-50 p-5 text-emerald-950">
@@ -614,104 +860,6 @@ export function RunDossierView({
               </li>
             ))}
           </ol>
-        )}
-      </section>
-
-      {/* live 混合编排：Run DAG + 副作用租约 */}
-      <section className="mt-10 border-t-2 border-stone-900 pt-7">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-stone-500">
-              LIVE HYBRID ORCHESTRATION / CANONICAL JOURNAL
-            </p>
-            <h2 className="mt-2 font-serif text-3xl">Dual-runtime Run DAG</h2>
-          </div>
-          {/* 启动是幂等的；未完成 Run 可在进程重启后从节点边界恢复。 */}
-          <button
-            className="min-h-11 border border-stone-900 px-3 font-mono text-[0.62rem] font-bold disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={
-              orchestrationMutation.isPending ||
-              ["completed", "awaiting_approval", "blocked", "cancelled"].includes(
-                dossier.status,
-              )
-            }
-            onClick={() => orchestrationMutation.mutate()}
-            type="button"
-          >
-            {orchestrationMutation.isPending
-              ? "Starting durable Run…"
-              : dossier.status === "completed"
-                ? "Run completed"
-                : dossier.status === "awaiting_approval"
-                  ? "Approval required"
-                  : dossier.status === "blocked"
-                    ? "Run blocked"
-                    : dossier.status === "cancelled"
-                      ? "Run cancelled"
-                      : latestRevision
-                        ? "Resume hybrid Run"
-                        : "Start hybrid Run"}
-          </button>
-        </div>
-
-        {orchestrationMutation.isError && (
-          <p className="mt-5 border border-red-800 bg-red-50 p-4 text-sm text-red-900">
-            Prism could not start the live Run. No source or browser effect was
-            attempted.
-          </p>
-        )}
-
-        {!latestRevision ? (
-          <p className="mt-5 border border-dashed border-stone-500 p-5 text-sm text-stone-600">
-            Start the bounded Run to observe durable node progress and effect fences.
-          </p>
-        ) : (
-          /* 最新修订的节点列表：类型/状态/前驱/DAG 修订/运行时/进度 */
-          <ol className="mt-5 space-y-3">
-            {latestRevision.nodes.map((node) => {
-              const progress = nodeProgressByNode.get(node.nodeId);
-              const introducedInRevision = dossier.dagRevisions.find((revision) =>
-                revision.nodes.some((candidate) => candidate.nodeId === node.nodeId),
-              )?.revision;
-              return (
-                <li
-                  className="border border-stone-500 bg-white/40 p-4"
-                  key={node.nodeId}
-                >
-                  <p className="font-mono text-[0.66rem] tracking-[0.08em]">
-                    {node.nodeType} / {progress?.state ?? "ready"}
-                  </p>
-                  <p className="mt-2 break-all font-mono text-[0.58rem] text-stone-500">
-                    READY AFTER{" "}
-                    {node.predecessorIds.length
-                      ? node.predecessorIds.join(", ")
-                      : "root evidence"}
-                    {` / DAG REVISION ${introducedInRevision ?? "unknown"}`}
-                  </p>
-                  <p className="mt-2 text-xs">
-                    {node.runtime} / {node.effectClass} / journal{" "}
-                    {progress ? `#${progress.journalPosition}` : "awaiting"} / artifacts{" "}
-                    {progress?.artifacts.length ?? 0}
-                  </p>
-                  <p className="mt-2 break-all font-mono text-[0.58rem] text-stone-500">
-                    correlation / causation:{" "}
-                    {progress
-                      ? `${progress.correlationId} / ${progress.causationEventId ?? "root"}`
-                      : "awaiting"}
-                  </p>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-        {latestRevision && (
-          <p className="mt-5 font-mono text-[0.6rem] text-stone-600">
-            {orchestrationActive ? "DURABLE POLL ACTIVE / " : "DURABLE RUN SETTLED / "}
-            EFFECT FENCE{" "}
-            {dossier.effectLease
-              ? `#${dossier.effectLease.token} / ${dossier.effectLease.state}`
-              : "none"}
-          </p>
         )}
       </section>
 
