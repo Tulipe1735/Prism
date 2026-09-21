@@ -2,31 +2,42 @@
   "name": "prism",
   "version": "0.1.0",
   "private": true,
+  "description": "A TypeScript browser-use CLI agent with a dynamic, indexed action space.",
+  "type": "module",
+  "bin": {
+    "prism": "./dist/cli.js",
+    "prism-mcp": "./dist/mcp.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev --filter=@prism/web",
+    "build": "tsup src/cli.ts src/mcp.ts --format esm --clean --sourcemap --no-splitting && cp src/browser/snapshot.js dist/snapshot.js",
+    "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "test:contracts": "pnpm --filter @prism/contracts test",
-    "test:prototype": "pnpm --filter @prism/web test:prototype",
-    "typecheck": "turbo run typecheck"
-  },
-  "devDependencies": {
-    "@prism/tooling-config": "workspace:*",
-    "@types/node": "22.20.1",
-    "prettier": "3.9.6",
-    "turbo": "2.10.7",
-    "typescript": "5.9.3"
+    "lint": "eslint .",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "engines": {
     "node": ">=22.19.0"
   },
-  "pnpm": {
-    "overrides": {
-      "eslint-plugin-command": "3.3.0"
-    }
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "chrome-remote-interface": "0.34.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "4.0.1",
+    "@types/chrome-remote-interface": "0.34.0",
+    "@types/node": "22.20.1",
+    "eslint": "9.39.5",
+    "prettier": "3.9.6",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
   },
   "packageManager": "pnpm@9.15.9"
 }

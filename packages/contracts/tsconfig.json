@@ -1,4 +1,0 @@
-{
-  "extends": "@prism/tooling-config/tsconfig/library.json",
-  "include": ["src/**/*.ts"]
-}

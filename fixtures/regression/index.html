@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prism Regression Fixture</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 40px;
+        display: grid;
+        gap: 12px;
+        max-width: 420px;
+      }
+      label {
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Registration</h1>
+    <label for="name">Name</label>
+    <input id="name" type="text" />
+    <label for="color">Favorite color</label>
+    <select id="color">
+      <option value="red">Red</option>
+      <option value="blue">Blue</option>
+      <option value="green">Green</option>
+    </select>
+    <button id="submit" type="button">Submit</button>
+    <p id="result" hidden></p>
+    <script>
+      const name = document.getElementById("name");
+      const color = document.getElementById("color");
+      document.getElementById("submit").addEventListener("click", () => {
+        const result = document.getElementById("result");
+        result.textContent = `Hello, ${name.value}! Color: ${color.value}`;
+        result.hidden = false;
+      });
+    </script>
+  </body>
+</html>
