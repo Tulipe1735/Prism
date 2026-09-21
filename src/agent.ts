@@ -13,19 +13,6 @@ import { join } from "node:path";
 import { StalePageError } from "./browser/session.ts";
 import { fieldContext } from "./text-helper.ts";
 
-export interface JudgeInput {
-  goal: string;
-  snapshot: Observation;
-  history: HistoryEntry[];
-  screenshotBase64?: string;
-}
-
-export interface JudgeVerdict {
-  satisfied: boolean;
-  reason: string;
-  model: string;
-}
-
 export interface ChooseInput {
   snapshot: Observation;
   goal: string;
@@ -35,7 +22,6 @@ export interface ChooseInput {
 export interface AgentDependencies {
   choose: (input: ChooseInput) => Promise<Decision>;
   fieldText: (context: TextContext) => Promise<TextHelperResult>;
-  judge: (input: JudgeInput) => Promise<JudgeVerdict>;
 }
 
 export type AgentEvent =
@@ -61,10 +47,9 @@ export type AgentEvent =
       elapsedMs: number;
     }
   | {
-      type: "verdict";
+      type: "finished";
       status: TaskStatus;
       reason: string;
-      verdict: JudgeVerdict | null;
     };
 
 export interface ConfirmContext {
@@ -78,7 +63,6 @@ export interface AgentOptions {
   goal: string;
   dependencies: AgentDependencies;
   maxSteps?: number;
-  judgeVision?: boolean;
   recordDir?: string;
   signal?: AbortSignal;
   onEvent?: (event: AgentEvent) => void;
@@ -92,7 +76,6 @@ export interface AgentResult {
   finalTitle: string;
   finalText: string;
   steps: HistoryEntry[];
-  verdict: JudgeVerdict | null;
   elapsedMs: number;
 }
 
@@ -126,7 +109,6 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   const history: HistoryEntry[] = [];
   let status: TaskStatus = "blocked";
   let reason = "No supported operation can progress.";
-  let verdict: JudgeVerdict | null = null;
   let pendingContext: string | null = null;
   let pendingText: string | null = null;
   let pendingHelper: string | null = null;
@@ -186,23 +168,9 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
           reason = "The model reported BLOCKED.";
           break;
         }
-        let screenshotBase64: string | undefined;
-        if (options.judgeVision === true) {
-          try {
-            screenshotBase64 = await session.captureScreenshot();
-          } catch {
-            screenshotBase64 = undefined;
-          }
-        }
-        verdict = await dependencies.judge({
-          goal,
-          snapshot,
-          history,
-          screenshotBase64,
-        });
-        status = verdict.satisfied ? "done" : "unverified";
-        reason = verdict.reason;
-        emit({ type: "verdict", status, reason, verdict });
+        status = "done";
+        reason = "The model reported DONE.";
+        emit({ type: "finished", status, reason });
         break;
       }
 
@@ -331,7 +299,6 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       goal,
       status,
       reason,
-      verdict,
       steps: history.length,
       elapsedMs: elapsed(),
       url: snapshot.url,
@@ -344,7 +311,6 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     finalTitle: snapshot.title,
     finalText: snapshot.text.slice(0, FINAL_TEXT_LIMIT),
     steps: history,
-    verdict,
     elapsedMs: elapsed(),
   };
 }

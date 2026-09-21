@@ -1,5 +1,5 @@
 import type { AddressInfo } from "node:net";
-import type { AgentDependencies, JudgeVerdict } from "../src/agent.ts";
+import type { AgentDependencies } from "../src/agent.ts";
 import type { BrowserConnection } from "../src/browser/connect.ts";
 import type { BrowserSession } from "../src/browser/session.ts";
 import type { Decision, HistoryEntry, Snapshot } from "../src/types.ts";
@@ -48,7 +48,7 @@ describe.runIf(enabled)("browser regression", () => {
     return openBrowserSession({ url: baseUrl, client: connection.client });
   }
 
-  it("fills, selects, clicks, records, and verifies a goal end to end", async () => {
+  it("fills, selects, clicks, and records a goal end to end", async () => {
     const session = await openFixture();
     const recordDir = mkdtempSync(join(tmpdir(), "prism-regression-"));
     try {
@@ -57,7 +57,6 @@ describe.runIf(enabled)("browser regression", () => {
         goal: "Register Ada with the blue color and submit the form.",
         dependencies: scriptedDependencies(),
         recordDir,
-        judgeVision: false,
       });
 
       expect(result.status).toBe("done");
@@ -146,16 +145,6 @@ function scriptedDependencies(): AgentDependencies {
       usage: {},
       latencyMs: 0,
     }),
-    judge: async ({ snapshot }): Promise<JudgeVerdict> => {
-      const satisfied = snapshot.text.includes("Hello, Ada! Color: blue");
-      return {
-        satisfied,
-        reason: satisfied
-          ? "The confirmation text is visible."
-          : "Missing confirmation.",
-        model: "scripted",
-      };
-    },
   };
   return dependencies;
 }

@@ -14,21 +14,19 @@ import { VERSION } from "./version.ts";
 export type TaskRunner = (options: BrowserTaskOptions) => Promise<BrowserTaskResult>;
 
 const OUTPUT_SCHEMA = {
-  status: z.enum(["done", "blocked", "unverified", "failed"]),
+  status: z.enum(["done", "blocked", "failed"]),
   reason: z.string(),
   final_url: z.string(),
   final_title: z.string(),
   final_text: z.string(),
   steps: z.number().int().nonnegative(),
   elapsed_ms: z.number().nonnegative(),
-  judge_satisfied: z.boolean().nullable(),
-  judge_reason: z.string().nullable(),
 };
 
 /**
  * A task-level MCP surface. The host supplies a URL and a goal; Prism owns the
- * observe/decide/act loop, freshness guards, budgets, and verification, so no
- * model-generated selector or coordinate ever reaches the browser.
+ * observe/decide/act loop, freshness guards, and budgets, so no model-generated
+ * selector or coordinate ever reaches the browser.
  */
 export function createPrismMcpServer(runTask: TaskRunner = runBrowserTask): McpServer {
   const server = new McpServer({ name: "prism", version: VERSION });
@@ -38,7 +36,7 @@ export function createPrismMcpServer(runTask: TaskRunner = runBrowserTask): McpS
     {
       title: "Browser task",
       description: [
-        "Complete a browser task in the user's own Chrome and report whether the goal was verified.",
+        "Complete a browser task in the user's own Chrome and report the outcome.",
         "Prism opens a background tab, observes an indexed table of visible controls, and decides and executes one operation at a time.",
         "Use this when a task needs navigation, form filling, search, or reading data from a website.",
         "One call covers the whole browsing subtask; report the returned status and reason to the user.",
@@ -90,8 +88,6 @@ export function createPrismMcpServer(runTask: TaskRunner = runBrowserTask): McpS
             final_text: result.finalText,
             steps: result.steps,
             elapsed_ms: result.elapsedMs,
-            judge_satisfied: result.verdict?.satisfied ?? null,
-            judge_reason: result.verdict?.reason ?? null,
           },
         };
       } catch (error) {
@@ -139,7 +135,7 @@ function progressReporter(
   if (token === undefined) return undefined;
   let progress = 0;
   return (event) => {
-    if (event.type !== "acted" && event.type !== "verdict") return;
+    if (event.type !== "acted" && event.type !== "finished") return;
     progress += 1;
     void extra
       .sendNotification({

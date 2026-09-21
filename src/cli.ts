@@ -25,18 +25,14 @@ Options:
 Environment:
   TYPESAFE_API_KEY      TypeSafe decision model key (required)
   TYPESAFE_MODEL        TypeSafe model id (default jev-latest)
-  TEXT_MODEL_API_KEY    OpenAI-compatible key for field text and judging
+  TEXT_MODEL_API_KEY    OpenAI-compatible key for field text
   TEXT_MODEL_BASE_URL   Field-text endpoint (default https://api.deepseek.com/v1)
   TEXT_MODEL            Field-text model (default deepseek-chat)
   TEXT_MODEL_REASONING  "none" to disable reasoning parameters
-  PRISM_JUDGE_API_KEY   Judge key (defaults to TEXT_MODEL_API_KEY)
-  PRISM_JUDGE_BASE_URL  Judge endpoint (defaults to TEXT_MODEL_BASE_URL)
-  PRISM_JUDGE_MODEL     Judge model (defaults to TEXT_MODEL)
-  PRISM_JUDGE_VISION    "1" to include the final screenshot in judging
 
 Exit codes:
-  0  the goal was done and the judge verified it
-  1  blocked, unverified, failed, or interrupted
+  0  the decision model reported DONE
+  1  blocked, failed, or interrupted
   2  configuration or browser connection error
 `;
 
@@ -201,7 +197,7 @@ function createReporter(json: boolean): (event: AgentEvent) => void {
         );
         break;
       }
-      case "verdict":
+      case "finished":
         console.log(`${event.status.toUpperCase()}: ${event.reason}`);
         break;
     }

@@ -13,7 +13,6 @@ const taskResult: BrowserTaskResult = {
   finalUrl: "https://example.com/done",
   finalTitle: "Done",
   finalText: "Your message was sent",
-  verdict: { satisfied: true, reason: "The confirmation is visible.", model: "judge" },
   steps: 2,
   elapsedMs: 1_200,
 };
@@ -61,7 +60,6 @@ describe("prism MCP server", () => {
     expect(response.structuredContent).toMatchObject({
       status: "done",
       steps: 2,
-      judge_satisfied: true,
     });
   });
 

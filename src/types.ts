@@ -89,4 +89,4 @@ export interface ModelUsage {
   latencyMs: number;
 }
 
-export type TaskStatus = "done" | "blocked" | "unverified" | "failed";
+export type TaskStatus = "done" | "blocked" | "failed";
