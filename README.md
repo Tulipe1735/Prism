@@ -128,70 +128,7 @@ opencode（`opencode.json`）：
 注意：不要在配置里用 `"environment": { "TYPESAFE_API_KEY": "{env:TYPESAFE_API_KEY}" }`
 传未设置的变量——空值会覆盖 `.env` 里的同名 key，导致加载失败。
 
-Pi 官方不做 MCP，集成 Pi 需要一个很小的 extension 去调用 `prism` CLI；该适配器尚未实现。
-
-## 一次运行的过程
-
-1. **观察。** 注入的 DOM reader 生成一张带编号的可见控件表（`[1] button 保存`、
-   `[2] textbox 邮箱`……），以及可见文本、页面指纹和每个元素的新鲜度 guard。
-2. **决策。** 一次 TypeSafe SystemOne 请求同时回答操作问题（`CLICK`、`TYPE_TEXT`、
-   `SELECT`、`SCROLL_UP`、`SCROLL_DOWN`、`WAIT`、`DONE`、`BLOCKED`）和对应的目标问题。响应必须是对候选 id 的有限概率分布，且选中的 id 必须是最大值；否则不执行任何动作。
-3. **执行。**
-   选中的编号会解析回观察时的真实 DOM 节点。输入前 Prism 会重新检查连接性、可见性、遮挡和 disabled/read-only 状态。永远不会使用模型生成的 selector 或坐标。
-4. **判定。** `DONE`
-   需要可见证据；随后 Prism 让 judge 模型判断目标是否满足（可选附带最终截图）。不满足时以非零码
-   `UNVERIFIED` 退出。
-
-预算是硬性的：`--max-steps`
-次动作、两倍的决策调用、同一时刻只有一个动作在执行。连续三次动作页面没有变化会以
-`BLOCKED` 结束。
-
-## 录制
-
-默认不写任何文件。`--record <dir>`
-会为每次观察写一张 JPEG（以耗时毫秒命名）、每条执行动作写一行 `steps.jsonl`，以及一份
-`final.json`。截图是尽力而为的：后台标签页可能限制渲染，因此某张截图可能被跳过，但步骤日志始终完整。
-
-## 退出码
-
-| 码  | 含义                            |
-| --- | ------------------------------- |
-| `0` | 目标完成且 judge 验证通过       |
-| `1` | blocked、unverified、失败或中断 |
-| `2` | 配置或浏览器连接错误            |
-
-## 安全
-
-Prism 对任何站点都可用，没有白名单，也不逐步审批；它使用所连接 Chrome
-profile 的会话。页面内容被视为不可信数据而非指令，但 agent 仍能读取你的 profile 能读到的内容，并以你的身份提交表单。请使用独立 Chrome
-profile，避免让它接触你不想被访问的账号或数据。输入的值会打印到终端，并包含在 `--record`
-的输出中。
-
-## 开发
-
-```bash
-pnpm typecheck
-pnpm lint
-pnpm test        # 单元测试；不需要 Chrome 或 API key
-pnpm build
-```
-
-浏览器集成测试需要 Chrome 在 9222 端口：
-
-```bash
-PRISM_IT_CHROME=1 PRISM_IT_BROWSER_URL=http://127.0.0.1:9222 \
-  pnpm vitest run tests/regression.integration.test.ts
-```
-
-它用脚本化决策驱动 `fixtures/regression/index.html`，不需要模型 key。
-
-## 限制
-
-继承自上游 snapshot reader：shadow
-root、iframe、canvas、文件上传、弹窗新标签、嵌套滚动、任意键盘控件均不在范围内。DOM
-reader 覆盖常见 HTML 与 ARIA 控件，而非完整的 accessible-name 规范。
-
-## 致谢
+## Respect
 
 `src/browser/snapshot.js` 来自
 [browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast)，以 MIT
