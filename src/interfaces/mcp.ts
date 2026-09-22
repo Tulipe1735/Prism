@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import type { AgentEvent } from "../runtime/agent.ts";
+import type { AgentDependencies, AgentEvent } from "../runtime/agent.ts";
 import type { BrowserTaskOptions, BrowserTaskResult } from "../runtime/task.ts";
 
 import process from "node:process";
@@ -9,9 +9,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { runBrowserTask } from "../runtime/task.ts";
+import { samplingText } from "../runtime/text-helper.ts";
 import { VERSION } from "../shared/version.ts";
 
 export type TaskRunner = (options: BrowserTaskOptions) => Promise<BrowserTaskResult>;
+
+const HOST_TEXT_TIMEOUT_MS = 60_000;
 
 const OUTPUT_SCHEMA = {
   status: z.enum(["done", "blocked", "failed"]),
@@ -77,6 +80,7 @@ export function createPrismMcpServer(runTask: TaskRunner = runBrowserTask): McpS
           recordDir: args.record_dir,
           signal: extra.signal,
           onEvent: progressReporter(extra),
+          fieldText: hostFieldText(server, extra.signal),
         });
         return {
           content: [{ type: "text", text: summarize(result) }],
@@ -105,6 +109,23 @@ export function createPrismMcpServer(runTask: TaskRunner = runBrowserTask): McpS
   );
 
   return server;
+}
+
+/**
+ * Answers field-text questions with the host's own model when it declares the
+ * sampling capability; otherwise the task falls back to TEXT_MODEL_*.
+ */
+function hostFieldText(
+  server: McpServer,
+  signal: AbortSignal,
+): AgentDependencies["fieldText"] | undefined {
+  if (server.server.getClientCapabilities()?.sampling === undefined) return undefined;
+  return (context) =>
+    samplingText(context, (params) =>
+      server.server.createMessage(params, {
+        signal: AbortSignal.any([signal, AbortSignal.timeout(HOST_TEXT_TIMEOUT_MS)]),
+      }),
+    );
 }
 
 function summarize(result: BrowserTaskResult): string {

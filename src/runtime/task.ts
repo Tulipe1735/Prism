@@ -1,6 +1,11 @@
 import type { BrowserSession } from "../browser/session.ts";
 
-import type { AgentEvent, AgentResult, ConfirmContext } from "./agent.ts";
+import type {
+  AgentDependencies,
+  AgentEvent,
+  AgentResult,
+  ConfirmContext,
+} from "./agent.ts";
 import { randomUUID } from "node:crypto";
 import process from "node:process";
 import { connectBrowser, parseBrowserUrl } from "../browser/connect.ts";
@@ -19,6 +24,8 @@ export interface BrowserTaskOptions {
   signal?: AbortSignal;
   onEvent?: (event: AgentEvent) => void;
   confirmDecision?: (context: ConfirmContext) => Promise<boolean>;
+  /** Overrides the OpenAI-compatible text helper, e.g. with MCP sampling. */
+  fieldText?: AgentDependencies["fieldText"];
 }
 
 export interface BrowserTaskResult {
@@ -65,14 +72,16 @@ export async function runBrowserTask(
       dependencies: {
         choose: ({ snapshot, goal, history }) =>
           choose({ snapshot, goal, history, apiKey: typesafeKey }),
-        fieldText: (context) => {
-          if (textKey === undefined) {
-            throw new ConfigError(
-              "TEXT_MODEL_API_KEY is required to type into a field.",
-            );
-          }
-          return fieldText(context, { apiKey: textKey, sessionId });
-        },
+        fieldText:
+          options.fieldText ??
+          ((context) => {
+            if (textKey === undefined) {
+              throw new ConfigError(
+                "TEXT_MODEL_API_KEY is required to type into a field.",
+              );
+            }
+            return fieldText(context, { apiKey: textKey, sessionId });
+          }),
       },
     });
 

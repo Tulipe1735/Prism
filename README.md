@@ -10,7 +10,7 @@ DevTools Protocol 执行，直到决策模型判定目标达成。
 - Node.js >= 22.19
 - 可通过 CDP 连接的 Chrome
 - `TYPESAFE_API_KEY`
-- 一个 OpenAI 兼容的 key
+- 一个 OpenAI 兼容的 key（仅 CLI 模式需要；MCP 宿主支持 sampling 时由宿主自己的模型回答字段文本）
 
 ## 安装
 
@@ -48,6 +48,10 @@ google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.prism-chrome"
 
 宿主把整个浏览子任务委托出去；observe/decide/act 循环、新鲜度校验、预算和判定都由 Prism 自己负责。每步进度会以 MCP
 progress notification 上报；取消请求会中止运行并关闭标签页。
+
+宿主声明了 `sampling` 能力时（opencode 支持），需要填写的字段文本由宿主自己的模型通过
+`sampling/createMessage` 回答，此时不需要 `TEXT_MODEL_API_KEY`；否则回退到
+`TEXT_MODEL_*`。决策（选哪个控件/目标）始终只走 TypeSafe，不会交给宿主模型。
 
 opencode（`opencode.json`）：
 

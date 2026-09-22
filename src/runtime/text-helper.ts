@@ -26,6 +26,22 @@ export interface TextHelperResult {
   latencyMs: number;
 }
 
+export interface CreateMessageParams {
+  messages: Array<{ role: "user"; content: { type: "text"; text: string } }>;
+  systemPrompt: string;
+  maxTokens: number;
+}
+
+export interface CreateMessageResult {
+  content: unknown;
+  model?: unknown;
+}
+
+/** One MCP sampling request, injected so this module stays transport-agnostic. */
+export type CreateMessage = (
+  params: CreateMessageParams,
+) => Promise<CreateMessageResult>;
+
 export function fieldContext(
   goal: string,
   action: SnapshotAction,
@@ -82,6 +98,29 @@ export async function fieldText(
   return { text: output, model, usage: readUsage(result), latencyMs };
 }
 
+/** Ask the connected host model (MCP sampling) for the field value. */
+export async function samplingText(
+  context: TextContext,
+  createMessage: CreateMessage,
+): Promise<TextHelperResult> {
+  const started = Date.now();
+  const result = await createMessage({
+    systemPrompt: TEXT_VALUE,
+    messages: [
+      { role: "user", content: { type: "text", text: JSON.stringify(context) } },
+    ],
+    maxTokens: 1024,
+  });
+  const latencyMs = Date.now() - started;
+
+  return {
+    text: parseTextAnswer(samplingContent(result)),
+    model: typeof result.model === "string" ? result.model : "host model",
+    usage: {},
+    latencyMs,
+  };
+}
+
 function resolveReasoning(
   setting: string | undefined,
   baseUrl: string,
@@ -106,22 +145,35 @@ export function sessionHeaders(
 }
 
 function readOutput(result: unknown): string | null {
-  const content = readContent(result);
+  return parseTextAnswer(readContent(result));
+}
+
+function parseTextAnswer(content: string): string | null {
   let output: unknown;
   try {
     output = JSON.parse(content);
   } catch {
-    throw new Error("Text helper returned no valid field value; nothing typed.");
+    throw invalid();
   }
   if (!isRecord(output) || Object.keys(output).length !== 1 || !("text" in output)) {
-    throw new Error("Text helper returned no valid field value; nothing typed.");
+    throw invalid();
   }
   const value = output.text;
   if (value === null) return null;
   if (typeof value !== "string" || value.trim().length === 0 || value.length > 2000) {
-    throw new Error("Text helper returned no valid field value; nothing typed.");
+    throw invalid();
   }
   return value;
+}
+
+function samplingContent(result: CreateMessageResult): string {
+  const blocks = Array.isArray(result.content) ? result.content : [result.content];
+  for (const block of blocks) {
+    if (isRecord(block) && block.type === "text" && typeof block.text === "string") {
+      return block.text;
+    }
+  }
+  throw invalid();
 }
 
 function readContent(result: unknown): string {

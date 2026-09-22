@@ -1,7 +1,12 @@
 import type { Snapshot } from "../../src/shared/types.ts";
 
 import { describe, expect, it, vi } from "vitest";
-import { fieldContext, fieldText } from "../../src/runtime/text-helper.ts";
+import {
+  fieldContext,
+  fieldText,
+  samplingText,
+  type TextContext,
+} from "../../src/runtime/text-helper.ts";
 
 function mockJsonFetch(body: unknown): ReturnType<typeof vi.fn> {
   return vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));
@@ -141,5 +146,75 @@ describe("fieldText", () => {
         { apiKey: "key", fetchImpl: asFetch(fetchMock) },
       ),
     ).rejects.toThrow(/no valid field value/);
+  });
+});
+
+describe("samplingText", () => {
+  const context: TextContext = {
+    goal: "Email me",
+    field: { label: "Email" },
+    page: { title: "", text: "" },
+    recent_actions: [],
+  };
+
+  it("asks the connected host model for the field value", async () => {
+    const createMessage = vi.fn(async () => ({
+      content: { type: "text", text: '{"text":"person@example.com"}' },
+      model: "host-model",
+    }));
+
+    const result = await samplingText(context, createMessage);
+
+    expect(result.text).toBe("person@example.com");
+    expect(result.model).toBe("host-model");
+    expect(result.usage).toEqual({});
+    expect(createMessage).toHaveBeenCalledWith({
+      systemPrompt: expect.stringContaining("exactly one key"),
+      messages: [
+        { role: "user", content: { type: "text", text: JSON.stringify(context) } },
+      ],
+      maxTokens: 1024,
+    });
+  });
+
+  it("reads the first text block from a content array", async () => {
+    const createMessage = async () => ({
+      content: [
+        { type: "image", data: "aGk=", mimeType: "image/png" },
+        { type: "text", text: '{"text":"Ada"}' },
+      ],
+      model: "host-model",
+    });
+
+    expect((await samplingText(context, createMessage)).text).toBe("Ada");
+  });
+
+  it("returns null when the host has no value", async () => {
+    const createMessage = async () => ({
+      content: { type: "text", text: '{"text":null}' },
+      model: "host-model",
+    });
+
+    expect((await samplingText(context, createMessage)).text).toBeNull();
+  });
+
+  it("names the host when the model is missing", async () => {
+    const createMessage = async () => ({
+      content: { type: "text", text: '{"text":"Ada"}' },
+    });
+
+    expect((await samplingText(context, createMessage)).model).toBe("host model");
+  });
+
+  it.each([
+    ["malformed JSON", { type: "text", text: "not json" }],
+    ["extra keys", { type: "text", text: '{"text":"a","other":1}' }],
+    ["empty text", { type: "text", text: '{"text":"  "}' }],
+    ["no text block", { type: "image", data: "aGk=", mimeType: "image/png" }],
+  ])("rejects %s", async (_name, content) => {
+    const createMessage = async () => ({ content, model: "host-model" });
+    await expect(samplingText(context, createMessage)).rejects.toThrow(
+      /no valid field value/,
+    );
   });
 });
