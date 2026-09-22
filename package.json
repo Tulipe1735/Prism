@@ -1,8 +1,12 @@
 {
-  "name": "prism",
+  "name": "@tulipe1735/prism",
   "version": "0.1.0",
-  "private": true,
   "description": "A TypeScript browser-use CLI agent with a dynamic, indexed action space.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tulipe1735/Prism.git"
+  },
   "type": "module",
   "bin": {
     "prism": "./dist/cli.js",
@@ -17,6 +21,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
     "start": "node dist/cli.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

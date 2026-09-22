@@ -5,8 +5,6 @@ DevTools Protocol 执行，直到决策模型判定目标达成。
 
 ![Prism 架构图](docs/architecture.svg)
 
-架构图源文件为 [docs/architecture.excalidraw](docs/architecture.excalidraw)，可用 VSCode Excalidraw 插件编辑。
-
 ## 环境要求
 
 - Node.js >= 22.19
@@ -16,29 +14,11 @@ DevTools Protocol 执行，直到决策模型判定目标达成。
 
 ## 安装
 
-Prism 未发布到 npm，从源码构建。包管理器使用 pnpm（仓库锁定 9.15.9，执行
-`corepack enable` 可自动匹配）：
-
 ```bash
-git clone https://github.com/Tulipe1735/Prism.git
-cd Prism
-pnpm install
-pnpm build
+npm install -g @tulipe1735/prism
 ```
 
-构建产物在 `dist/`，含两个可执行入口：`prism`（CLI）和 `prism-mcp`（MCP
-server）。构建后可直接验证：
-
-```bash
-node dist/cli.js --help
-```
-
-在仓库根目录执行 `pnpm link --global` 可把 `prism` 和 `prism-mcp` 一并安装到 PATH：
-
-```bash
-pnpm link --global
-prism --help
-```
+包含两个可执行入口：`prism`（CLI）和 `prism-mcp`（MCP server）
 
 ## 连接 Chrome
 
