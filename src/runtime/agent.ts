@@ -116,6 +116,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   let decisions = 0;
   let staleAborts = 0;
 
+  // The main agent loop.
   while (true) {
     if (options.signal?.aborted === true) {
       status = "blocked";
@@ -133,12 +134,14 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       break;
     }
 
+    // Observe
     try {
       if (!(await session.samePage(snapshot))) {
         snapshot = await observe();
         continue;
       }
 
+      // Reason
       decisions += 1;
       const decision = await dependencies.choose({ snapshot, goal, history });
       const terminal = decision.choice === "DONE" || decision.choice === "BLOCKED";
@@ -221,6 +224,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         }
       }
 
+      // Act
       // BrowserSession.act rechecks freshness immediately before input.
       await session.act(action, snapshot, text);
       staleAborts = 0;
@@ -247,9 +251,10 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
         executed_ms: elapsed(),
         elapsed_ms: elapsed(),
       };
-      // Record execution before observing. A stale post-action observation must not erase it.
+      // History update
       history.push(entry);
 
+      // 新一轮 Observe
       snapshot = await observe();
       entry.page_changed = snapshot.fingerprint !== before.fingerprint;
       entry.url = snapshot.url;
