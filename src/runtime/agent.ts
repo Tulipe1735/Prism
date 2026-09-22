@@ -1,16 +1,16 @@
-import type { BrowserSession, Observation } from "./browser/session.ts";
-import type { TextContext, TextHelperResult } from "./text-helper.ts";
+import type { BrowserSession, Observation } from "../browser/session.ts";
 import type {
   Decision,
   HistoryEntry,
   SnapshotActionKind,
   TaskStatus,
-} from "./types.ts";
+} from "../shared/types.ts";
+import type { TextContext, TextHelperResult } from "./text-helper.ts";
 
 import { Buffer } from "node:buffer";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { StalePageError } from "./browser/session.ts";
+import { StalePageError } from "../browser/session.ts";
 import { fieldContext } from "./text-helper.ts";
 
 export interface ChooseInput {

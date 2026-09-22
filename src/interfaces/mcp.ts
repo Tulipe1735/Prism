@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import type { AgentEvent } from "./agent.ts";
-import type { BrowserTaskOptions, BrowserTaskResult } from "./task.ts";
+import type { AgentEvent } from "../runtime/agent.ts";
+import type { BrowserTaskOptions, BrowserTaskResult } from "../runtime/task.ts";
 
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -8,8 +8,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { runBrowserTask } from "./task.ts";
-import { VERSION } from "./version.ts";
+import { runBrowserTask } from "../runtime/task.ts";
+import { VERSION } from "../shared/version.ts";
 
 export type TaskRunner = (options: BrowserTaskOptions) => Promise<BrowserTaskResult>;
 

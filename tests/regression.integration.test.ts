@@ -1,8 +1,8 @@
 import type { AddressInfo } from "node:net";
-import type { AgentDependencies } from "../src/agent.ts";
 import type { BrowserConnection } from "../src/browser/connect.ts";
 import type { BrowserSession } from "../src/browser/session.ts";
-import type { Decision, HistoryEntry, Snapshot } from "../src/types.ts";
+import type { AgentDependencies } from "../src/runtime/agent.ts";
+import type { Decision, HistoryEntry, Snapshot } from "../src/shared/types.ts";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 
 import { createServer } from "node:http";
@@ -11,9 +11,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { runAgent } from "../src/agent.ts";
 import { connectBrowser, parseBrowserUrl } from "../src/browser/connect.ts";
 import { openBrowserSession } from "../src/browser/session.ts";
+import { runAgent } from "../src/runtime/agent.ts";
 
 const enabled = process.env.PRISM_IT_CHROME === "1";
 const fixture = new URL("../fixtures/regression/index.html", import.meta.url);

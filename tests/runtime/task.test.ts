@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ConfigError } from "./errors.ts";
-import { runBrowserTask } from "./task.ts";
+import { runBrowserTask } from "../../src/runtime/task.ts";
+import { ConfigError } from "../../src/shared/errors.ts";
 
 describe("runBrowserTask configuration", () => {
   afterEach(() => {

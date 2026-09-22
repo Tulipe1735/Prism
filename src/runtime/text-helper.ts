@@ -1,6 +1,6 @@
-import type { HistoryEntry, Snapshot, SnapshotAction } from "./types.ts";
+import type { HistoryEntry, Snapshot, SnapshotAction } from "../shared/types.ts";
 import process from "node:process";
-import { postJson } from "./http.ts";
+import { postJson } from "../shared/http.ts";
 import { TEXT_VALUE } from "./prompts.ts";
 
 export interface TextContext {

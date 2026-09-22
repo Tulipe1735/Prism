@@ -1,7 +1,7 @@
-import type { Snapshot } from "./types.ts";
+import type { Snapshot } from "../../src/shared/types.ts";
 
 import { describe, expect, it, vi } from "vitest";
-import { fieldContext, fieldText } from "./text-helper.ts";
+import { fieldContext, fieldText } from "../../src/runtime/text-helper.ts";
 
 function mockJsonFetch(body: unknown): ReturnType<typeof vi.fn> {
   return vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));

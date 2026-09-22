@@ -1,6 +1,6 @@
 import CDP from "chrome-remote-interface";
 
-import { ConfigError } from "../errors.ts";
+import { ConfigError } from "../shared/errors.ts";
 
 export interface CdpClient {
   send: (method: string, params?: object, sessionId?: string) => Promise<any>;

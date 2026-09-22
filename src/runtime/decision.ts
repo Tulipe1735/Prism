@@ -1,7 +1,7 @@
-import type { Decision, HistoryEntry, Snapshot } from "./types.ts";
+import type { Decision, HistoryEntry, Snapshot } from "../shared/types.ts";
 import process from "node:process";
+import { postJson } from "../shared/http.ts";
 import { actionSpace } from "./action-space.ts";
-import { postJson } from "./http.ts";
 import { NEXT_ACTION, TARGET } from "./prompts.ts";
 
 const SYSTEMONE_URL = "https://api.typesafe.ai/v1/systemone";

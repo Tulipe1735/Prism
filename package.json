@@ -1,6 +1,6 @@
 {
   "name": "@tulipe1735/prism",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A TypeScript browser-use CLI agent with a dynamic, indexed action space.",
   "license": "MIT",
   "repository": {
@@ -13,11 +13,12 @@
     "prism-mcp": "./dist/mcp.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "tsup src/cli.ts src/mcp.ts --format esm --clean --sourcemap --no-splitting && cp src/browser/snapshot.js dist/snapshot.js",
-    "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/cli.ts",
+    "build": "tsup src/interfaces/cli.ts src/interfaces/mcp.ts --format esm --clean --sourcemap --no-splitting && node -e \"require('node:fs').copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
+    "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/interfaces/cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",

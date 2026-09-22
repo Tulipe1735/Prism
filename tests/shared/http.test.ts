@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { postJson } from "./http.ts";
+import { postJson } from "../../src/shared/http.ts";
 
 function response(status: number, body: string): Response {
   return new Response(body, { status });

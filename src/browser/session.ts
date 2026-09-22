@@ -1,4 +1,4 @@
-import type { Snapshot, SnapshotAction } from "../types.ts";
+import type { Snapshot, SnapshotAction } from "../shared/types.ts";
 import type { CdpClient } from "./connect.ts";
 import { createHash } from "node:crypto";
 

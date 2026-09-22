@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { parseBrowserUrl } from "./browser/connect.ts";
-import { parseArgs } from "./cli.ts";
-import { ConfigError } from "./errors.ts";
+import { parseBrowserUrl } from "../../src/browser/connect.ts";
+import { parseArgs } from "../../src/interfaces/cli.ts";
+import { ConfigError } from "../../src/shared/errors.ts";
 
 describe("parseArgs", () => {
   it("defaults to a 60-action budget without step, record, or JSON", () => {

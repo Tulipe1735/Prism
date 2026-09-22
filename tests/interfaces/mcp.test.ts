@@ -1,11 +1,11 @@
-import type { TaskRunner } from "./mcp.ts";
-import type { BrowserTaskOptions, BrowserTaskResult } from "./task.ts";
+import type { TaskRunner } from "../../src/interfaces/mcp.ts";
+import type { BrowserTaskOptions, BrowserTaskResult } from "../../src/runtime/task.ts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it, vi } from "vitest";
-import { ConfigError } from "./errors.ts";
-import { createPrismMcpServer } from "./mcp.ts";
+import { createPrismMcpServer } from "../../src/interfaces/mcp.ts";
+import { ConfigError } from "../../src/shared/errors.ts";
 
 const taskResult: BrowserTaskResult = {
   status: "done",

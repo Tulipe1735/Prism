@@ -42,9 +42,9 @@ google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.prism-chrome"
 
 `prism-mcp` 是一个 stdio MCP server，只暴露一个任务级工具：
 
-| 工具           | 输入                                       | 返回                                                                                            |
-| -------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `browser_task` | `url`、`goal`、`max_steps?`、`record_dir?` | `status`、`reason`、`final_url`、`final_title`、`final_text`、`steps`、`elapsed_ms`、judge 字段 |
+| 工具           | 输入                                       | 返回                                                                                |
+| -------------- | ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `browser_task` | `url`、`goal`、`max_steps?`、`record_dir?` | `status`、`reason`、`final_url`、`final_title`、`final_text`、`steps`、`elapsed_ms` |
 
 宿主把整个浏览子任务委托出去；observe/decide/act 循环、新鲜度校验、预算和判定都由 Prism 自己负责。每步进度会以 MCP
 progress notification 上报；取消请求会中止运行并关闭标签页。

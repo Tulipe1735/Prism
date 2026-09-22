@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-import type { AgentEvent } from "./agent.ts";
+import type { AgentEvent } from "../runtime/agent.ts";
 import process from "node:process";
 import { createInterface } from "node:readline/promises";
 
 import { pathToFileURL } from "node:url";
-import { ConfigError } from "./errors.ts";
-import { runBrowserTask } from "./task.ts";
-import { VERSION } from "./version.ts";
+import { runBrowserTask } from "../runtime/task.ts";
+import { ConfigError } from "../shared/errors.ts";
+import { VERSION } from "../shared/version.ts";
 
 const HELP = `prism ${VERSION} — a browser-use CLI agent
 

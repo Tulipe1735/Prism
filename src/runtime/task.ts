@@ -1,13 +1,13 @@
-import type { AgentEvent, AgentResult, ConfirmContext } from "./agent.ts";
+import type { BrowserSession } from "../browser/session.ts";
 
-import type { BrowserSession } from "./browser/session.ts";
+import type { AgentEvent, AgentResult, ConfirmContext } from "./agent.ts";
 import { randomUUID } from "node:crypto";
 import process from "node:process";
+import { connectBrowser, parseBrowserUrl } from "../browser/connect.ts";
+import { openBrowserSession } from "../browser/session.ts";
+import { ConfigError } from "../shared/errors.ts";
 import { runAgent } from "./agent.ts";
-import { connectBrowser, parseBrowserUrl } from "./browser/connect.ts";
-import { openBrowserSession } from "./browser/session.ts";
 import { choose } from "./decision.ts";
-import { ConfigError } from "./errors.ts";
 import { fieldText } from "./text-helper.ts";
 
 export interface BrowserTaskOptions {

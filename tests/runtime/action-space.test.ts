@@ -1,7 +1,7 @@
-import type { SnapshotAction } from "./types.ts";
+import type { SnapshotAction } from "../../src/shared/types.ts";
 
 import { describe, expect, it } from "vitest";
-import { actionSpace } from "./action-space.ts";
+import { actionSpace } from "../../src/runtime/action-space.ts";
 
 const actions: SnapshotAction[] = [
   { id: "e1", kind: "click", node: 1, role: "button", label: "Save" },
