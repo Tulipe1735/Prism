@@ -3,88 +3,9 @@
 Prism 是一个 TypeScript 浏览器智能体 CLI。给它一个网址和一句目标，它会把页面读成一张带编号的可见控件表，让决策模型选择「对哪个元素执行哪个操作」，通过 Chrome
 DevTools Protocol 执行，直到决策模型判定目标达成。
 
-```mermaid
-flowchart TD
-  subgraph group_interfaces["Interfaces"]
-    node_cli["CLI<br/>[cli.ts]"]
-    node_mcp["MCP Server<br/>[mcp.ts]"]
-  end
+![Prism 架构图](docs/architecture.svg)
 
-  subgraph group_orchestration["Task Orchestration"]
-    node_task["Task Runner<br/>[task.ts]"]
-  end
-
-  subgraph group_agent["Agent Runtime"]
-    node_agent_loop["Agent Loop<br/>[agent.ts]"]
-    node_action_space["Action Space<br/>[action-space.ts]"]
-    node_decision["Decision Client<br/>[decision.ts]"]
-    node_field_text["Field Text<br/>[text-helper.ts]"]
-    node_records["Run Records<br/>[agent.ts]"]
-  end
-
-  subgraph group_browser["Browser Control"]
-    node_connection["CDP Connection<br/>[connect.ts]"]
-    node_session["Browser Session<br/>[session.ts]"]
-    node_snapshot["DOM Snapshot<br/>[snapshot.js]"]
-  end
-
-  node_user(("User"))
-  node_mcp_host(("MCP Host"))
-  node_chrome["Chrome"]
-  node_decision_api["Decision API"]
-  node_text_api["Text Model API"]
-
-  node_user -->|"submits task"| node_cli
-  node_mcp_host -->|"calls tool"| node_mcp
-  node_cli -->|"runs task"| node_task
-  node_mcp -->|"delegates task"| node_task
-  node_task -->|"connects browser"| node_connection
-  node_task -->|"opens session"| node_session
-  node_task -->|"runs agent"| node_agent_loop
-  node_connection -->|"connects CDP"| node_chrome
-  node_session -->|"sends commands"| node_chrome
-  node_session -->|"evaluates snapshot"| node_snapshot
-  node_session -->|"returns observation"| node_agent_loop
-  node_agent_loop -->|"observes and acts"| node_session
-  node_agent_loop -->|"requests choice"| node_decision
-  node_decision -->|"builds choices"| node_action_space
-  node_decision -->|"posts decision"| node_decision_api
-  node_decision_api -->|"returns choice"| node_decision
-  node_agent_loop -->|"requests value"| node_field_text
-  node_field_text -->|"posts field context"| node_text_api
-  node_text_api -->|"returns value"| node_field_text
-  node_field_text -->|"returns text"| node_agent_loop
-  node_agent_loop -->|"writes run data"| node_records
-  node_agent_loop -->|"returns outcome"| node_task
-  node_task -->|"returns result"| node_cli
-  node_task -->|"returns result"| node_mcp
-
-  click node_cli "https://github.com/tulipe1735/prism/blob/main/src/cli.ts"
-  click node_mcp "https://github.com/tulipe1735/prism/blob/main/src/mcp.ts"
-  click node_task "https://github.com/tulipe1735/prism/blob/main/src/task.ts"
-  click node_agent_loop "https://github.com/tulipe1735/prism/blob/main/src/agent.ts"
-  click node_action_space "https://github.com/tulipe1735/prism/blob/main/src/action-space.ts"
-  click node_decision "https://github.com/tulipe1735/prism/blob/main/src/decision.ts"
-  click node_field_text "https://github.com/tulipe1735/prism/blob/main/src/text-helper.ts"
-  click node_records "https://github.com/tulipe1735/prism/blob/main/src/agent.ts"
-  click node_connection "https://github.com/tulipe1735/prism/blob/main/src/browser/connect.ts"
-  click node_session "https://github.com/tulipe1735/prism/blob/main/src/browser/session.ts"
-  click node_snapshot "https://github.com/tulipe1735/prism/blob/main/src/browser/snapshot.js"
-
-  classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
-  classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
-  classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
-  classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
-  classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
-
-  class node_cli,node_mcp toneBlue
-  class node_task toneAmber
-  class node_agent_loop,node_action_space,node_decision,node_field_text,node_records toneMint
-  class node_connection,node_session,node_snapshot toneRose
-  class node_user,node_mcp_host,node_chrome,node_decision_api,node_text_api toneIndigo
-
-  linkStyle default stroke:#94a3b8,stroke-width:1.2px
-```
+架构图源文件为 [docs/architecture.excalidraw](docs/architecture.excalidraw)，可用 VSCode Excalidraw 插件编辑。
 
 ## 环境要求
 
@@ -141,11 +62,11 @@ google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.prism-chrome"
 
 `prism-mcp` 是一个 stdio MCP server，只暴露一个任务级工具：
 
-| 工具           | 输入                                       | 返回                                                                                |
-| -------------- | ------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `browser_task` | `url`、`goal`、`max_steps?`、`record_dir?` | `status`、`reason`、`final_url`、`final_title`、`final_text`、`steps`、`elapsed_ms` |
+| 工具           | 输入                                       | 返回                                                                                            |
+| -------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `browser_task` | `url`、`goal`、`max_steps?`、`record_dir?` | `status`、`reason`、`final_url`、`final_title`、`final_text`、`steps`、`elapsed_ms`、judge 字段 |
 
-宿主把整个浏览子任务委托出去；observe/decide/act 循环、新鲜度校验和预算都由 Prism 自己负责。每步进度会以 MCP
+宿主把整个浏览子任务委托出去；observe/decide/act 循环、新鲜度校验、预算和判定都由 Prism 自己负责。每步进度会以 MCP
 progress notification 上报；取消请求会中止运行并关闭标签页。
 
 opencode（`opencode.json`）：
