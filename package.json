@@ -1,6 +1,7 @@
 {
   "name": "@tulipe1735/prism",
-  "version": "0.1.3",
+  "version": "0.1.4",
+  "mcpName": "io.github.Tulipe1735/prism",
   "description": "A TypeScript browser-use CLI agent with a dynamic, indexed action space.",
   "license": "MIT",
   "repository": {

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Tulipe1735/prism",
+  "description": "Complete web tasks in the user's own Chrome via an observe-decide-act browser agent.",
+  "repository": {
+    "url": "https://github.com/Tulipe1735/Prism",
+    "source": "github",
+    "id": "1310654974"
+  },
+  "version": "0.1.4",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@tulipe1735/prism",
+      "version": "0.1.4",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "TYPESAFE_API_KEY",
+          "description": "TypeSafe API key used for the decision model.",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "TEXT_MODEL_API_KEY",
+          "description": "OpenAI-compatible key for field text; only needed when the MCP host does not support sampling.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "TEXT_MODEL_BASE_URL",
+          "description": "Field-text endpoint.",
+          "isRequired": false,
+          "format": "string",
+          "default": "https://api.deepseek.com/v1"
+        },
+        {
+          "name": "TEXT_MODEL",
+          "description": "Field-text model id.",
+          "isRequired": false,
+          "format": "string",
+          "default": "deepseek-chat"
+        }
+      ]
+    }
+  ]
+}
