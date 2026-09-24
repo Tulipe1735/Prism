@@ -1,4 +1,24 @@
 #!/usr/bin/env node
+
+// 伪代码
+// async function main() {
+//   const options = parseArgs();
+
+//   setupCtrlC();
+
+//   const reporter = createReporter();
+
+//   const result = await runBrowserTask({
+//     url,
+//     goal,
+//     reporter,
+//     confirmation,
+//     abortSignal,
+//   });
+
+//   return result.done ? 0 : 1;
+// }
+
 import type { AgentEvent } from "../runtime/agent.ts";
 import process from "node:process";
 import { createInterface } from "node:readline/promises";
@@ -50,6 +70,7 @@ export interface CliOptions {
 
 const VALUE_FLAGS = new Set(["--max-steps", "--record", "--browser-url"]);
 
+// CLI parser
 export function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     maxSteps: 60,
@@ -109,6 +130,18 @@ export function parseArgs(argv: string[]): CliOptions {
   return options;
 }
 
+// CLI orchestration layer
+// parse args
+// ↓
+// setup IO
+// ↓
+// setup cancellation
+// ↓
+// run task
+// ↓
+// print result
+// ↓
+// return code
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const options = parseArgs(argv);
   if (options.help) {
@@ -125,6 +158,17 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     );
   }
 
+  // Ctrl+C
+  //  ↓
+  // SIGINT
+  //  ↓
+  // controller.abort()
+  //  ↓
+  // AbortSignal
+  //  ↓
+  // runBrowserTask
+  //  ↓
+  // Agent loop / browser operation 停止
   const controller = new AbortController();
   const onSigint = (): void => controller.abort();
   process.once("SIGINT", onSigint);
@@ -135,6 +179,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     if (options.step)
       prompt = createInterface({ input: process.stdin, output: process.stderr });
 
+    // 进入 Runtime
     const result = await runBrowserTask({
       url: options.url,
       goal: options.goal,
@@ -173,6 +218,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   }
 }
 
+// Event → UI
 function createReporter(json: boolean): (event: AgentEvent) => void {
   if (json) return (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
 

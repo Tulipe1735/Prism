@@ -39,6 +39,7 @@ export interface BrowserTaskResult {
 }
 
 /**
+ * 任务启动器 / orchestration layer
  * One complete browser task: connect to Chrome, open a background tab, run the
  * observe/decide/act loop, and close the tab. This is the integration surface
  * for the CLI, the MCP server, and any host that embeds Prism.
