@@ -1,0 +1,35 @@
+{
+  "cohorts": [
+    {
+      "file": "evals/results/modal-before.jsonl",
+      "runs": 10,
+      "steps": 56,
+      "unique_planned_pairs": true,
+      "cost_counters_recomputed": true,
+      "first_indexed_controls_and_ids_equal": true,
+      "oracle_success_verified": true,
+      "model_and_hashes_verified": true,
+      "private_fixture_attributes_absent": true,
+      "variants": {
+        "prism-full": 10
+      }
+    },
+    {
+      "file": "evals/results/modal-after.jsonl",
+      "runs": 10,
+      "steps": 40,
+      "unique_planned_pairs": true,
+      "cost_counters_recomputed": true,
+      "first_indexed_controls_and_ids_equal": true,
+      "oracle_success_verified": true,
+      "model_and_hashes_verified": true,
+      "private_fixture_attributes_absent": true,
+      "variants": {
+        "prism-full": 10
+      }
+    }
+  ],
+  "source_archive": "evals/results/ambiguity-source.tar.gz",
+  "source_archive_sha256": "1e9dd49d9b1936bd2b6c94f256fb4d0c0e7451cd8a646bf39e264c9e442b8ae4",
+  "archived_files_byte_equal": 101
+}

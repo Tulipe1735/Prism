@@ -1,0 +1,687 @@
+{
+  "healthy": true,
+  "reasons": [],
+  "variance": [
+    {
+      "task": "ambiguity-001",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-001",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-001",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-001",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-002",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-002",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-002",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-002",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-003",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-003",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-003",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-003",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-004",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-004",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-004",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-004",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-005",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-005",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-005",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-005",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-006",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-006",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-006",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-006",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-007",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-007",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-007",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-007",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-008",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-008",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-008",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-008",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-009",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-009",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-009",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-009",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-010",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-010",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-010",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-010",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "ambiguity-011",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-011",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-011",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "ambiguity-011",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "form-001",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "form-001",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "form-001",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": true
+    },
+    {
+      "task": "form-001",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "grounding-001",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "grounding-001",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "grounding-001",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-001",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-002",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-002",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-002",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-002",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-003",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "grounding-003",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": true
+    },
+    {
+      "task": "grounding-003",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "grounding-003",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-004",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-004",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-004",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": true
+    },
+    {
+      "task": "grounding-004",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-005",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-005",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-005",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "grounding-005",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "navigation-001",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "navigation-001",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "navigation-001",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "navigation-001",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-001",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "stale-001",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-001",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": true
+    },
+    {
+      "task": "stale-001",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-002",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-002",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-002",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-002",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-003",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-003",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-003",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": true
+    },
+    {
+      "task": "stale-003",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-004",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": true
+    },
+    {
+      "task": "stale-004",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-004",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": true
+    },
+    {
+      "task": "stale-004",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": true,
+      "behaviorMixed": true
+    },
+    {
+      "task": "stale-005",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-005",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-005",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-005",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-006",
+      "variant": "prism-full",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-006",
+      "variant": "prism-no-stale-recovery",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-006",
+      "variant": "prism-no-validation",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    },
+    {
+      "task": "stale-006",
+      "variant": "raw-selector",
+      "runs": 3,
+      "successMixed": false,
+      "behaviorMixed": false
+    }
+  ],
+  "expected_runs": 288,
+  "completed_runs": 288,
+  "model": "glm-5.3-flash",
+  "temperature": 0,
+  "source_hash": "7c923b14708441e9ea01fc078fd094175ec58c1bdb705d9b1ab739caf1147fc8",
+  "endpoint_errors": 0,
+  "success_mixed_groups": 19,
+  "behavior_mixed_groups": 26,
+  "total_task_variant_groups": 96
+}

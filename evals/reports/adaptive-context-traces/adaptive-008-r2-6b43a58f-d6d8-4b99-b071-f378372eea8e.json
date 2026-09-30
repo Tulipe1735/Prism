@@ -1,0 +1,460 @@
+{
+  "classification": {
+    "task": "adaptive-008",
+    "repetition": 2,
+    "run_id": "6b43a58f-d6d8-4b99-b071-f378372eea8e",
+    "failure_type": "BUDGET_EXCEEDED",
+    "reason": "Evaluation wall-clock budget exceeded.",
+    "classification": "unrelated infrastructure failure",
+    "explanation": "The first local-context request selected and executed the correct Archive control. The oracle confirms Completed: Archive with zero wrong inputs. The compact terminal request then received no model response across two HTTP attempts; its step lasted 235.3 s until the 240 s task budget aborted it. No unresolved collisions or wrong target. Trace supports a provider/transport timeout, but cannot identify the remote root cause. The failed run is retained."
+  },
+  "summary": {
+    "schema_version": 3,
+    "experiment_id": "686e804c-8378-4433-a216-b55b02261fa1",
+    "task_id": "adaptive-008",
+    "run_id": "6b43a58f-d6d8-4b99-b071-f378372eea8e",
+    "variant": "indexed-adaptive",
+    "provider": "model",
+    "category": "ambiguity",
+    "repetition": 2,
+    "record_type": "summary",
+    "success": false,
+    "status": "failed",
+    "reason": "Evaluation wall-clock budget exceeded.",
+    "steps": 1,
+    "attempts": 1,
+    "invalid_actions": 0,
+    "invalid_outputs": 0,
+    "invalid_selectors": 0,
+    "selector_attempts": 0,
+    "target_attempts": 1,
+    "scored_target_attempts": 1,
+    "correct_target_selections": 1,
+    "grounding_errors": 0,
+    "input_tokens": null,
+    "output_tokens": null,
+    "total_tokens": null,
+    "wrong_target_actions": 0,
+    "grounding_observed_actions": 1,
+    "decision_calls": 2,
+    "llm_calls": 3,
+    "retries": 1,
+    "http_retries": 1,
+    "stale_events": 0,
+    "stale_recoveries": 0,
+    "latency_ms": 240009.7623399999,
+    "failure_type": "BUDGET_EXCEEDED",
+    "evidence": {
+      "checks": [
+        {
+          "expected": "Completed: Archive",
+          "actual": "Completed: Archive",
+          "passed": true
+        }
+      ],
+      "wrong_targets": 0,
+      "mutation_count": 0
+    },
+    "final_url": null,
+    "representation_observations": 2,
+    "representation_candidates_total": 3,
+    "representation_chars_total": 133,
+    "representation_estimated_tokens_total": 34,
+    "metadata": {
+      "started_at": "2026-09-30T16:08:37.620Z",
+      "task_hash": "a264329af3cc2104af8c4c98c40352493a266808bd97e0e785973038791b4524",
+      "fixture_hash": "c749b42f76633c937d420ea4f0f8e003a7deb63c6d0bc9fabf519e3151079ddf",
+      "source_hash": "f840b3888ad4648ade281a5996c858dcbc57844737e1dd2d13eb96f51671eed1",
+      "git_commit": "c1c74f9c1968004dbc914a4e9486d6b20d21c204",
+      "git_dirty": true,
+      "node_version": "v22.23.2",
+      "prism_version": "0.1.4",
+      "browser_version": "Chrome/153.0.8010.12",
+      "model": "glm-5.3-flash",
+      "text_model": "glm-5.3-flash",
+      "max_steps": 8,
+      "timeout_ms": 240000,
+      "cohort": {
+        "id": "ambiguity-adaptive-v1",
+        "model": "glm-5.3-flash",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "apiKeyEnv": "TEXT_MODEL_API_KEY",
+        "temperature": 0,
+        "topP": 1,
+        "maxTokens": 8192,
+        "reasoning": "provider-default",
+        "repeats": 3,
+        "maxSteps": 8,
+        "httpRetries": 2,
+        "staleRetries": 5,
+        "viewport": {
+          "width": 1120,
+          "height": 780
+        },
+        "browserVersion": "Chrome/153.0.8010.12",
+        "observation": "action-representation",
+        "modalPolicy": "observed",
+        "repetitionOffset": 0,
+        "variants": [
+          "indexed-local",
+          "indexed-structural",
+          "indexed-adaptive",
+          "raw-selector"
+        ],
+        "tasks": "evals/tasks/ambiguity-adaptive-v1.json",
+        "categories": [
+          "ambiguity"
+        ],
+        "fixturePort": 9841,
+        "timeoutMs": 240000,
+        "concurrency": 4,
+        "maxLlmCalls": 1500
+      },
+      "cohort_hash": "8eb14df996480488edbe7baea1bfe900acca68185571b94e00ba6ff255b881a3",
+      "system_prompt_hash": "c40b40cd952a0540cc616ac6b491b9e5ee11f84ac6f614cc55585ac116ae9fa4",
+      "task_prompt_hash": "92c06502d1024435f95f8709fa636a5beefe0b5b390832bc7db113c28ab50108",
+      "policy": "chat-heads-v2",
+      "representation": "adaptive",
+      "returned_models": [
+        "glm-5.3-flash"
+      ]
+    }
+  },
+  "steps": [
+    {
+      "schema_version": 3,
+      "experiment_id": "686e804c-8378-4433-a216-b55b02261fa1",
+      "task_id": "adaptive-008",
+      "run_id": "6b43a58f-d6d8-4b99-b071-f378372eea8e",
+      "variant": "indexed-adaptive",
+      "provider": "model",
+      "category": "ambiguity",
+      "repetition": 2,
+      "record_type": "step",
+      "step": 1,
+      "action_step": 1,
+      "action": "CLICK",
+      "target": "2",
+      "selected_target": {
+        "action_id": "e2",
+        "node": 2,
+        "label": "Delete"
+      },
+      "action_attempt": true,
+      "valid": true,
+      "validation_valid": true,
+      "executed": true,
+      "wrong_target": false,
+      "retry_count": 0,
+      "http_retries": 0,
+      "stale_detected": false,
+      "stale_events": 0,
+      "stale_recoveries": 0,
+      "latency_ms": 4705.923356000101,
+      "decision_calls": 1,
+      "llm_calls": 1,
+      "models": [
+        "glm-5.3-flash"
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 504,
+          "completion_tokens": 106,
+          "total_tokens": 610,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0,
+            "cache_write_tokens": 0
+          },
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          }
+        }
+      ],
+      "status": "executed",
+      "failure_type": null,
+      "error": null,
+      "selector": null,
+      "selector_valid": null,
+      "selector_failure": null,
+      "confidence": 0.95,
+      "target_confidence": 0.95,
+      "target_assessment": "correct",
+      "model_input": {
+        "goal": "Delete the visible Archive item.",
+        "page": {
+          "url": "http://127.0.0.1:9841/ambiguity-study/hidden-duplicate.html",
+          "title": "Control selection",
+          "text": "Pending"
+        },
+        "dom": null,
+        "dom_truncated": false,
+        "representation": "adaptive",
+        "adaptive": {
+          "initial_level": "compact",
+          "final_level": "local",
+          "number_of_candidates": 2,
+          "compact_collided": true,
+          "role_collided": true,
+          "local_collided": false,
+          "compact_collisions": 1,
+          "role_collisions": 1,
+          "local_collisions": 0,
+          "structural_required": false,
+          "unresolved_ambiguity": false,
+          "collision_groups": {
+            "compact": [
+              {
+                "operation": "CLICK",
+                "description": "[] Delete",
+                "candidates": [
+                  "1",
+                  "2"
+                ]
+              }
+            ],
+            "role": [
+              {
+                "operation": "CLICK",
+                "description": "[] button \"Delete\"",
+                "candidates": [
+                  "1",
+                  "2"
+                ]
+              }
+            ],
+            "local": [],
+            "structural": []
+          },
+          "candidate_levels": {
+            "CLICK": {
+              "1": "local",
+              "2": "local"
+            }
+          },
+          "unresolved_groups": [],
+          "representation_characters": 105,
+          "estimated_representation_tokens": 27
+        },
+        "target_mode": "indexed",
+        "targets": {
+          "CLICK": {
+            "1": "[1] button \"Delete\"\n  context: Draft",
+            "2": "[2] button \"Delete\"\n  context: Archive"
+          }
+        },
+        "operations": {
+          "CLICK": "Click an element, button, menu option, autocomplete suggestion, or calendar day.",
+          "WAIT": "Wait for the page to update",
+          "DONE": "Every requirement is visibly satisfied.",
+          "BLOCKED": "No supported operation can progress."
+        },
+        "history": []
+      },
+      "representation_cost": {
+        "candidates": 2,
+        "characters": 105,
+        "estimated_tokens": 27,
+        "estimator": "utf8-bytes-div-4",
+        "chars_per_candidate": 52.5,
+        "estimated_tokens_per_candidate": 13.5
+      },
+      "adaptive": {
+        "initial_level": "compact",
+        "final_level": "local",
+        "number_of_candidates": 2,
+        "compact_collided": true,
+        "role_collided": true,
+        "local_collided": false,
+        "compact_collisions": 1,
+        "role_collisions": 1,
+        "local_collisions": 0,
+        "structural_required": false,
+        "unresolved_ambiguity": false,
+        "collision_groups": {
+          "compact": [
+            {
+              "operation": "CLICK",
+              "description": "[] Delete",
+              "candidates": [
+                "1",
+                "2"
+              ]
+            }
+          ],
+          "role": [
+            {
+              "operation": "CLICK",
+              "description": "[] button \"Delete\"",
+              "candidates": [
+                "1",
+                "2"
+              ]
+            }
+          ],
+          "local": [],
+          "structural": []
+        },
+        "candidate_levels": {
+          "CLICK": {
+            "1": "local",
+            "2": "local"
+          }
+        },
+        "unresolved_groups": [],
+        "representation_characters": 105,
+        "estimated_representation_tokens": 27
+      },
+      "prompt_hash": "760b5c1597165ca4701e68d4e161031be4721c74ac388e3aff491415d9e63e7c",
+      "raw_model_output": "{\"operation\":{\"choice\":\"CLICK\",\"probabilities\":{\"CLICK\":1,\"WAIT\":0,\"DONE\":0,\"BLOCKED\":0},\"confidence\":0.95},\"target\":{\"choice\":\"2\",\"probabilities\":{\"1\":0,\"2\":1},\"confidence\":0.95},\"text\":null}",
+      "system_fingerprint": null,
+      "provider_error": null,
+      "input_tokens": 504,
+      "output_tokens": 106,
+      "total_tokens": 610
+    },
+    {
+      "schema_version": 3,
+      "experiment_id": "686e804c-8378-4433-a216-b55b02261fa1",
+      "task_id": "adaptive-008",
+      "run_id": "6b43a58f-d6d8-4b99-b071-f378372eea8e",
+      "variant": "indexed-adaptive",
+      "provider": "model",
+      "category": "ambiguity",
+      "repetition": 2,
+      "record_type": "step",
+      "step": 2,
+      "action_step": 2,
+      "action": null,
+      "target": null,
+      "selected_target": null,
+      "action_attempt": false,
+      "valid": null,
+      "validation_valid": null,
+      "executed": false,
+      "wrong_target": null,
+      "retry_count": 1,
+      "http_retries": 1,
+      "stale_detected": false,
+      "stale_events": 0,
+      "stale_recoveries": 0,
+      "latency_ms": 235255.39853300015,
+      "decision_calls": 1,
+      "llm_calls": 2,
+      "models": [],
+      "usage": [],
+      "status": "failed",
+      "failure_type": "BUDGET_EXCEEDED",
+      "error": "Evaluation wall-clock budget exceeded.",
+      "selector": null,
+      "selector_valid": null,
+      "selector_failure": null,
+      "confidence": null,
+      "target_confidence": null,
+      "target_assessment": null,
+      "model_input": {
+        "goal": "Delete the visible Archive item.",
+        "page": {
+          "url": "http://127.0.0.1:9841/ambiguity-study/hidden-duplicate.html",
+          "title": "Control selection",
+          "text": "Completed: Archive"
+        },
+        "dom": null,
+        "dom_truncated": false,
+        "representation": "adaptive",
+        "adaptive": {
+          "initial_level": "compact",
+          "final_level": "compact",
+          "number_of_candidates": 1,
+          "compact_collided": false,
+          "role_collided": false,
+          "local_collided": false,
+          "compact_collisions": 0,
+          "role_collisions": 0,
+          "local_collisions": 0,
+          "structural_required": false,
+          "unresolved_ambiguity": false,
+          "collision_groups": {
+            "compact": [],
+            "role": [],
+            "local": [],
+            "structural": []
+          },
+          "candidate_levels": {
+            "CLICK": {
+              "1": "compact"
+            }
+          },
+          "unresolved_groups": [],
+          "representation_characters": 28,
+          "estimated_representation_tokens": 7
+        },
+        "target_mode": "indexed",
+        "targets": {
+          "CLICK": {
+            "1": "[1] Delete"
+          }
+        },
+        "operations": {
+          "CLICK": "Click an element, button, menu option, autocomplete suggestion, or calendar day.",
+          "WAIT": "Wait for the page to update",
+          "DONE": "Every requirement is visibly satisfied.",
+          "BLOCKED": "No supported operation can progress."
+        },
+        "history": [
+          {
+            "action": "Delete",
+            "kind": "click",
+            "text": null,
+            "page_changed": true
+          }
+        ]
+      },
+      "representation_cost": {
+        "candidates": 1,
+        "characters": 28,
+        "estimated_tokens": 7,
+        "estimator": "utf8-bytes-div-4",
+        "chars_per_candidate": 28,
+        "estimated_tokens_per_candidate": 7
+      },
+      "adaptive": {
+        "initial_level": "compact",
+        "final_level": "compact",
+        "number_of_candidates": 1,
+        "compact_collided": false,
+        "role_collided": false,
+        "local_collided": false,
+        "compact_collisions": 0,
+        "role_collisions": 0,
+        "local_collisions": 0,
+        "structural_required": false,
+        "unresolved_ambiguity": false,
+        "collision_groups": {
+          "compact": [],
+          "role": [],
+          "local": [],
+          "structural": []
+        },
+        "candidate_levels": {
+          "CLICK": {
+            "1": "compact"
+          }
+        },
+        "unresolved_groups": [],
+        "representation_characters": 28,
+        "estimated_representation_tokens": 7
+      },
+      "prompt_hash": "d79f3e0e65ea8e3ae2786b7b35d167b3f7044183c8b606e45e8574955c7f91ea",
+      "raw_model_output": null,
+      "system_fingerprint": null,
+      "provider_error": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null
+    }
+  ]
+}

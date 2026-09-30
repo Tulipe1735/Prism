@@ -1,0 +1,19 @@
+{
+  "initial_actions": ["Publish draft", "Save draft", "Wait for the page to update"],
+  "modal_actions": [
+    "Publish draft",
+    "Save draft",
+    "Dismiss update notice",
+    "Wait for the page to update"
+  ],
+  "facts": {
+    "dialog_open": true,
+    "modal": true,
+    "save_checkVisibility": true,
+    "save_disabled": false,
+    "hit_at_save": "DIALOG",
+    "dismiss_present": true
+  },
+  "background_execution_error": "Target changed or is covered. Observe again.",
+  "after_dismiss_result": "Draft saved"
+}

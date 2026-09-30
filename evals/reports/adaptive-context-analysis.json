@@ -1,0 +1,934 @@
+{
+  "integrity": {
+    "planned_runs": 144,
+    "completed_runs": 144,
+    "plan_status": "incomplete",
+    "missing_cells": [],
+    "duplicate_cells": 0,
+    "unplanned_cells": [],
+    "orphan_steps": [],
+    "control_sets": 1,
+    "historical_files_unchanged": true,
+    "returned_model_drift": [],
+    "endpoint_stop_reason": "Endpoint failure: Eval decision model connection failed; no action executed.",
+    "provider_connection_failures": [
+      {
+        "task": "adaptive-016",
+        "variant": "indexed-local",
+        "repetition": 2,
+        "run_id": "9559f09d-4dd6-4ba4-bfd6-5dda056be34a",
+        "reason": "Eval decision model connection failed; no action executed."
+      },
+      {
+        "task": "adaptive-103",
+        "variant": "indexed-local",
+        "repetition": 2,
+        "run_id": "7e1e38d4-9b85-4282-8d74-ddccf67c0d51",
+        "reason": "Eval decision model connection failed; no action executed."
+      },
+      {
+        "task": "adaptive-103",
+        "variant": "raw-selector",
+        "repetition": 2,
+        "run_id": "a664492c-2c90-4f2b-af2d-ce578bd482b6",
+        "reason": "Eval decision model connection failed; no action executed."
+      }
+    ],
+    "wall_clock_exhaustions": 5,
+    "step_records": 289,
+    "run_ids": 144
+  },
+  "metrics": {
+    "indexed-local": {
+      "runs": 36,
+      "successes": 24,
+      "success_rate": 0.6666666666666666,
+      "correct_target_rate": 0.7027027027027027,
+      "first_correct_target_rate": 0.6944444444444444,
+      "correct_target_count": 26,
+      "scored_target_count": 37,
+      "wrong_target_rate": 0.2972972972972973,
+      "wrong_target_count": 11,
+      "audited_execution_count": 37,
+      "oracle_attainment_rate": 0.6944444444444444,
+      "wrong_target_run_rate": 0.16666666666666666,
+      "semantic_ambiguity_failure_rate": 0.16666666666666666,
+      "invalid_action_rate": 0.0,
+      "invalid_output_run_rate": 0.08333333333333333,
+      "avg_steps": 1.1666666666666667,
+      "avg_llm_calls": 2.361111111111111,
+      "avg_latency_ms": 63320.176841638895,
+      "representation_observations": 78,
+      "avg_representation_tokens": 32.61538461538461,
+      "avg_representation_characters": 128.37179487179486,
+      "avg_initial_representation_tokens": 36.75,
+      "total_representation_tokens": 2544,
+      "representation_tokens_per_success_including_failures": 106.0,
+      "representation_tokens_per_success_successful_runs_only": 57.875,
+      "http_retries": 7,
+      "total_llm_calls": 85,
+      "failure_types": {
+        "SEMANTIC_AMBIGUITY": 6,
+        "MODEL_OUTPUT_ERROR": 3,
+        "BUDGET_EXCEEDED": 1,
+        "DECISION_ERROR": 2
+      }
+    },
+    "indexed-structural": {
+      "runs": 36,
+      "successes": 35,
+      "success_rate": 0.9722222222222222,
+      "correct_target_rate": 1.0,
+      "first_correct_target_rate": 1.0,
+      "correct_target_count": 36,
+      "scored_target_count": 36,
+      "wrong_target_rate": 0.0,
+      "wrong_target_count": 0,
+      "audited_execution_count": 36,
+      "oracle_attainment_rate": 1.0,
+      "wrong_target_run_rate": 0.0,
+      "semantic_ambiguity_failure_rate": 0.0,
+      "invalid_action_rate": 0.0,
+      "invalid_output_run_rate": 0.027777777777777776,
+      "avg_steps": 1,
+      "avg_llm_calls": 2,
+      "avg_latency_ms": 32152.48205261112,
+      "representation_observations": 72,
+      "avg_representation_tokens": 51.708333333333336,
+      "avg_representation_characters": 204.95833333333334,
+      "avg_initial_representation_tokens": 62.916666666666664,
+      "total_representation_tokens": 3723,
+      "representation_tokens_per_success_including_failures": 106.37142857142857,
+      "representation_tokens_per_success_successful_runs_only": 102.68571428571428,
+      "http_retries": 0,
+      "total_llm_calls": 72,
+      "failure_types": {
+        "MODEL_OUTPUT_ERROR": 1
+      }
+    },
+    "indexed-adaptive": {
+      "runs": 36,
+      "successes": 33,
+      "success_rate": 0.9166666666666666,
+      "correct_target_rate": 1.0,
+      "first_correct_target_rate": 0.9444444444444444,
+      "correct_target_count": 34,
+      "scored_target_count": 34,
+      "wrong_target_rate": 0.0,
+      "wrong_target_count": 0,
+      "audited_execution_count": 34,
+      "oracle_attainment_rate": 0.9444444444444444,
+      "wrong_target_run_rate": 0.0,
+      "semantic_ambiguity_failure_rate": 0.0,
+      "invalid_action_rate": 0.0,
+      "invalid_output_run_rate": 0.05555555555555555,
+      "avg_steps": 0.9444444444444444,
+      "avg_llm_calls": 1.9722222222222223,
+      "avg_latency_ms": 33463.69258597222,
+      "representation_observations": 70,
+      "avg_representation_tokens": 32.15714285714286,
+      "avg_representation_characters": 127.15714285714286,
+      "avg_initial_representation_tokens": 39.833333333333336,
+      "total_representation_tokens": 2251,
+      "representation_tokens_per_success_including_failures": 68.21212121212122,
+      "representation_tokens_per_success_successful_runs_only": 63.78787878787879,
+      "http_retries": 1,
+      "total_llm_calls": 71,
+      "failure_types": {
+        "MODEL_OUTPUT_ERROR": 2,
+        "BUDGET_EXCEEDED": 1
+      }
+    },
+    "raw-selector": {
+      "runs": 36,
+      "successes": 30,
+      "success_rate": 0.8333333333333334,
+      "correct_target_rate": 1.0,
+      "first_correct_target_rate": 0.9166666666666666,
+      "correct_target_count": 33,
+      "scored_target_count": 33,
+      "wrong_target_rate": 0.0,
+      "wrong_target_count": 0,
+      "audited_execution_count": 33,
+      "oracle_attainment_rate": 0.9166666666666666,
+      "wrong_target_run_rate": 0.0,
+      "semantic_ambiguity_failure_rate": 0.0,
+      "invalid_action_rate": 0.08333333333333333,
+      "invalid_output_run_rate": 0.05555555555555555,
+      "avg_steps": 0.9166666666666666,
+      "avg_llm_calls": 1.9722222222222223,
+      "avg_latency_ms": 43058.53496658332,
+      "representation_observations": 69,
+      "avg_representation_tokens": 173.6086956521739,
+      "avg_representation_characters": 692.9565217391304,
+      "avg_initial_representation_tokens": 173.75,
+      "total_representation_tokens": 11979,
+      "representation_tokens_per_success_including_failures": 399.3,
+      "representation_tokens_per_success_successful_runs_only": 357.06666666666666,
+      "http_retries": 2,
+      "total_llm_calls": 71,
+      "failure_types": {
+        "INVALID_ACTION": 3,
+        "MODEL_OUTPUT_ERROR": 2,
+        "DECISION_ERROR": 1
+      }
+    }
+  },
+  "escalation": {
+    "observations": 70,
+    "final_level_counts": {
+      "local": 23,
+      "structural": 17,
+      "compact": 27,
+      "role": 3
+    },
+    "initial_observation_level_counts": {
+      "local": 15,
+      "structural": 9,
+      "role": 3,
+      "compact": 9
+    },
+    "candidate_level_counts": {
+      "local": 55,
+      "structural": 43,
+      "compact": 54,
+      "role": 6
+    },
+    "observations_reaching": {
+      "compact": 70,
+      "role": 43,
+      "local": 40,
+      "structural": 17
+    },
+    "resolved_observations": 70,
+    "unresolved_observations": 0,
+    "terminal_structural_observations": 8,
+    "structural_observations_without_target_selection": 9,
+    "structural_tasks": [
+      "adaptive-007",
+      "adaptive-012",
+      "adaptive-016"
+    ]
+  },
+  "comparison": {
+    "paired_tasks": 12,
+    "paired_runs": 36,
+    "success_difference": -0.05555555555555555,
+    "success_difference_task_cluster_95_interval": [
+      -0.16666666666666666,
+      0.05555555555555555
+    ],
+    "wrong_run_difference": 0,
+    "wrong_run_difference_task_cluster_95_interval": [
+      0,
+      0
+    ],
+    "representation_savings_vs_structural": 0.37810521468861513,
+    "initial_representation_savings_vs_structural": 0.366887417218543
+  },
+  "per_task": [
+    {
+      "task": "adaptive-001",
+      "goal": "Delete Item B.",
+      "arms": {
+        "indexed-local": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 76,
+          "avg_calls": 2
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 125,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 76,
+          "avg_calls": 2
+        },
+        "raw-selector": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 499,
+          "avg_calls": 2
+        }
+      },
+      "adaptive_initial_levels": {
+        "local": 3
+      }
+    },
+    {
+      "task": "adaptive-005",
+      "goal": "Delete the order numbered 408.",
+      "arms": {
+        "indexed-local": {
+          "successes": 2,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 59.666666666666664,
+          "avg_calls": 1.6666666666666667
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 99,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 69,
+          "avg_calls": 2
+        },
+        "raw-selector": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 308,
+          "avg_calls": 2
+        }
+      },
+      "adaptive_initial_levels": {
+        "local": 3
+      }
+    },
+    {
+      "task": "adaptive-007",
+      "goal": "Delete the Draft entry in Team Beta.",
+      "arms": {
+        "indexed-local": {
+          "successes": 0,
+          "runs": 3,
+          "wrong_inputs": 4,
+          "avg_tokens_per_run": 114,
+          "avg_calls": 3.6666666666666665
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 123,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 2,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 106.33333333333333,
+          "avg_calls": 1.6666666666666667
+        },
+        "raw-selector": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 538,
+          "avg_calls": 2
+        }
+      },
+      "adaptive_initial_levels": {
+        "structural": 3
+      }
+    },
+    {
+      "task": "adaptive-008",
+      "goal": "Delete the visible Archive item.",
+      "arms": {
+        "indexed-local": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 42,
+          "avg_calls": 2
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 63,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 2,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 34,
+          "avg_calls": 2.3333333333333335
+        },
+        "raw-selector": {
+          "successes": 0,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 119,
+          "avg_calls": 1
+        }
+      },
+      "adaptive_initial_levels": {
+        "local": 3
+      }
+    },
+    {
+      "task": "adaptive-009",
+      "goal": "Submit the enabled Renewal form.",
+      "arms": {
+        "indexed-local": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 44,
+          "avg_calls": 2
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 68,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 35,
+          "avg_calls": 2
+        },
+        "raw-selector": {
+          "successes": 1,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 300,
+          "avg_calls": 2
+        }
+      },
+      "adaptive_initial_levels": {
+        "local": 3
+      }
+    },
+    {
+      "task": "adaptive-012",
+      "goal": "Continue the account in the West region.",
+      "arms": {
+        "indexed-local": {
+          "successes": 1,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 77.66666666666667,
+          "avg_calls": 2.3333333333333335
+        },
+        "indexed-structural": {
+          "successes": 2,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 129,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 129,
+          "avg_calls": 2
+        },
+        "raw-selector": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 443,
+          "avg_calls": 2
+        }
+      },
+      "adaptive_initial_levels": {
+        "structural": 3
+      }
+    },
+    {
+      "task": "adaptive-013",
+      "goal": "Use the Open link, rather than the Open button.",
+      "arms": {
+        "indexed-local": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 26,
+          "avg_calls": 2
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 41,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 23,
+          "avg_calls": 2
+        },
+        "raw-selector": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 163,
+          "avg_calls": 2
+        }
+      },
+      "adaptive_initial_levels": {
+        "role": 3
+      }
+    },
+    {
+      "task": "adaptive-015",
+      "goal": "Open the Atlas East project link.",
+      "arms": {
+        "indexed-local": {
+          "successes": 2,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 57,
+          "avg_calls": 1.6666666666666667
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 112,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 2,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 57,
+          "avg_calls": 1.6666666666666667
+        },
+        "raw-selector": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 270,
+          "avg_calls": 2
+        }
+      },
+      "adaptive_initial_levels": {
+        "local": 3
+      }
+    },
+    {
+      "task": "adaptive-016",
+      "goal": "Submit the Personal invoice form.",
+      "arms": {
+        "indexed-local": {
+          "successes": 0,
+          "runs": 3,
+          "wrong_inputs": 7,
+          "avg_tokens_per_run": 152,
+          "avg_calls": 4.666666666666667
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 131,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 131,
+          "avg_calls": 2
+        },
+        "raw-selector": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 440,
+          "avg_calls": 2
+        }
+      },
+      "adaptive_initial_levels": {
+        "structural": 3
+      }
+    },
+    {
+      "task": "adaptive-101",
+      "goal": "Save profile.",
+      "arms": {
+        "indexed-local": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 66,
+          "avg_calls": 2
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 107,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 28,
+          "avg_calls": 2
+        },
+        "raw-selector": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 309,
+          "avg_calls": 2
+        }
+      },
+      "adaptive_initial_levels": {
+        "compact": 3
+      }
+    },
+    {
+      "task": "adaptive-102",
+      "goal": "Open dashboard.",
+      "arms": {
+        "indexed-local": {
+          "successes": 2,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 66.66666666666667,
+          "avg_calls": 1.6666666666666667
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 133,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 34,
+          "avg_calls": 2
+        },
+        "raw-selector": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 294,
+          "avg_calls": 2
+        }
+      },
+      "adaptive_initial_levels": {
+        "compact": 3
+      }
+    },
+    {
+      "task": "adaptive-103",
+      "goal": "Export report.",
+      "arms": {
+        "indexed-local": {
+          "successes": 2,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 67,
+          "avg_calls": 2.6666666666666665
+        },
+        "indexed-structural": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 110,
+          "avg_calls": 2
+        },
+        "indexed-adaptive": {
+          "successes": 3,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 28,
+          "avg_calls": 2
+        },
+        "raw-selector": {
+          "successes": 2,
+          "runs": 3,
+          "wrong_inputs": 0,
+          "avg_tokens_per_run": 310,
+          "avg_calls": 2.6666666666666665
+        }
+      },
+      "adaptive_initial_levels": {
+        "compact": 3
+      }
+    }
+  ],
+  "initial_prompt_equivalence": [
+    {
+      "task": "adaptive-001",
+      "adaptive_equals_local": true,
+      "adaptive_equals_structural": false,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "8379e361344902a19801bfd8e3f6e158182c89aa596a24cf93e71705091c7fc0"
+        ],
+        "indexed-structural": [
+          "e3c4d5cc059f5a7c5fdbb96786b1231524212cf474de0935ce1d8dccc87e69f6"
+        ],
+        "indexed-adaptive": [
+          "8379e361344902a19801bfd8e3f6e158182c89aa596a24cf93e71705091c7fc0"
+        ],
+        "raw-selector": [
+          "973edde25edeca2ab2967ce457298704aeb9a1063e1a1902ca8f57a67f8fa0fe"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-005",
+      "adaptive_equals_local": true,
+      "adaptive_equals_structural": false,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "88e7cbe74131709825a60ef8f0d3e1ecbc1aeecea9e1e7a9f3bac65a867fd454"
+        ],
+        "indexed-structural": [
+          "498732af42324d866d8d082bcafd0fabfd36a23c72910b78358bc0fc605f303a"
+        ],
+        "indexed-adaptive": [
+          "88e7cbe74131709825a60ef8f0d3e1ecbc1aeecea9e1e7a9f3bac65a867fd454"
+        ],
+        "raw-selector": [
+          "82ceb9453b47ceb6c7342596f4928bf0c000dbbbfc5a5d952542ae8d07045006"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-007",
+      "adaptive_equals_local": false,
+      "adaptive_equals_structural": true,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "74ee8f02c7a2cc03e30e95a127f657421c210d28e1589f3096379b851464c02b"
+        ],
+        "indexed-structural": [
+          "860642977f45ec75a46c89e8fa47c8e0ce48e9c1b15053c01c91af78d6c8426e"
+        ],
+        "indexed-adaptive": [
+          "860642977f45ec75a46c89e8fa47c8e0ce48e9c1b15053c01c91af78d6c8426e"
+        ],
+        "raw-selector": [
+          "17b26372add0bd66dd852d86da3dab5496c213e47cbb069a20c36b99c9760d40"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-008",
+      "adaptive_equals_local": true,
+      "adaptive_equals_structural": false,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "760b5c1597165ca4701e68d4e161031be4721c74ac388e3aff491415d9e63e7c"
+        ],
+        "indexed-structural": [
+          "b22bcdc23c64e994a014daf84d46acd2a67823663e2b50eb13631cec53f8a6bc"
+        ],
+        "indexed-adaptive": [
+          "760b5c1597165ca4701e68d4e161031be4721c74ac388e3aff491415d9e63e7c"
+        ],
+        "raw-selector": [
+          "4534a40f11d82a7042f4df98f572c3453e0e146eeb18e420d7dee5745219ad8a"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-009",
+      "adaptive_equals_local": true,
+      "adaptive_equals_structural": false,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "fea4e128b1b610f8bfcccb5b2452ac3eacd7a661cedf6dc5c27f51d9bfc541eb"
+        ],
+        "indexed-structural": [
+          "b46176bead5d264fcbc272e7fa37f84ebe94d569220ff7a5acda6f5fe0b00bd0"
+        ],
+        "indexed-adaptive": [
+          "fea4e128b1b610f8bfcccb5b2452ac3eacd7a661cedf6dc5c27f51d9bfc541eb"
+        ],
+        "raw-selector": [
+          "ad70c00bfe24379e7972dc8bfc45b8330e1541304e7bfba0f653031830525a06"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-012",
+      "adaptive_equals_local": false,
+      "adaptive_equals_structural": true,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "a221f458bcd8a1c43b1f32ae8b6cf3742f09a2b873c3457e6b7886f99429d635"
+        ],
+        "indexed-structural": [
+          "584adcdf0b828c30fa9264fc562a5c46d3e4c8607e49e15dff52dc892eba5908"
+        ],
+        "indexed-adaptive": [
+          "584adcdf0b828c30fa9264fc562a5c46d3e4c8607e49e15dff52dc892eba5908"
+        ],
+        "raw-selector": [
+          "3211f4181a9bc4329f5442a3e1a23841a1427cd376324238d8f05a6847342477"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-013",
+      "adaptive_equals_local": true,
+      "adaptive_equals_structural": false,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "7b3e9842b4cd92419b2e1ac2fc112c4fe74694172db9f2ef05978f9d78e93590"
+        ],
+        "indexed-structural": [
+          "9c33e9a4ad6e3752f6306d479068758b5e43e83576ec79f45aaae34c90b728e1"
+        ],
+        "indexed-adaptive": [
+          "7b3e9842b4cd92419b2e1ac2fc112c4fe74694172db9f2ef05978f9d78e93590"
+        ],
+        "raw-selector": [
+          "d5e1816ce93b97a1dfdbfdc7114447a132b8de6634c2782f61bdde7101905d20"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-015",
+      "adaptive_equals_local": true,
+      "adaptive_equals_structural": false,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "4e20780fe1f7eb5eb3ea1c220fbdb61e6377474dda69ec57e3eabb93f940ca36"
+        ],
+        "indexed-structural": [
+          "c885ab091d4e304bfd61b550c053afe236c0a285394a074b935d17630c469a23"
+        ],
+        "indexed-adaptive": [
+          "4e20780fe1f7eb5eb3ea1c220fbdb61e6377474dda69ec57e3eabb93f940ca36"
+        ],
+        "raw-selector": [
+          "6d0987e27054e9c3992d8eb2d5a5bdf76562282de0157be6d60b3238881c23f0"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-016",
+      "adaptive_equals_local": false,
+      "adaptive_equals_structural": true,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "53bb52ee7afcc08e25ec7bc79ad1ab60967c1e45f6bae6c50fd82fc7418de3cf"
+        ],
+        "indexed-structural": [
+          "8fe9d064e16d11974dc0a75e3befe8649b2e157e768e267ac2a09038a9d70040"
+        ],
+        "indexed-adaptive": [
+          "8fe9d064e16d11974dc0a75e3befe8649b2e157e768e267ac2a09038a9d70040"
+        ],
+        "raw-selector": [
+          "62d59d8cbf3ba35aea8d7e719c4067cfa76a790b64f910f06b93cdccaaa749f0"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-101",
+      "adaptive_equals_local": false,
+      "adaptive_equals_structural": false,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "eb60816d64dd5047ee0e1d611b40ec4668f541f7025b4523e12d8b80cbced837"
+        ],
+        "indexed-structural": [
+          "cf16c6c3ae13c6b28b0427a56a0844869c7010c99e0c3f287c34317d61db010d"
+        ],
+        "indexed-adaptive": [
+          "622d9e29101984a397b4e240f9a4740740e3e5a817ef4d986df26cb7c8e0e8d9"
+        ],
+        "raw-selector": [
+          "41058a96dc9446590cc83892dede2c8afda79929a400cd2cbd5c940c68812bac"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-102",
+      "adaptive_equals_local": false,
+      "adaptive_equals_structural": false,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "b58efec90e666635f608fb80d0434512776a8c82cdbcbfbafefabaf46c1fcbb5"
+        ],
+        "indexed-structural": [
+          "6aaf8169b8fac9dec86235f9bc11151762f8ee6377cf195fbbddd70162d99c01"
+        ],
+        "indexed-adaptive": [
+          "241795311fabcea5efecba4d45b30218b94b3a8fa3ca14144cb24db613f09825"
+        ],
+        "raw-selector": [
+          "f6fee0f9e4e2059bfd48ace646808cec2f459d6fb803759618c1ace19f4d48ce"
+        ]
+      }
+    },
+    {
+      "task": "adaptive-103",
+      "adaptive_equals_local": false,
+      "adaptive_equals_structural": false,
+      "initial_prompt_hashes": {
+        "indexed-local": [
+          "27e087ef8db62c937426f6b74d60c0ea48495b238b279096d2f52ae3873638a4"
+        ],
+        "indexed-structural": [
+          "c4e48d4ab078deca8138739561e109f6043085963d74710ea4eca55a4037ec69"
+        ],
+        "indexed-adaptive": [
+          "e8e27f8fc5e79c6ec13e8370b4cb36a0d7f6de90c04183ad6fcb1295fdf890c4"
+        ],
+        "raw-selector": [
+          "d572ee2740570903dbd81f9862d2440a0a8151cb3d1ede0bde3e29e5c5e5ab44"
+        ]
+      }
+    }
+  ],
+  "adaptive_failures": [
+    {
+      "task": "adaptive-015",
+      "repetition": 0,
+      "run_id": "896f6ecc-c05e-421e-a94b-e70dd66f8cbd",
+      "failure_type": "MODEL_OUTPUT_ERROR",
+      "reason": "Invalid TypeSafe response; no action executed.",
+      "classification": "model output-format failure",
+      "explanation": "Step 1 before any execution. Missing operation probability keys: BLOCKED, DONE, WAIT. Final level local, unresolved=False. Existing validator rejected the response; no evidence of detector causation."
+    },
+    {
+      "task": "adaptive-007",
+      "repetition": 1,
+      "run_id": "74f23b62-1e3a-402d-a2f8-ad74c8f1fbd2",
+      "failure_type": "MODEL_OUTPUT_ERROR",
+      "reason": "Invalid TypeSafe response; no action executed.",
+      "classification": "model output-format failure",
+      "explanation": "Step 1 before any execution. Missing target confidence. Final level structural, unresolved=False. Existing validator rejected the response; no evidence of detector causation."
+    },
+    {
+      "task": "adaptive-008",
+      "repetition": 2,
+      "run_id": "6b43a58f-d6d8-4b99-b071-f378372eea8e",
+      "failure_type": "BUDGET_EXCEEDED",
+      "reason": "Evaluation wall-clock budget exceeded.",
+      "classification": "unrelated infrastructure failure",
+      "explanation": "The first local-context request selected and executed the correct Archive control. The oracle confirms Completed: Archive with zero wrong inputs. The compact terminal request then received no model response across two HTTP attempts; its step lasted 235.3 s until the 240 s task budget aborted it. No unresolved collisions or wrong target. Trace supports a provider/transport timeout, but cannot identify the remote root cause. The failed run is retained."
+    }
+  ]
+}

@@ -1,0 +1,323 @@
+{
+  "classification": {
+    "task": "adaptive-015",
+    "repetition": 0,
+    "run_id": "896f6ecc-c05e-421e-a94b-e70dd66f8cbd",
+    "failure_type": "MODEL_OUTPUT_ERROR",
+    "reason": "Invalid TypeSafe response; no action executed.",
+    "classification": "model output-format failure",
+    "explanation": "Step 1 before any execution. Missing operation probability keys: BLOCKED, DONE, WAIT. Final level local, unresolved=False. Existing validator rejected the response; no evidence of detector causation."
+  },
+  "summary": {
+    "schema_version": 3,
+    "experiment_id": "686e804c-8378-4433-a216-b55b02261fa1",
+    "task_id": "adaptive-015",
+    "run_id": "896f6ecc-c05e-421e-a94b-e70dd66f8cbd",
+    "variant": "indexed-adaptive",
+    "provider": "model",
+    "category": "ambiguity",
+    "repetition": 0,
+    "record_type": "summary",
+    "success": false,
+    "status": "failed",
+    "reason": "Invalid TypeSafe response; no action executed.",
+    "steps": 0,
+    "attempts": 1,
+    "invalid_actions": 0,
+    "invalid_outputs": 1,
+    "invalid_selectors": 0,
+    "selector_attempts": 0,
+    "target_attempts": 0,
+    "scored_target_attempts": 0,
+    "correct_target_selections": 0,
+    "grounding_errors": 0,
+    "input_tokens": 523,
+    "output_tokens": 115,
+    "total_tokens": 638,
+    "wrong_target_actions": 0,
+    "grounding_observed_actions": 0,
+    "decision_calls": 1,
+    "llm_calls": 1,
+    "retries": 0,
+    "http_retries": 0,
+    "stale_events": 0,
+    "stale_recoveries": 0,
+    "latency_ms": 6030.289815999975,
+    "failure_type": "MODEL_OUTPUT_ERROR",
+    "evidence": {
+      "checks": [
+        {
+          "expected": "Completed: Atlas East",
+          "actual": "Pending",
+          "passed": false
+        }
+      ],
+      "wrong_targets": 0,
+      "mutation_count": 0
+    },
+    "final_url": null,
+    "representation_observations": 1,
+    "representation_candidates_total": 3,
+    "representation_chars_total": 153,
+    "representation_estimated_tokens_total": 39,
+    "metadata": {
+      "started_at": "2026-09-30T15:57:42.592Z",
+      "task_hash": "47719b92e29793cbbf48c7218dba379ec9e88d74ee182b31be6dd74780c77506",
+      "fixture_hash": "c749b42f76633c937d420ea4f0f8e003a7deb63c6d0bc9fabf519e3151079ddf",
+      "source_hash": "f840b3888ad4648ade281a5996c858dcbc57844737e1dd2d13eb96f51671eed1",
+      "git_commit": "c1c74f9c1968004dbc914a4e9486d6b20d21c204",
+      "git_dirty": true,
+      "node_version": "v22.23.2",
+      "prism_version": "0.1.4",
+      "browser_version": "Chrome/153.0.8010.12",
+      "model": "glm-5.3-flash",
+      "text_model": "glm-5.3-flash",
+      "max_steps": 8,
+      "timeout_ms": 240000,
+      "cohort": {
+        "id": "ambiguity-adaptive-v1",
+        "model": "glm-5.3-flash",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "apiKeyEnv": "TEXT_MODEL_API_KEY",
+        "temperature": 0,
+        "topP": 1,
+        "maxTokens": 8192,
+        "reasoning": "provider-default",
+        "repeats": 3,
+        "maxSteps": 8,
+        "httpRetries": 2,
+        "staleRetries": 5,
+        "viewport": {
+          "width": 1120,
+          "height": 780
+        },
+        "browserVersion": "Chrome/153.0.8010.12",
+        "observation": "action-representation",
+        "modalPolicy": "observed",
+        "repetitionOffset": 0,
+        "variants": [
+          "indexed-local",
+          "indexed-structural",
+          "indexed-adaptive",
+          "raw-selector"
+        ],
+        "tasks": "evals/tasks/ambiguity-adaptive-v1.json",
+        "categories": [
+          "ambiguity"
+        ],
+        "fixturePort": 9841,
+        "timeoutMs": 240000,
+        "concurrency": 4,
+        "maxLlmCalls": 1500
+      },
+      "cohort_hash": "8eb14df996480488edbe7baea1bfe900acca68185571b94e00ba6ff255b881a3",
+      "system_prompt_hash": "c40b40cd952a0540cc616ac6b491b9e5ee11f84ac6f614cc55585ac116ae9fa4",
+      "task_prompt_hash": "92c06502d1024435f95f8709fa636a5beefe0b5b390832bc7db113c28ab50108",
+      "policy": "chat-heads-v2",
+      "representation": "adaptive",
+      "returned_models": [
+        "glm-5.3-flash"
+      ]
+    }
+  },
+  "steps": [
+    {
+      "schema_version": 3,
+      "experiment_id": "686e804c-8378-4433-a216-b55b02261fa1",
+      "task_id": "adaptive-015",
+      "run_id": "896f6ecc-c05e-421e-a94b-e70dd66f8cbd",
+      "variant": "indexed-adaptive",
+      "provider": "model",
+      "category": "ambiguity",
+      "repetition": 0,
+      "record_type": "step",
+      "step": 1,
+      "action_step": 1,
+      "action": "CLICK",
+      "target": "3",
+      "selected_target": null,
+      "action_attempt": true,
+      "valid": true,
+      "validation_valid": false,
+      "executed": false,
+      "wrong_target": null,
+      "retry_count": 0,
+      "http_retries": 0,
+      "stale_detected": false,
+      "stale_events": 0,
+      "stale_recoveries": 0,
+      "latency_ms": 5971.818556000013,
+      "decision_calls": 1,
+      "llm_calls": 1,
+      "models": [
+        "glm-5.3-flash"
+      ],
+      "usage": [
+        {
+          "prompt_tokens": 523,
+          "completion_tokens": 115,
+          "total_tokens": 638,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cached_tokens": 0,
+            "cache_write_tokens": 0
+          },
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": 0
+          }
+        }
+      ],
+      "status": "failed",
+      "failure_type": "MODEL_OUTPUT_ERROR",
+      "error": "Invalid TypeSafe response; no action executed.",
+      "selector": null,
+      "selector_valid": null,
+      "selector_failure": null,
+      "confidence": 0.99,
+      "target_confidence": 0.99,
+      "target_assessment": null,
+      "model_input": {
+        "goal": "Open the Atlas East project link.",
+        "page": {
+          "url": "http://127.0.0.1:9841/ambiguity-study/similar-entities.html",
+          "title": "Control selection",
+          "text": "Pending"
+        },
+        "dom": null,
+        "dom_truncated": false,
+        "representation": "adaptive",
+        "adaptive": {
+          "initial_level": "compact",
+          "final_level": "local",
+          "number_of_candidates": 3,
+          "compact_collided": true,
+          "role_collided": true,
+          "local_collided": false,
+          "compact_collisions": 1,
+          "role_collisions": 1,
+          "local_collisions": 0,
+          "structural_required": false,
+          "unresolved_ambiguity": false,
+          "collision_groups": {
+            "compact": [
+              {
+                "operation": "CLICK",
+                "description": "[] Open",
+                "candidates": [
+                  "1",
+                  "2",
+                  "3"
+                ]
+              }
+            ],
+            "role": [
+              {
+                "operation": "CLICK",
+                "description": "[] link \"Open\"",
+                "candidates": [
+                  "1",
+                  "2",
+                  "3"
+                ]
+              }
+            ],
+            "local": [],
+            "structural": []
+          },
+          "candidate_levels": {
+            "CLICK": {
+              "1": "local",
+              "2": "local",
+              "3": "local"
+            }
+          },
+          "unresolved_groups": [],
+          "representation_characters": 153,
+          "estimated_representation_tokens": 39
+        },
+        "target_mode": "indexed",
+        "targets": {
+          "CLICK": {
+            "1": "[1] link \"Open\"\n  context: Atlas North",
+            "2": "[2] link \"Open\"\n  context: Atlas West",
+            "3": "[3] link \"Open\"\n  context: Atlas East"
+          }
+        },
+        "operations": {
+          "CLICK": "Click an element, button, menu option, autocomplete suggestion, or calendar day.",
+          "WAIT": "Wait for the page to update",
+          "DONE": "Every requirement is visibly satisfied.",
+          "BLOCKED": "No supported operation can progress."
+        },
+        "history": []
+      },
+      "representation_cost": {
+        "candidates": 3,
+        "characters": 153,
+        "estimated_tokens": 39,
+        "estimator": "utf8-bytes-div-4",
+        "chars_per_candidate": 51,
+        "estimated_tokens_per_candidate": 13
+      },
+      "adaptive": {
+        "initial_level": "compact",
+        "final_level": "local",
+        "number_of_candidates": 3,
+        "compact_collided": true,
+        "role_collided": true,
+        "local_collided": false,
+        "compact_collisions": 1,
+        "role_collisions": 1,
+        "local_collisions": 0,
+        "structural_required": false,
+        "unresolved_ambiguity": false,
+        "collision_groups": {
+          "compact": [
+            {
+              "operation": "CLICK",
+              "description": "[] Open",
+              "candidates": [
+                "1",
+                "2",
+                "3"
+              ]
+            }
+          ],
+          "role": [
+            {
+              "operation": "CLICK",
+              "description": "[] link \"Open\"",
+              "candidates": [
+                "1",
+                "2",
+                "3"
+              ]
+            }
+          ],
+          "local": [],
+          "structural": []
+        },
+        "candidate_levels": {
+          "CLICK": {
+            "1": "local",
+            "2": "local",
+            "3": "local"
+          }
+        },
+        "unresolved_groups": [],
+        "representation_characters": 153,
+        "estimated_representation_tokens": 39
+      },
+      "prompt_hash": "4e20780fe1f7eb5eb3ea1c220fbdb61e6377474dda69ec57e3eabb93f940ca36",
+      "raw_model_output": "{\"operation\":{\"choice\":\"CLICK\",\"probabilities\":{\"CLICK\":1.0},\"confidence\":0.99},\"target\":{\"choice\":\"3\",\"probabilities\":{\"3\":1.0,\"1\":0.0,\"2\":0.0},\"confidence\":0.99},\"text\":null}",
+      "system_fingerprint": null,
+      "provider_error": null,
+      "input_tokens": 523,
+      "output_tokens": 115,
+      "total_tokens": 638
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "checked_at": "2026-09-30T16:18:55.599Z",
+  "frozen_inputs": {
+    "source": true,
+    "fixtures": true,
+    "tasks": true,
+    "config": true,
+    "archive": true
+  },
+  "historical_files": [
+    {
+      "path": "evals/results/ambiguity-initial.jsonl",
+      "unchanged": true
+    },
+    {
+      "path": "evals/results/ambiguity-initial.jsonl.meta.json",
+      "unchanged": true
+    },
+    {
+      "path": "evals/results/ambiguity-source.tar.gz",
+      "unchanged": true
+    },
+    {
+      "path": "evals/cohorts/ambiguity-initial.json",
+      "unchanged": true
+    },
+    {
+      "path": "evals/cohorts/ambiguity-protocol.md",
+      "unchanged": true
+    },
+    {
+      "path": "evals/tasks/ambiguity-study.json",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/parent-only.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/entity-links.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/delete-rows.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/role-cue.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/hidden-duplicate.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/same-role-label.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/submit-cards.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/rerendered-controls.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/form-legend.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/semantic-sections.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/nested-cards.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/nearby-text.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/support.js",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/many-rows.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/reordered-controls.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/similar-entities.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/fixtures/ambiguity-study/disabled-duplicate.html",
+      "unchanged": true
+    },
+    {
+      "path": "evals/reports/ambiguity-interim.md",
+      "unchanged": true
+    },
+    {
+      "path": "evals/reports/ambiguity-audit.json",
+      "unchanged": true
+    }
+  ],
+  "strict_schema_records": 433
+}
