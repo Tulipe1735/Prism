@@ -9,7 +9,13 @@ export default antfu(
     markdown: false,
     toml: false,
     yaml: false,
-    ignores: ["coverage/**", "dist/**", "fixtures/**", "src/browser/snapshot.js"],
+    ignores: [
+      "coverage/**",
+      "dist/**",
+      "fixtures/**",
+      "evals/fixtures/**",
+      "src/browser/snapshot.js",
+    ],
   },
   {
     name: "prism/typescript",

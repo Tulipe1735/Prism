@@ -20,13 +20,16 @@
   "scripts": {
     "build": "tsup src/interfaces/cli.ts src/interfaces/mcp.ts --format esm --clean --sourcemap --no-splitting && node -e \"require('node:fs').copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
     "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/interfaces/cli.ts",
+    "eval": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/cli.ts",
+    "eval:report": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/report-cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
     "start": "node dist/cli.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval:cohort": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/cohort.ts"
   },
   "engines": {
     "node": ">=22.19.0"
