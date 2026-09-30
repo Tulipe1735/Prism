@@ -1,5 +1,6 @@
 import type { HistoryEntry, Snapshot, SnapshotAction } from "../shared/types.ts";
 import process from "node:process";
+import { ModelOutputError } from "../shared/errors.ts";
 import { postJson } from "../shared/http.ts";
 import { TEXT_VALUE } from "./prompts.ts";
 
@@ -195,7 +196,9 @@ function readUsage(result: unknown): Record<string, unknown> {
 }
 
 function invalid(): Error {
-  return new Error("Text helper returned no valid field value; nothing typed.");
+  return new ModelOutputError(
+    "Text helper returned no valid field value; nothing typed.",
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, any> {

@@ -1,5 +1,6 @@
 import type { Decision, HistoryEntry, Snapshot } from "../shared/types.ts";
 import process from "node:process";
+import { ModelOutputError } from "../shared/errors.ts";
 import { postJson } from "../shared/http.ts";
 import { actionSpace } from "./action-space.ts";
 import { NEXT_ACTION, TARGET } from "./prompts.ts";
@@ -22,6 +23,8 @@ export interface ChooseOptions {
   apiKey: string;
   model?: string;
   fetchImpl?: typeof fetch;
+  /** Disable distribution/argmax checks only. Observed-target mapping is retained. */
+  validation?: boolean;
 }
 
 interface ValidatedChoice {
@@ -93,8 +96,30 @@ export async function choose(options: ChooseOptions): Promise<Decision> {
   });
   const latencyMs = Date.now() - started;
 
+  return parseDecisionResponse(result, {
+    snapshot,
+    latencyMs,
+    request: body,
+    validation: options.validation,
+  });
+}
+
+/** Parse a decision from any model transport using Prism's production validation. */
+export function parseDecisionResponse(
+  result: unknown,
+  options: {
+    snapshot: Snapshot;
+    latencyMs: number;
+    request: unknown;
+    validation?: boolean;
+  },
+): Decision {
+  const { targets, controls } = actionSpace(options.snapshot.actions);
+  const operations = decisionOperations(options.snapshot);
+
   const answers = readAnswers(result);
-  const operationAnswer = validateChoice(answers.operation, operations);
+  const validate = options.validation === false ? readChoice : validateChoice;
+  const operationAnswer = validate(answers.operation, operations);
   const operation = operationAnswer.choice;
 
   let target: string | null = null;
@@ -105,7 +130,7 @@ export async function choose(options: ChooseOptions): Promise<Decision> {
   const operationTargets = targets[operation];
   if (operationTargets !== undefined) {
     // Unused target heads cannot cause an action. Validate only the head the operation selects.
-    targetAnswer = validateChoice(
+    targetAnswer = validate(
       answers[`${operation.toLowerCase()}_target`],
       operationTargets,
     );
@@ -134,8 +159,22 @@ export async function choose(options: ChooseOptions): Promise<Decision> {
     rawAnswers: answers,
     model: readModel(result),
     usage: readUsage(result),
-    latencyMs,
-    request: body,
+    latencyMs: options.latencyMs,
+    request: options.request,
+  };
+}
+
+export function decisionOperations(snapshot: Snapshot): Record<string, string> {
+  const { targets, controls } = actionSpace(snapshot.actions);
+  return {
+    ...Object.fromEntries(
+      Object.keys(targets).map((key) => [key, OPERATION_LABELS[key]!]),
+    ),
+    ...Object.fromEntries(
+      Object.entries(controls).map(([key, action]) => [key, action.label]),
+    ),
+    DONE: "Every requirement is visibly satisfied.",
+    BLOCKED: "No supported operation can progress.",
   };
 }
 
@@ -160,7 +199,8 @@ export function validateChoice(
 ): ValidatedChoice {
   if (!isRecord(answer)) throw invalidResponse();
   const { choice, probabilities, confidence } = answer;
-  if (typeof choice !== "string" || !(choice in ids)) throw invalidResponse();
+  if (typeof choice !== "string" || !Object.hasOwn(ids, choice))
+    throw invalidResponse();
   if (!isRecord(probabilities)) throw invalidResponse();
   if (typeof confidence !== "number" || !Number.isFinite(confidence))
     throw invalidResponse();
@@ -199,8 +239,30 @@ export function validateChoice(
   };
 }
 
+function readChoice(answer: unknown, ids: Record<string, unknown>): ValidatedChoice {
+  if (
+    !isRecord(answer) ||
+    typeof answer.choice !== "string" ||
+    !Object.hasOwn(ids, answer.choice)
+  )
+    throw invalidResponse();
+  const probabilities: Record<string, number> = {};
+  for (const id of Object.keys(ids)) {
+    const value = isRecord(answer.probabilities) ? answer.probabilities[id] : undefined;
+    probabilities[id] = typeof value === "number" && Number.isFinite(value) ? value : 0;
+  }
+  return {
+    choice: answer.choice,
+    probabilities,
+    confidence:
+      typeof answer.confidence === "number" && Number.isFinite(answer.confidence)
+        ? answer.confidence
+        : 0,
+  };
+}
+
 function invalidResponse(): Error {
-  return new Error("Invalid TypeSafe response; no action executed.");
+  return new ModelOutputError("Invalid TypeSafe response; no action executed.");
 }
 
 function isRecord(value: unknown): value is Record<string, any> {

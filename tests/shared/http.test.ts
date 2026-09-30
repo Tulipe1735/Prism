@@ -7,6 +7,25 @@ function response(status: number, body: string): Response {
 }
 
 describe("postJson", () => {
+  it("honors a caller retry limit and cancellation before sending a request", async () => {
+    const fetchImpl = vi.fn(async () => response(503, "unavailable"));
+    const options = {
+      url: "https://example.com",
+      apiKey: "key",
+      body: {},
+      label: "Test",
+      fetchImpl,
+      maxAttempts: 1,
+    };
+    await expect(postJson(options)).rejects.toThrow("HTTP 503");
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const controller = new AbortController();
+    controller.abort(new Error("Task cancelled"));
+    await expect(postJson({ ...options, signal: controller.signal })).rejects.toThrow(
+      "Task cancelled",
+    );
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
   it("returns parsed JSON on success", async () => {
     const fetchImpl = vi.fn(async () => response(200, '{"ok":true}'));
     const result = await postJson({

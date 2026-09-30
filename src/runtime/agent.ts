@@ -11,6 +11,7 @@ import { Buffer } from "node:buffer";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { StalePageError } from "../browser/session.ts";
+import { InvalidActionError } from "../shared/errors.ts";
 import { fieldContext } from "./text-helper.ts";
 
 export interface ChooseInput {
@@ -58,6 +59,12 @@ export interface ConfirmContext {
   action: Observation["actions"][number] | null;
 }
 
+export interface StaleEvent {
+  step: number;
+  stage: "page" | "terminal" | "field" | "execution";
+  reason: string;
+}
+
 export interface AgentOptions {
   session: BrowserSession;
   goal: string;
@@ -67,6 +74,10 @@ export interface AgentOptions {
   signal?: AbortSignal;
   onEvent?: (event: AgentEvent) => void;
   confirmDecision?: (context: ConfirmContext) => Promise<boolean>;
+  /** Fail on detected stale state instead of re-observing (default: recover). */
+  staleRecovery?: boolean;
+  /** Optional reliability instrumentation; separate from CLI/MCP events. */
+  onStale?: (event: StaleEvent) => void;
 }
 
 export interface AgentResult {
@@ -115,6 +126,10 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
   let pendingTextLatency = 0;
   let decisions = 0;
   let staleAborts = 0;
+  const stale = (stage: StaleEvent["stage"], message: string): void => {
+    options.onStale?.({ step: history.length + 1, stage, reason: message });
+    if (options.staleRecovery === false) throw new StalePageError(message);
+  };
 
   // The main agent loop.
   while (true) {
@@ -137,6 +152,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
     // Observe
     try {
       if (!(await session.samePage(snapshot))) {
+        stale("page", "Document or URL changed before decision.");
         snapshot = await observe();
         continue;
       }
@@ -163,6 +179,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
       if (terminal) {
         if (!(await session.samePage(snapshot))) {
+          stale("terminal", "Document or URL changed before terminal decision.");
           snapshot = await observe();
           continue;
         }
@@ -178,7 +195,9 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       }
 
       if (action === null) {
-        throw new Error(`Decision references unknown action "${decision.choice}".`);
+        throw new InvalidActionError(
+          `Decision references unknown action "${decision.choice}".`,
+        );
       }
       if (options.confirmDecision !== undefined) {
         const confirmed = await options.confirmDecision({
@@ -198,6 +217,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       let textLatencyMs = 0;
       if (action.kind === "fill") {
         if (!(await session.fresh(snapshot, action))) {
+          stale("field", "Field changed before text generation.");
           snapshot = await observe();
           continue;
         }
@@ -226,7 +246,18 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
 
       // Act
       // BrowserSession.act rechecks freshness immediately before input.
-      await session.act(action, snapshot, text);
+      try {
+        await session.act(action, snapshot, text);
+      } catch (error) {
+        if (error instanceof StalePageError) {
+          options.onStale?.({
+            step: history.length + 1,
+            stage: "execution",
+            reason: error.message,
+          });
+        }
+        throw error;
+      }
       staleAborts = 0;
       pendingContext = null;
       pendingText = null;
@@ -286,6 +317,7 @@ export async function runAgent(options: AgentOptions): Promise<AgentResult> {
       }
     } catch (error) {
       if (error instanceof StalePageError) {
+        if (options.staleRecovery === false) throw error;
         staleAborts += 1;
         if (staleAborts > 5) {
           status = "blocked";

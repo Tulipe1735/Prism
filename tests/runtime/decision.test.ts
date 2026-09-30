@@ -171,4 +171,27 @@ describe("choose", () => {
       }),
     ).rejects.toThrow(/Invalid TypeSafe response/);
   });
+
+  it("retains offered-target membership when distribution validation is disabled", async () => {
+    for (const target of ["unknown", "toString"]) {
+      await expect(
+        choose({
+          snapshot: snapshot({ actions: [clickAction] }),
+          goal: "Click Save",
+          history: [],
+          apiKey: "test-key",
+          validation: false,
+          fetchImpl: asFetch(
+            mockJsonFetch({
+              model: "test",
+              answers: {
+                operation: { choice: "CLICK" },
+                click_target: { choice: target },
+              },
+            }),
+          ),
+        }),
+      ).rejects.toThrow(/Invalid TypeSafe response/);
+    }
+  });
 });
