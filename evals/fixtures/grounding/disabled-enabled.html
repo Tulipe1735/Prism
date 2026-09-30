@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Prism eval: disabled-enabled</title>
+    <style>
+      body {
+        font: 18px sans-serif;
+        margin: 40px;
+      }
+      button {
+        padding: 16px;
+        margin: 12px;
+      }
+      article,
+      form {
+        padding: 8px;
+      }
+      dialog {
+        padding: 50px;
+      }
+      dialog::backdrop {
+        background: #0008;
+      }
+    </style>
+    <script src="/support.js" defer></script>
+  </head>
+  <body data-scenario="disabled-enabled" data-success="Payment opened">
+    <h1>Disabled Enabled</h1>
+    <p id="revision">Use the controls below.</p>
+    <main id="controls">
+      <button disabled data-target="disabled">Continue to payment</button
+      ><button data-target="enabled" data-correct>Continue to payment</button>
+    </main>
+    <dialog id="notice">
+      <p>A new revision is available.</p>
+      <button id="dismiss">Dismiss update notice</button>
+    </dialog>
+    <p id="result" role="status">Pending</p>
+    <div id="eval-state" hidden data-wrong-targets="0" data-mutations="0"></div>
+  </body>
+</html>

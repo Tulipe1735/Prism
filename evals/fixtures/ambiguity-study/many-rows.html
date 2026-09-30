@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Control selection</title>
+    <style>
+      body {
+        font: 16px sans-serif;
+        margin: 20px;
+      }
+      article,
+      section,
+      fieldset,
+      li,
+      .row {
+        margin: 6px;
+        padding: 4px;
+      }
+      button,
+      a {
+        display: inline-block;
+        padding: 8px;
+        margin: 4px;
+      }
+      td {
+        padding: 3px;
+      }
+      h2,
+      h3 {
+        font-size: 16px;
+        margin: 4px;
+      }
+      #controls {
+        max-width: 900px;
+      }
+    </style>
+    <script src="/ambiguity-study/support.js" defer></script>
+  </head>
+  <body data-order="3,7,0,5,2,8,1,4,6" data-layout="normal">
+    <h1>Manage entries</h1>
+    <main id="controls">
+      <section>
+        <h2>Inventory</h2>
+        <table>
+          <tr>
+            <td>Item A</td>
+            <td>$11.00</td>
+            <td>
+              <button type="button" data-target="0" data-description="Item A">
+                Delete
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Item B</td>
+            <td>$12.00</td>
+            <td>
+              <button type="button" data-target="1" data-description="Item B">
+                Delete
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Item C</td>
+            <td>$13.00</td>
+            <td>
+              <button type="button" data-target="2" data-description="Item C">
+                Delete
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Item D</td>
+            <td>$14.00</td>
+            <td>
+              <button type="button" data-target="3" data-description="Item D">
+                Delete
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Item E</td>
+            <td>$15.00</td>
+            <td>
+              <button type="button" data-target="4" data-description="Item E">
+                Delete
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Item F</td>
+            <td>$16.00</td>
+            <td>
+              <button type="button" data-target="5" data-description="Item F">
+                Delete
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Item G</td>
+            <td>$17.00</td>
+            <td>
+              <button type="button" data-target="6" data-description="Item G">
+                Delete
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Item H</td>
+            <td>$18.00</td>
+            <td>
+              <button
+                type="button"
+                data-target="7"
+                data-correct
+                data-description="Item H"
+              >
+                Delete
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Item I</td>
+            <td>$19.00</td>
+            <td>
+              <button type="button" data-target="8" data-description="Item I">
+                Delete
+              </button>
+            </td>
+          </tr>
+        </table>
+      </section>
+    </main>
+    <p id="result" role="status">Pending</p>
+    <div id="eval-state" hidden data-wrong-targets="0" data-mutations="0"></div>
+  </body>
+</html>

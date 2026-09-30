@@ -1,0 +1,74 @@
+[
+  {
+    "id": "grounding-study-001",
+    "url": "/ambiguity-study/delete-rows.html",
+    "goal": "Delete Item B.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item B"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-007",
+    "url": "/ambiguity-study/nested-cards.html",
+    "goal": "Delete the Draft entry in Team Beta.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Draft in Team Beta"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-013",
+    "url": "/ambiguity-study/role-cue.html",
+    "goal": "Use the Open link, rather than the Open button.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Open link"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  }
+]

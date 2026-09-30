@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Repeated Delete</title>
+    <style>
+      body {
+        font: 18px sans-serif;
+        margin: 40px;
+      }
+      .entry,
+      td {
+        padding: 12px;
+      }
+      button {
+        padding: 12px;
+      }
+    </style>
+    <script src="/support.js" defer></script>
+  </head>
+  <body data-success="Delete completed for Item B">
+    <h1>Manage entries</h1>
+    <main id="controls">
+      <table>
+        <tbody>
+          <tr>
+            <td>Item A</td>
+            <td><button type="button" data-target="0">Delete</button></td>
+          </tr>
+          <tr>
+            <td>Item B</td>
+            <td><button type="button" data-target="1" data-correct>Delete</button></td>
+          </tr>
+          <tr>
+            <td>Item C</td>
+            <td><button type="button" data-target="2">Delete</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+    <dialog id="notice"><button id="dismiss">Dismiss update notice</button></dialog>
+    <p id="result" role="status">Pending</p>
+    <div id="eval-state" hidden data-wrong-targets="0" data-mutations="0"></div>
+  </body>
+</html>

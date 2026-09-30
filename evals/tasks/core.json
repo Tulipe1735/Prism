@@ -1,0 +1,423 @@
+[
+  {
+    "id": "grounding-001",
+    "url": "/grounding/repeated-delete.html",
+    "goal": "Click the Delete button for Item B.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Deleted Item B"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete Item B"
+      }
+    ]
+  },
+  {
+    "id": "grounding-002",
+    "url": "/grounding/similar-labels.html",
+    "goal": "Save the draft, without publishing it.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Draft saved"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Save draft"
+      }
+    ]
+  },
+  {
+    "id": "grounding-003",
+    "url": "/grounding/semantic-target.html",
+    "goal": "Archive Project Atlas, keeping its backup.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Atlas archived"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Archive Project Atlas"
+      }
+    ]
+  },
+  {
+    "id": "grounding-004",
+    "url": "/grounding/hidden-visible.html",
+    "goal": "Confirm the visible invitation.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Invitation confirmed"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Confirm invitation"
+      }
+    ]
+  },
+  {
+    "id": "grounding-005",
+    "url": "/grounding/disabled-enabled.html",
+    "goal": "Continue to payment using the enabled button.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Payment opened"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Continue to payment"
+      }
+    ]
+  },
+  {
+    "id": "stale-001",
+    "url": "/stale/rerender.html",
+    "goal": "Delete Item B after the list updates.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Deleted Item B"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete Item B"
+      }
+    ]
+  },
+  {
+    "id": "stale-002",
+    "url": "/stale/node-replacement.html",
+    "goal": "Approve request B after its control is replaced.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Request B approved"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Approve request B"
+      }
+    ]
+  },
+  {
+    "id": "stale-003",
+    "url": "/stale/reordering.html",
+    "goal": "Choose Plan B even if the plans move.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Plan B chosen"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Choose Plan B"
+      }
+    ]
+  },
+  {
+    "id": "stale-004",
+    "url": "/stale/delayed-modal.html",
+    "goal": "Save the draft. Dismiss the update notice if it appears.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Draft saved"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Save draft"
+      }
+    ]
+  },
+  {
+    "id": "stale-005",
+    "url": "/stale/disappearing.html",
+    "goal": "Continue checkout using the replacement control if needed.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Checkout continued"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Continue checkout"
+      }
+    ]
+  },
+  {
+    "id": "stale-006",
+    "url": "/stale/state-change.html",
+    "goal": "Save the current draft after its revision changes.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Current revision saved"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Save draft"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-001",
+    "url": "/ambiguity/repeated-labels.html",
+    "goal": "Delete Item B and keep Item A.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Deleted Item B"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-002",
+    "url": "/ambiguity/contextual-continue.html",
+    "goal": "Continue the shipping form, leaving billing unchanged.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Shipping continued"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Continue shipping"
+      }
+    ]
+  },
+  {
+    "id": "grounding-validation-001",
+    "url": "/grounding/similar-labels.html",
+    "goal": "Save the draft, without publishing it.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Draft saved"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Save draft"
+      }
+    ],
+    "fault": "non-argmax-target"
+  }
+]

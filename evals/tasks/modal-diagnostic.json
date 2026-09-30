@@ -1,0 +1,32 @@
+[
+  {
+    "id": "stale-004",
+    "url": "/stale/delayed-modal.html",
+    "goal": "Save the draft. Dismiss the update notice if it appears.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Draft saved"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Save draft"
+      }
+    ]
+  }
+]

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Projects</title>
+    <style>
+      body {
+        font: 18px sans-serif;
+        margin: 40px;
+      }
+      a {
+        display: block;
+        padding: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Project directory</h1>
+    <nav>
+      <a href="#orion" data-target="orion">Open Project Orion</a
+      ><a href="#atlas" data-correct>Open Project Atlas</a>
+    </nav>
+    <p id="result" role="status">Pending</p>
+    <div id="eval-state" hidden data-wrong-targets="0" data-mutations="0"></div>
+    <script>
+      document.querySelectorAll("a").forEach(
+        (a) =>
+          (a.onclick = (e) => {
+            e.preventDefault();
+            history.pushState({}, "", a.getAttribute("href"));
+            if (a.hasAttribute("data-correct"))
+              document.querySelector("#result").textContent = "Project Atlas dashboard";
+            else {
+              const s = document.querySelector("#eval-state");
+              s.dataset.wrongTargets = String(+s.dataset.wrongTargets + 1);
+              document.querySelector("#result").textContent = "Project Orion dashboard";
+            }
+          }),
+      );
+      window.__prismEval = {};
+    </script>
+  </body>
+</html>

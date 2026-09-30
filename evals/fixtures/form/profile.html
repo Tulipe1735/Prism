@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Profile</title>
+    <style>
+      body {
+        font: 18px sans-serif;
+        margin: 40px;
+      }
+      input,
+      button {
+        padding: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Edit profile</h1>
+    <form id="profile">
+      <label for="name">Display name</label
+      ><input id="name" name="display-name" value="Guest" data-correct /><button
+        type="submit"
+        data-correct
+      >
+        Save profile</button
+      ><button type="button" id="cancel" data-target="cancel">Cancel</button>
+    </form>
+    <p id="result" role="status">Pending</p>
+    <div id="eval-state" hidden data-wrong-targets="0" data-mutations="0"></div>
+    <script>
+      document.querySelector("#profile").addEventListener("submit", (e) => {
+        e.preventDefault();
+        document.querySelector("#result").textContent =
+          "Saved profile: " + document.querySelector("#name").value;
+      });
+      document.querySelector("#cancel").onclick = () => {
+        const s = document.querySelector("#eval-state");
+        s.dataset.wrongTargets = String(+s.dataset.wrongTargets + 1);
+        document.querySelector("#result").textContent = "Cancelled";
+      };
+      window.__prismEval = {};
+    </script>
+  </body>
+</html>

@@ -1,0 +1,386 @@
+[
+  {
+    "id": "grounding-study-001",
+    "url": "/ambiguity-study/delete-rows.html",
+    "goal": "Delete Item B.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item B"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-002",
+    "url": "/ambiguity-study/submit-cards.html",
+    "goal": "Submit the Orion request.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Orion"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-003",
+    "url": "/ambiguity-study/same-role-label.html",
+    "goal": "Continue the Gamma workflow.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Gamma"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-004",
+    "url": "/ambiguity-study/semantic-sections.html",
+    "goal": "Submit Account settings.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Account settings"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-005",
+    "url": "/ambiguity-study/nearby-text.html",
+    "goal": "Delete the order numbered 408.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Order 408"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-006",
+    "url": "/ambiguity-study/entity-links.html",
+    "goal": "Open the Vega project link.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Vega"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-007",
+    "url": "/ambiguity-study/nested-cards.html",
+    "goal": "Delete the Draft entry in Team Beta.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Draft in Team Beta"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-008",
+    "url": "/ambiguity-study/hidden-duplicate.html",
+    "goal": "Delete the visible Archive item.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Archive"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-009",
+    "url": "/ambiguity-study/disabled-duplicate.html",
+    "goal": "Submit the enabled Renewal form.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Renewal"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-010",
+    "url": "/ambiguity-study/reordered-controls.html",
+    "goal": "Delete Item A.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item A"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-011",
+    "url": "/ambiguity-study/rerendered-controls.html",
+    "goal": "Submit the Vega request.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Vega"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-012",
+    "url": "/ambiguity-study/parent-only.html",
+    "goal": "Continue the account in the West region.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Account in West region"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-013",
+    "url": "/ambiguity-study/role-cue.html",
+    "goal": "Use the Open link, rather than the Open button.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Open link"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-014",
+    "url": "/ambiguity-study/many-rows.html",
+    "goal": "Delete Item H.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item H"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-015",
+    "url": "/ambiguity-study/similar-entities.html",
+    "goal": "Open the Atlas East project link.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Atlas East"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "grounding-study-016",
+    "url": "/ambiguity-study/form-legend.html",
+    "goal": "Submit the Personal invoice form.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Personal invoice"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  }
+]

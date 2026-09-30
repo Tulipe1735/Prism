@@ -1,0 +1,732 @@
+[
+  {
+    "id": "grounding-001",
+    "url": "/grounding/repeated-delete.html",
+    "goal": "Click the Delete button for Item B.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Deleted Item B"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete Item B"
+      }
+    ]
+  },
+  {
+    "id": "grounding-002",
+    "url": "/grounding/similar-labels.html",
+    "goal": "Save the draft, without publishing it.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Draft saved"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Save draft"
+      }
+    ]
+  },
+  {
+    "id": "grounding-003",
+    "url": "/grounding/semantic-target.html",
+    "goal": "Archive Project Atlas, keeping its backup.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Atlas archived"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Archive Project Atlas"
+      }
+    ]
+  },
+  {
+    "id": "grounding-004",
+    "url": "/grounding/hidden-visible.html",
+    "goal": "Confirm the visible invitation.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Invitation confirmed"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Confirm invitation"
+      }
+    ]
+  },
+  {
+    "id": "grounding-005",
+    "url": "/grounding/disabled-enabled.html",
+    "goal": "Continue to payment using the enabled button.",
+    "category": "grounding",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Payment opened"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Continue to payment"
+      }
+    ]
+  },
+  {
+    "id": "stale-001",
+    "url": "/stale/rerender.html",
+    "goal": "Delete Item B.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Deleted Item B"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete Item B"
+      }
+    ]
+  },
+  {
+    "id": "stale-002",
+    "url": "/stale/node-replacement.html",
+    "goal": "Approve request B.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Request B approved"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Approve request B"
+      }
+    ]
+  },
+  {
+    "id": "stale-003",
+    "url": "/stale/reordering.html",
+    "goal": "Choose Plan B.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Plan B chosen"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Choose Plan B"
+      }
+    ]
+  },
+  {
+    "id": "stale-004",
+    "url": "/stale/delayed-modal.html",
+    "goal": "Save the draft. Dismiss the update notice if it appears.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Draft saved"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Save draft"
+      }
+    ]
+  },
+  {
+    "id": "stale-005",
+    "url": "/stale/disappearing.html",
+    "goal": "Continue checkout.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Checkout continued"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Continue checkout"
+      }
+    ]
+  },
+  {
+    "id": "stale-006",
+    "url": "/stale/state-change.html",
+    "goal": "Save the current draft.",
+    "category": "stale",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Current revision saved"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": true,
+      "mutationCount": 1
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Save draft"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-001",
+    "url": "/ambiguity/repeated-labels.html",
+    "goal": "Delete Item B and keep Item A.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Deleted Item B"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-002",
+    "url": "/ambiguity/contextual-continue.html",
+    "goal": "Continue the shipping form, leaving billing unchanged.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Shipping continued"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Continue shipping"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-003",
+    "url": "/ambiguity/delete-table.html",
+    "goal": "Delete Item B. Do not delete any other entry.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Delete completed for Item B"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-004",
+    "url": "/ambiguity/submit-forms.html",
+    "goal": "Submit Shipping address. Do not submit any other entry.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Submit completed for Shipping address"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Submit"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-005",
+    "url": "/ambiguity/continue-cards.html",
+    "goal": "Continue Premium plan. Do not continue any other entry.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Continue completed for Premium plan"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Continue"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-006",
+    "url": "/ambiguity/delete-last.html",
+    "goal": "Delete Item C. Do not delete any other entry.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Delete completed for Item C"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-007",
+    "url": "/ambiguity/submit-table.html",
+    "goal": "Submit Invoice 204. Do not submit any other entry.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Submit completed for Invoice 204"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Submit"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-008",
+    "url": "/ambiguity/same-role.html",
+    "goal": "Delete Project Atlas. Do not delete any other entry.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Delete completed for Project Atlas"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-009",
+    "url": "/ambiguity/nearby-label.html",
+    "goal": "Submit Account settings. Do not submit any other entry.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Submit completed for Account settings"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Submit"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-010",
+    "url": "/ambiguity/identical-cards.html",
+    "goal": "Delete Blue collection. Do not delete any other entry.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Delete completed for Blue collection"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete"
+      }
+    ]
+  },
+  {
+    "id": "ambiguity-011",
+    "url": "/ambiguity/delete-first.html",
+    "goal": "Delete Item A. Do not delete any other entry.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Delete completed for Item A"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Delete"
+      }
+    ]
+  },
+  {
+    "id": "form-001",
+    "url": "/form/profile.html",
+    "goal": "Set the display name to Ada and save the profile.",
+    "category": "form",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Saved profile: Ada"
+        },
+        {
+          "kind": "value",
+          "selector": "#name",
+          "equals": "Ada"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "fill",
+        "label": "Display name",
+        "text": "Ada"
+      },
+      {
+        "kind": "click",
+        "label": "Save profile"
+      }
+    ]
+  },
+  {
+    "id": "navigation-001",
+    "url": "/navigation/project.html",
+    "goal": "Open the Project Atlas dashboard.",
+    "category": "navigation",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Project Atlas dashboard"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    },
+    "script": [
+      {
+        "kind": "click",
+        "label": "Open Project Atlas"
+      }
+    ]
+  }
+]

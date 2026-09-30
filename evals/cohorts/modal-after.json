@@ -1,0 +1,29 @@
+{
+  "id": "modal-after",
+  "model": "glm-5.3-flash",
+  "baseUrl": "https://opencode.ai/zen/go/v1",
+  "apiKeyEnv": "TEXT_MODEL_API_KEY",
+  "temperature": 0,
+  "topP": 1,
+  "maxTokens": 8192,
+  "reasoning": "provider-default",
+  "maxSteps": 8,
+  "httpRetries": 2,
+  "staleRetries": 5,
+  "viewport": {
+    "width": 1120,
+    "height": 780
+  },
+  "browserVersion": "Chrome/153.0.8010.12",
+  "observation": "matched-dom",
+  "variants": ["prism-full"],
+  "tasks": "evals/tasks/modal-diagnostic.json",
+  "categories": ["stale"],
+  "fixturePort": 9841,
+  "timeoutMs": 240000,
+  "concurrency": 4,
+  "maxLlmCalls": 1000,
+  "repeats": 10,
+  "modalPolicy": "active-dialog",
+  "repetitionOffset": 0
+}

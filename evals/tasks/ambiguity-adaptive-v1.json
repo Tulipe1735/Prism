@@ -1,0 +1,290 @@
+[
+  {
+    "id": "adaptive-001",
+    "url": "/ambiguity-study/delete-rows.html",
+    "goal": "Delete Item B.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item B"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-005",
+    "url": "/ambiguity-study/nearby-text.html",
+    "goal": "Delete the order numbered 408.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Order 408"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-007",
+    "url": "/ambiguity-study/nested-cards.html",
+    "goal": "Delete the Draft entry in Team Beta.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Draft in Team Beta"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-008",
+    "url": "/ambiguity-study/hidden-duplicate.html",
+    "goal": "Delete the visible Archive item.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Archive"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-009",
+    "url": "/ambiguity-study/disabled-duplicate.html",
+    "goal": "Submit the enabled Renewal form.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Renewal"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-012",
+    "url": "/ambiguity-study/parent-only.html",
+    "goal": "Continue the account in the West region.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Account in West region"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-013",
+    "url": "/ambiguity-study/role-cue.html",
+    "goal": "Use the Open link, rather than the Open button.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Open link"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-015",
+    "url": "/ambiguity-study/similar-entities.html",
+    "goal": "Open the Atlas East project link.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Atlas East"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-016",
+    "url": "/ambiguity-study/form-legend.html",
+    "goal": "Submit the Personal invoice form.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Personal invoice"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-101",
+    "url": "/adaptive-context/unique-profile.html",
+    "goal": "Save profile.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Save profile"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-102",
+    "url": "/adaptive-context/unique-dashboard.html",
+    "goal": "Open dashboard.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Open dashboard"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  },
+  {
+    "id": "adaptive-103",
+    "url": "/adaptive-context/unique-report.html",
+    "goal": "Export report.",
+    "category": "ambiguity",
+    "maxSteps": 8,
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Export report"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    },
+    "fixture": {
+      "mutateAfterDecision": false,
+      "mutationCount": 0
+    }
+  }
+]

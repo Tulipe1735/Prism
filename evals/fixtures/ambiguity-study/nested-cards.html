@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Control selection</title>
+    <style>
+      body {
+        font: 16px sans-serif;
+        margin: 20px;
+      }
+      article,
+      section,
+      fieldset,
+      li,
+      .row {
+        margin: 6px;
+        padding: 4px;
+      }
+      button,
+      a {
+        display: inline-block;
+        padding: 8px;
+        margin: 4px;
+      }
+      td {
+        padding: 3px;
+      }
+      h2,
+      h3 {
+        font-size: 16px;
+        margin: 4px;
+      }
+      #controls {
+        max-width: 900px;
+      }
+    </style>
+    <script src="/ambiguity-study/support.js" defer></script>
+  </head>
+  <body data-order="1,2,0" data-layout="normal">
+    <h1>Manage entries</h1>
+    <main id="controls">
+      <section>
+        <h2>Team Alpha</h2>
+        <article>
+          <h3>Draft</h3>
+          <div role="group">
+            <span>Draft</span
+            ><button
+              type="button"
+              data-target="0"
+              data-description="Draft in Team Alpha"
+            >
+              Delete
+            </button>
+          </div>
+        </article>
+      </section>
+      <section>
+        <h2>Team Beta</h2>
+        <article>
+          <h3>Draft</h3>
+          <div role="group">
+            <span>Draft</span
+            ><button
+              type="button"
+              data-target="1"
+              data-correct
+              data-description="Draft in Team Beta"
+            >
+              Delete
+            </button>
+          </div>
+        </article>
+      </section>
+      <section>
+        <h2>Team Gamma</h2>
+        <article>
+          <h3>Draft</h3>
+          <div role="group">
+            <span>Draft</span
+            ><button
+              type="button"
+              data-target="2"
+              data-description="Draft in Team Gamma"
+            >
+              Delete
+            </button>
+          </div>
+        </article>
+      </section>
+    </main>
+    <p id="result" role="status">Pending</p>
+    <div id="eval-state" hidden data-wrong-targets="0" data-mutations="0"></div>
+  </body>
+</html>
