@@ -1,0 +1,47 @@
+{
+  "verified_at": "2026-10-01T08:27:18.505Z",
+  "cohort": "paper-replication-model2-v1",
+  "planned_cells": 240,
+  "terminal_summaries": 240,
+  "unique_cells": 240,
+  "complete": true,
+  "valid": true,
+  "per_arm": 60,
+  "smoke_requests": 1,
+  "benchmark_http_attempts": 520,
+  "provider_usage_coverage": "520/520",
+  "response_usage_reconciliation": "passed for every run",
+  "response_prompt_reconciliation": "passed",
+  "initial_prompt_pairs_checked": 240,
+  "initial_prompt_drift": [],
+  "all_frozen_hashes_match": true,
+  "parent_freeze": "passed",
+  "replication_freeze": "passed",
+  "historical": {
+    "checked": 202,
+    "changed": []
+  },
+  "unexpected_control_drift": [],
+  "declared_measurement_difference": "Passive cloned-response logging; minor potential host/latency overhead. Effective provider sampling/default reasoning not exposed.",
+  "unit_and_browser_tests": {
+    "passed": 102,
+    "files": 16,
+    "browser_tests": 10,
+    "live_model_calls": 0
+  },
+  "typecheck": "passed",
+  "lint": "passed",
+  "build": "passed",
+  "secret_scan": {
+    "artifacts": 16,
+    "leaks": 0
+  },
+  "raw_results_sha256": "77fde25713633aa536373d5846da71eb9a2c79518a26cdb51e5deda2a79b6a92",
+  "response_log_sha256": "e5e86d02826b5e661a116608f4f9d42579809a0d544ade389d3373cf34839b96",
+  "source_archive": {
+    "path": "evals/results/paper-replication-model2-v1-source.tar.gz",
+    "sha256": "dc09f7ea1c17f31fcce192635f4584e9ddf51e63c35c253e6638455c9db012b0"
+  },
+  "post_cohort_analysis_source_sha256": "62d40c383e580160c6dfa93b37132cc035e38526c746c93ff0a5cf12aaf0234b",
+  "stop_condition": "240 unique terminal cells complete; no extra repeats, model switches, method changes or external trials"
+}

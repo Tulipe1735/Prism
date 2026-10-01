@@ -1,0 +1,16 @@
+{
+  "expected_runs": 240,
+  "terminal_summaries": 240,
+  "unique_cells": 240,
+  "complete": true,
+  "valid": true,
+  "failures": [],
+  "historical": {
+    "checked": 202,
+    "changed": []
+  },
+  "source_archive": {
+    "path": "evals/results/paper-replication-model2-v1-source.tar.gz",
+    "sha256": "dc09f7ea1c17f31fcce192635f4584e9ddf51e63c35c253e6638455c9db012b0"
+  }
+}

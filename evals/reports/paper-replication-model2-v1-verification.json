@@ -1,0 +1,16 @@
+{
+  "verified_at": "2026-10-01T08:03:36.909Z",
+  "node": "v22.23.2",
+  "unit_and_browser_tests": {
+    "passed": 102,
+    "files": 16,
+    "browser_tests": 10,
+    "live_model_calls": 0
+  },
+  "typecheck": "passed",
+  "lint": "passed",
+  "build": "passed",
+  "historical_parent_freeze": "verified unchanged",
+  "replication_tests": "3 passed",
+  "scope": "Pre-execution verification; final post-cohort audit required"
+}
