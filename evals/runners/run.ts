@@ -7,6 +7,7 @@ import type {
   EvalTask,
   Evidence,
   Provider,
+  StepRecord,
   SummaryRecord,
   Variant,
 } from "../schema.ts";
@@ -25,6 +26,13 @@ import { Collector } from "./collector.ts";
 import { digest, SYSTEM_PROMPT, TASK_PROMPT_FORMAT } from "./model.ts";
 import { createDependencies } from "./providers.ts";
 import { filterModalObservation, representationFor } from "./representation.ts";
+
+export function firstGroundingSuccess(rows: StepRecord[]): boolean {
+  const first = rows.find(
+    (r) => r.executed && ["correct", "wrong"].includes(r.target_assessment ?? ""),
+  );
+  return first?.target_assessment === "correct" && first.wrong_target === false;
+}
 
 export function hash(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -115,7 +123,7 @@ export async function runOne(options: {
     }
     stage = "oracle";
     state.evidence = await readEvidence(session, task.success);
-    collector = new Collector(identity, state.evidence);
+    collector = new Collector(identity, state.evidence, task.preregistered);
     let mutated = false;
     const ownedSession = session;
     const observe = session.observe.bind(session);
@@ -139,8 +147,11 @@ export async function runOne(options: {
       abort.signal.throwIfAborted();
       stage = "execution";
       await act(...args);
-      abort.signal.throwIfAborted();
       collector.executed(null);
+      stage = "oracle";
+      state.evidence = await readEvidence(ownedSession, task.success);
+      collector.executed(state.evidence);
+      abort.signal.throwIfAborted();
     };
     result = await runAgent({
       session,
@@ -217,6 +228,7 @@ export async function runOne(options: {
     result !== undefined &&
     state.evidence !== null &&
     evaluateSuccess(state.evidence, task.success) &&
+    (!task.preregistered || result.status === "done") &&
     mutationMatched;
   const reason =
     error instanceof Error
@@ -255,6 +267,19 @@ export async function runOne(options: {
     ...identity,
     record_type: "summary",
     success,
+    ...(task.preregistered
+      ? {
+          // First scored execution is the confirmatory grounding trial. Later corrections
+          // never erase an earlier wrong input; terminal/provider errors are independent.
+          grounding_success: firstGroundingSuccess(rows),
+          strict_task_success: success && result?.status === "done",
+          infrastructure_failures: [
+            ...new Set(
+              rows.flatMap((r) => (r.infrastructure_events ?? []).map((e) => e.label)),
+            ),
+          ],
+        }
+      : {}),
     status: error === undefined ? (result?.status ?? "failed") : "failed",
     reason,
     steps: rows.filter((row) => row.executed).length,
@@ -276,7 +301,8 @@ export async function runOne(options: {
     ...Object.fromEntries(
       ["input_tokens", "output_tokens", "total_tokens"].map((key) => [
         key,
-        rows.length && rows.every((r) => r[key as "total_tokens"] !== null)
+        rows.length &&
+        rows.every((r) => r[key as "total_tokens"] !== null && r.llm_calls <= 1)
           ? rows.reduce((sum, r) => sum + r[key as "total_tokens"]!, 0)
           : null,
       ]),

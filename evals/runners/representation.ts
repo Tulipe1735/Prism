@@ -13,7 +13,7 @@ export type Representation = ModelInput["representation"];
 export const CONTEXT_LIMITS = { local: 80, nearby: 120, section: 48, ancestors: 6 };
 
 export function representationFor(variant: Variant): Representation {
-  if (variant === "raw-selector") return "selector-dom";
+  if (variant.startsWith("raw-selector")) return "selector-dom";
   if (variant.startsWith("indexed-")) return variant.slice(8) as Representation;
   return "role";
 }

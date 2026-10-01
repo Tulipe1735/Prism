@@ -1,12 +1,16 @@
 import type { Cohort, EvalTask, SummaryRecord } from "../schema.ts";
 import { randomUUID } from "node:crypto";
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { connectBrowser, parseBrowserUrl } from "../../src/browser/connect.ts";
 import { cohortSchema, parseTasks } from "../schema.ts";
+import {
+  verifyCompletedCells,
+  verifyConfirmatoryFreeze,
+} from "./confirmatory-controls.ts";
 import { fixtureRoot, hashTree, startFixtures } from "./fixtures.ts";
 import { digest, SYSTEM_PROMPT, TASK_PROMPT_FORMAT } from "./model.ts";
 import { loadResults } from "./report.ts";
@@ -82,17 +86,30 @@ async function main(): Promise<void> {
     /* Environment may already be configured. */
   }
   let cohort = cohortSchema.parse(JSON.parse(await readFile(values.config!, "utf8")));
+  const confirmatory =
+    resolve(values.config!) === resolve("evals/cohorts/paper-confirmatory-v1.json") ||
+    cohort.id === "paper-confirmatory-v1" ||
+    resolve(cohort.tasks) === resolve("evals/tasks/paper-confirmatory-v1.json");
   if (!process.env[cohort.apiKeyEnv]?.trim())
     throw new Error(`Missing ${cohort.apiKeyEnv}; no cohort started.`);
   let tasks = parseTasks(JSON.parse(await readFile(cohort.tasks, "utf8"))).filter(
     (t) => cohort.categories.includes(t.category) && !t.fault,
   );
+  if (values.smoke && confirmatory)
+    throw new Error("No confirmatory smoke/model calls before freeze.");
   if (values.smoke) {
     tasks = tasks.filter((t) => ["grounding-002", "stale-002"].includes(t.id));
     cohort = { ...cohort, id: "smoke", repeats: 1 };
   }
   tasks = tasks.map((task) => ({ ...task, maxSteps: cohort.maxSteps }));
   const output = resolve(values.output ?? `evals/results/${cohort.id}.jsonl`);
+  if (
+    confirmatory &&
+    (values.smoke || output !== resolve("evals/results/paper-confirmatory-v1.jsonl"))
+  )
+    throw new Error(
+      "Confirmatory cohort requires the canonical output and full frozen plan.",
+    );
   await mkdir(resolve("evals/results"), { recursive: true });
   const fixtures = await startFixtures(cohort.fixturePort);
   let connection: Awaited<ReturnType<typeof connectBrowser>> | undefined;
@@ -108,6 +125,8 @@ async function main(): Promise<void> {
       fixture_hash: await hashTree(fixtureRoot),
       source_hash: await sourceHash(),
     };
+    if (confirmatory)
+      await verifyConfirmatoryFreeze(cohort, browser, values["browser-url"]!);
     const controlHash = digest(
       JSON.stringify({
         cohort,
@@ -154,6 +173,11 @@ async function main(): Promise<void> {
     const completed = new Set(existing.map(pairKey));
     if (completed.size !== existing.length)
       throw new Error("Duplicate task/variant/repetition pair.");
+    if (confirmatory)
+      verifyCompletedCells(
+        existing,
+        plan.map((p) => pairKey({ task_id: p.task.id, ...p })),
+      );
     const pending = plan.filter(
       (p) => !completed.has(pairKey({ task_id: p.task.id, ...p })),
     );
@@ -162,6 +186,7 @@ async function main(): Promise<void> {
       control_hash: controlHash,
       cohort,
       metadata,
+      node_version: process.version,
       expected_runs: plan.length,
       tasks: tasks.map((t) => t.id),
       planned_pairs: plan.map((p) => pairKey({ task_id: p.task.id, ...p })),
@@ -169,6 +194,14 @@ async function main(): Promise<void> {
     };
     await writeFile(planPath, `${JSON.stringify(savedPlan, null, 2)}\n`);
     const writeRecords = resultWriter(output);
+    let checkpointPending = Promise.resolve();
+    const checkpoint = (data: object): Promise<void> => {
+      checkpointPending = checkpointPending.then(async () => {
+        await writeFile(`${planPath}.tmp`, `${JSON.stringify(data, null, 2)}\n`);
+        await rename(`${planPath}.tmp`, planPath);
+      });
+      return checkpointPending;
+    };
     let llmCalls = existing.reduce((sum, r) => sum + r.llm_calls, 0);
     let cursor = 0;
     let finished = existing.length;
@@ -187,6 +220,15 @@ async function main(): Promise<void> {
     const worker = async (): Promise<void> => {
       while (cursor < pending.length && !stopReason) {
         const item = pending[cursor++]!;
+        if (confirmatory) {
+          try {
+            await verifyConfirmatoryFreeze(cohort, browser, values["browser-url"]!);
+          } catch (error) {
+            stopReason = error instanceof Error ? error.message : String(error);
+            break;
+          }
+          if (stopReason) break;
+        }
         const result = await runOne({
           connection: connection!,
           fixtureUrl: fixtures.url,
@@ -202,6 +244,11 @@ async function main(): Promise<void> {
         });
         results.push(result);
         finished++;
+        await checkpoint({
+          ...savedPlan,
+          completed_runs: finished,
+          llm_calls: llmCalls,
+        });
         console.log(
           `${finished}/${plan.length} ${result.success ? "PASS" : "FAIL"} ${result.task_id} ${result.variant} r${result.repetition} steps=${result.steps} calls=${result.llm_calls} ${result.failure_type ?? ""}`,
         );
@@ -219,12 +266,12 @@ async function main(): Promise<void> {
     await Promise.all(Array.from({ length: cohort.concurrency }, worker));
     await writeFile(
       planPath,
-      `${JSON.stringify({ ...savedPlan, status: stopReason ? "incomplete" : "complete", completed_runs: finished, llm_calls: llmCalls, stop_reason: stopReason }, null, 2)}\n`,
+      `${JSON.stringify({ ...savedPlan, status: stopReason || finished !== plan.length ? "incomplete" : "complete", completed_runs: finished, llm_calls: llmCalls, stop_reason: stopReason }, null, 2)}\n`,
     );
     console.log(
       `Saved ${finished}/${plan.length} runs to ${output}${stopReason ? `; ${stopReason}` : ""}`,
     );
-    if (stopReason) process.exitCode = 1;
+    if (stopReason || finished !== plan.length) process.exitCode = 1;
   } finally {
     await connection?.close();
     await fixtures.close();

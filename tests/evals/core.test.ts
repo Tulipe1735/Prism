@@ -162,7 +162,7 @@ describe("evaluation task parser", () => {
     expect(
       parseOptions(["--category", "stale", "--variant", "all", "--repeat", "2"])
         .variants,
-    ).toHaveLength(9);
+    ).toHaveLength(10);
     expect(parseOptions(["--variant", "raw-selector"]).variants).toEqual([
       "raw-selector",
     ]);

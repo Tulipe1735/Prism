@@ -85,7 +85,7 @@ export function createDependencies(options: {
     throw new ConfigError(
       "A cohort, browser session and configured model key are required for real-model evals.",
     );
-  if (provider === "scripted" && variant === "raw-selector")
+  if (provider === "scripted" && variant.startsWith("raw-selector"))
     throw new ConfigError("raw-selector requires the real-model cohort runner.");
   let modelText: string | null = null;
   return {
@@ -101,7 +101,7 @@ export function createDependencies(options: {
           apiKey: decisionKey!,
           collector,
           signal: options.signal,
-          selector: variant === "raw-selector",
+          selector: variant.startsWith("raw-selector"),
           representation: representationFor(variant),
           validation: variant !== "prism-no-validation",
           beforeCall: options.beforeCall,

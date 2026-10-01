@@ -13,6 +13,7 @@ import {
 import { sessionHeaders } from "../../src/runtime/text-helper.ts";
 import { InvalidActionError, ModelOutputError } from "../../src/shared/errors.ts";
 import { postJson } from "../../src/shared/http.ts";
+import { ProviderFailureError } from "../failures.ts";
 import { adaptiveTargets } from "./adaptive.ts";
 import {
   actionEvidence,
@@ -209,37 +210,61 @@ export async function chatDecision(options: {
   };
   let calls = 0;
   const started = performance.now();
-  const result: any = await postJson({
-    url: `${cohort.baseUrl.replace(/\/$/, "")}/chat/completions`,
-    apiKey: options.apiKey,
-    body,
-    headers: sessionHeaders(cohort.baseUrl, collector.identity.run_id),
-    signal: options.signal,
-    maxAttempts: cohort.httpRetries + 1,
-    timeoutMs: Math.min(120000, cohort.timeoutMs),
-    label: "Eval decision model",
-    fetchImpl: async (url, init) => {
-      options.beforeCall?.();
-      collector.httpCall(calls++ > 0);
-      const response = await (options.fetchImpl ?? fetch)(url, init);
-      if (!response.ok) {
+  let result: any;
+  try {
+    result = await postJson({
+      url: `${cohort.baseUrl.replace(/\/$/, "")}/chat/completions`,
+      apiKey: options.apiKey,
+      body,
+      headers: sessionHeaders(cohort.baseUrl, collector.identity.run_id),
+      signal: options.signal,
+      maxAttempts: cohort.httpRetries + 1,
+      timeoutMs: Math.min(120000, cohort.timeoutMs),
+      label: "Eval decision model",
+      fetchImpl: async (url, init) => {
+        options.beforeCall?.();
+        collector.httpCall(calls++ > 0);
+        let response: Response;
         try {
-          const body: any = await response.clone().json();
-          collector.providerError(
-            JSON.stringify({
-              status: response.status,
-              code: body?.error?.code,
-              type: body?.error?.type,
-              message: body?.error?.message,
-            }),
-          );
-        } catch {
-          collector.providerError(`HTTP ${response.status}`);
+          response = await (options.fetchImpl ?? fetch)(url, init);
+        } catch (error) {
+          if (!options.signal.aborted)
+            collector.infrastructure(
+              init?.signal?.aborted ||
+                (error instanceof Error && /timeout/i.test(error.name))
+                ? "PROVIDER_TIMEOUT"
+                : "ENDPOINT_FAILURE",
+            );
+          throw error;
         }
-      }
-      return response;
-    },
-  });
+        if (!response.ok)
+          collector.infrastructure("PROVIDER_HTTP_ERROR", response.status);
+        if (!response.ok) {
+          try {
+            const body: any = await response.clone().json();
+            collector.providerError(
+              JSON.stringify({
+                status: response.status,
+                code: body?.error?.code,
+                type: body?.error?.type,
+                message: body?.error?.message,
+              }),
+            );
+          } catch {
+            collector.providerError(`HTTP ${response.status}`);
+          }
+        }
+        return response;
+      },
+    });
+  } catch (error) {
+    if (collector.infrastructureLabel && !options.signal.aborted)
+      throw new ProviderFailureError(
+        collector.infrastructureLabel,
+        error instanceof Error ? error.message : String(error),
+      );
+    throw error;
+  }
   const content = result?.choices?.[0]?.message?.content;
   collector.chatResponse(result, typeof content === "string" ? content : null);
   if (typeof content !== "string")

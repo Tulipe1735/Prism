@@ -1,0 +1,16 @@
+{
+  "expected_runs": 240,
+  "terminal_summaries": 240,
+  "unique_cells": 240,
+  "complete": true,
+  "valid": true,
+  "failures": [],
+  "historical": {
+    "checked": 119,
+    "changed": []
+  },
+  "source_archive": {
+    "path": "evals/results/paper-confirmatory-v1-source.tar.gz",
+    "sha256": "70f9216fae88778483c16aa9e6b5b437c3834c5ad19ceef1bb10c8d6bcc59408"
+  }
+}

@@ -13,6 +13,7 @@ export const variantSchema = z.enum([
   "prism-no-stale-recovery",
   "prism-no-validation",
   "raw-selector",
+  "raw-selector-reference",
   "indexed-compact",
   "indexed-role",
   "indexed-local",
@@ -32,6 +33,11 @@ export const failureTypeSchema = z.enum([
   "BUDGET_EXCEEDED",
   "MODEL_OUTPUT_ERROR",
   "UNKNOWN",
+  "UNDER_EXPANSION",
+  "OVER_EXPANSION",
+  "PROVIDER_TIMEOUT",
+  "PROVIDER_HTTP_ERROR",
+  "ENDPOINT_FAILURE",
 ]);
 export type FailureType = z.infer<typeof failureTypeSchema>;
 export type Variant = z.infer<typeof variantSchema>;
@@ -81,14 +87,17 @@ export const cohortSchema = z
   .strict()
   .refine(
     (cohort) =>
-      cohort.observation !== "native" || !cohort.variants.includes("raw-selector"),
+      cohort.observation !== "native" ||
+      !cohort.variants.some((v) => v.startsWith("raw-selector")),
     "Raw selectors need DOM evidence",
   )
   .refine(
     (cohort) =>
       cohort.observation !== "action-representation" ||
       (cohort.modalPolicy === "observed" &&
-        cohort.variants.every((v) => v.startsWith("indexed-") || v === "raw-selector")),
+        cohort.variants.every(
+          (v) => v.startsWith("indexed-") || v.startsWith("raw-selector"),
+        )),
     "Representation studies must not include reliability ablations",
   );
 export type Cohort = z.infer<typeof cohortSchema>;
@@ -102,6 +111,10 @@ const collisionGroupSchema = z
   .strict();
 export const adaptiveSchema = z
   .object({
+    task_ambiguity_class: z.enum(["unique", "local", "structural"]).optional(),
+    expected_minimum_level: adaptiveLevelSchema.optional(),
+    matches_minimum_level: z.boolean().optional(),
+    task_phase: z.enum(["pre-grounding", "post-grounding"]).optional(),
     initial_level: z.literal("compact"),
     // Maximum used level; individual candidates can remain at cheaper levels.
     final_level: adaptiveLevelSchema,
@@ -192,6 +205,13 @@ export const taskSchema = z
     category: categorySchema,
     maxSteps: z.number().int().positive().optional(),
     success: successSchema,
+    preregistered: z
+      .object({
+        ambiguity_class: z.enum(["unique", "local", "structural"]),
+        minimum_level: adaptiveLevelSchema,
+      })
+      .strict()
+      .optional(),
     fixture: z
       .object({
         mutateAfterDecision: z.boolean().default(false),
@@ -285,6 +305,21 @@ export const stepSchema = z
     raw_model_output: z.string().nullable(),
     system_fingerprint: z.string().nullable(),
     provider_error: z.string().nullable(),
+    infrastructure_events: z
+      .array(
+        z
+          .object({
+            attempt: nonnegative,
+            label: z.enum([
+              "PROVIDER_TIMEOUT",
+              "PROVIDER_HTTP_ERROR",
+              "ENDPOINT_FAILURE",
+            ]),
+            status: nonnegative.nullable(),
+          })
+          .strict(),
+      )
+      .optional(),
     input_tokens: nonnegative.nullable(),
     output_tokens: nonnegative.nullable(),
     total_tokens: nonnegative.nullable(),
@@ -309,6 +344,9 @@ export const summarySchema = z
     ...common,
     record_type: z.literal("summary"),
     success: z.boolean(),
+    grounding_success: z.boolean().optional(),
+    strict_task_success: z.boolean().optional(),
+    infrastructure_failures: z.array(failureTypeSchema).optional(),
     status: z.enum(["done", "blocked", "failed"]),
     reason: z.string(),
     steps: nonnegative,

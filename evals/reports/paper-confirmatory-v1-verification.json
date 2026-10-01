@@ -1,0 +1,25 @@
+{
+  "verified_at": "2026-10-01T03:13:52.564Z",
+  "unit_and_browser_tests": {
+    "passed": 99,
+    "files": 15,
+    "browser_tests": 10,
+    "live_model_calls": 0
+  },
+  "typecheck": "passed",
+  "lint": "passed",
+  "build": "passed",
+  "historical": {
+    "checked": 119,
+    "changed": []
+  },
+  "production_files_compared_to_pilot": 15,
+  "production_differences": [],
+  "adaptive_policy_unchanged": true,
+  "extractor_and_formatter_unchanged": true,
+  "policy_hash": "b8f62f42960cf84a942ded9a63028b7260a2e7827eac8aacd2cc1459964d87de",
+  "extractor_hash": "501bc2902709f295bfb573d57d529f2de2ca55a9a25e8ed03de8c05fb42d3312",
+  "formatter_hash": "f2d444abf351de08d3dc683988971a860c8f9605a05e8aa0b72d05f1095b730f",
+  "system_prompt_hash": "c40b40cd952a0540cc616ac6b491b9e5ee11f84ac6f614cc55585ac116ae9fa4",
+  "task_prompt_hash": "92c06502d1024435f95f8709fa636a5beefe0b5b390832bc7db113c28ab50108"
+}

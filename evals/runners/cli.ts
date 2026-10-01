@@ -110,7 +110,10 @@ export async function main(args: string[]): Promise<void> {
     (!cohort || !process.env[cohort.apiKeyEnv]?.trim())
   )
     throw new Error("Real-model runs require --cohort FILE and its configured key.");
-  if (options.provider === "scripted" && options.variants.includes("raw-selector"))
+  if (
+    options.provider === "scripted" &&
+    options.variants.some((v) => v.startsWith("raw-selector"))
+  )
     throw new Error(
       "raw-selector requires --provider model and --cohort FILE; select indexed variants for scripted runs.",
     );

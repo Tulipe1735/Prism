@@ -1,6 +1,12 @@
 import type { AgentEvent, StaleEvent } from "../../src/runtime/agent.ts";
 import type { Decision } from "../../src/shared/types.ts";
-import type { Evidence, ModelInput, StepRecord, SummaryRecord } from "../schema.ts";
+import type {
+  EvalTask,
+  Evidence,
+  ModelInput,
+  StepRecord,
+  SummaryRecord,
+} from "../schema.ts";
 import { validateChoice } from "../../src/runtime/decision.ts";
 import { representationCost } from "./representation.ts";
 
@@ -24,8 +30,15 @@ export class Collector {
   private started = 0;
   private previousWrongTargets: number | null;
 
-  constructor(identity: RunIdentity, initialEvidence: Evidence | null) {
+  private readonly annotation?: EvalTask["preregistered"];
+
+  constructor(
+    identity: RunIdentity,
+    initialEvidence: Evidence | null,
+    annotation?: EvalTask["preregistered"],
+  ) {
     this.identity = identity;
+    this.annotation = annotation;
     this.previousWrongTargets = initialEvidence?.wrong_targets ?? null;
   }
 
@@ -144,6 +157,23 @@ export class Collector {
     }
   }
 
+  infrastructure(
+    label: "PROVIDER_TIMEOUT" | "PROVIDER_HTTP_ERROR" | "ENDPOINT_FAILURE",
+    status: number | null = null,
+  ): void {
+    if (!this.current) throw new Error("Infrastructure event outside attempt.");
+    (this.current.infrastructure_events ??= []).push({
+      attempt: this.current.llm_calls,
+      label,
+      status,
+    });
+  }
+
+  get infrastructureLabel():
+    "PROVIDER_TIMEOUT" | "PROVIDER_HTTP_ERROR" | "ENDPOINT_FAILURE" | undefined {
+    return this.current?.infrastructure_events?.at(-1)?.label;
+  }
+
   providerError(message: string): void {
     if (this.current) this.current.provider_error = message;
   }
@@ -151,7 +181,21 @@ export class Collector {
   prompt(input: ModelInput, hash: string): void {
     if (!this.current) throw new Error("Prompt outside attempt.");
     this.current.model_input = input;
-    if (input.adaptive) this.current.adaptive = input.adaptive;
+    if (input.adaptive) {
+      if (this.annotation)
+        Object.assign(input.adaptive, {
+          task_ambiguity_class: this.annotation.ambiguity_class,
+          expected_minimum_level: this.annotation.minimum_level,
+          matches_minimum_level:
+            input.adaptive.final_level === this.annotation.minimum_level,
+          task_phase: this.rows.some(
+            (r) => r.executed && r.target_assessment === "correct",
+          )
+            ? "post-grounding"
+            : "pre-grounding",
+        });
+      this.current.adaptive = input.adaptive;
+    }
     this.current.representation_cost = representationCost(input);
     this.current.prompt_hash = hash;
   }

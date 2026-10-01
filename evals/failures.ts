@@ -2,6 +2,17 @@ import type { EvalTask, Evidence, FailureType } from "./schema.ts";
 import { ExecutionError, StalePageError } from "../src/browser/session.ts";
 import { InvalidActionError, ModelOutputError } from "../src/shared/errors.ts";
 
+export class ProviderFailureError extends Error {
+  readonly label: "PROVIDER_TIMEOUT" | "PROVIDER_HTTP_ERROR" | "ENDPOINT_FAILURE";
+  constructor(
+    label: "PROVIDER_TIMEOUT" | "PROVIDER_HTTP_ERROR" | "ENDPOINT_FAILURE",
+    message: string,
+  ) {
+    super(message);
+    this.label = label;
+  }
+}
+
 export type FailureStage =
   "setup" | "observation" | "decision" | "execution" | "oracle";
 
@@ -19,6 +30,7 @@ export function classifyFailure(input: {
     return task.category === "ambiguity"
       ? "SEMANTIC_AMBIGUITY"
       : "ACTION_GROUNDING_ERROR";
+  if (error instanceof ProviderFailureError) return error.label;
   if (input.timedOut || /budget/i.test(reason)) return "BUDGET_EXCEEDED";
   if (error instanceof InvalidActionError) return "INVALID_ACTION";
   if (

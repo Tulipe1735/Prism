@@ -1,0 +1,350 @@
+[
+  {
+    "id": "paper-unique-01",
+    "url": "/paper-confirmatory-v1/unique-01.html",
+    "goal": "Save profile.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Save profile"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-unique-02",
+    "url": "/paper-confirmatory-v1/unique-02.html",
+    "goal": "Open dashboard.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Open dashboard"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-unique-03",
+    "url": "/paper-confirmatory-v1/unique-03.html",
+    "goal": "Export report.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Export report"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-unique-04",
+    "url": "/paper-confirmatory-v1/unique-04.html",
+    "goal": "Archive project.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Archive project"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-local-01",
+    "url": "/paper-confirmatory-v1/local-01.html",
+    "goal": "Delete item Cedar.",
+    "category": "ambiguity",
+    "preregistered": {
+      "ambiguity_class": "local",
+      "minimum_level": "local"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Cedar"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-local-02",
+    "url": "/paper-confirmatory-v1/local-02.html",
+    "goal": "Submit the Museum application.",
+    "category": "ambiguity",
+    "preregistered": {
+      "ambiguity_class": "local",
+      "minimum_level": "local"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Museum"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-local-03",
+    "url": "/paper-confirmatory-v1/local-03.html",
+    "goal": "Open order 7302.",
+    "category": "ambiguity",
+    "preregistered": {
+      "ambiguity_class": "local",
+      "minimum_level": "local"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Order 7302"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-local-04",
+    "url": "/paper-confirmatory-v1/local-04.html",
+    "goal": "Edit the Atlas workspace.",
+    "category": "ambiguity",
+    "preregistered": {
+      "ambiguity_class": "local",
+      "minimum_level": "local"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Atlas"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-structural-01",
+    "url": "/paper-confirmatory-v1/structural-01.html",
+    "goal": "Delete Draft in Team South.",
+    "category": "ambiguity",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Draft in Team South"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-structural-02",
+    "url": "/paper-confirmatory-v1/structural-02.html",
+    "goal": "Submit the Supplier invoice.",
+    "category": "ambiguity",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Supplier invoice"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-structural-03",
+    "url": "/paper-confirmatory-v1/structural-03.html",
+    "goal": "Open Account in Region East.",
+    "category": "ambiguity",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Account in Region East"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "paper-structural-04",
+    "url": "/paper-confirmatory-v1/structural-04.html",
+    "goal": "Continue Setup in Project Harbor.",
+    "category": "ambiguity",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Setup in Project Harbor"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  }
+]

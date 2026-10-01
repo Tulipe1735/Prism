@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Control selection</title>
+    <style>
+      body {
+        font: 16px sans-serif;
+        margin: 20px;
+      }
+      article,
+      section,
+      fieldset,
+      li,
+      [role="group"] {
+        margin: 6px;
+        padding: 4px;
+      }
+      button,
+      a {
+        display: inline-block;
+        padding: 8px;
+        margin: 4px;
+      }
+      h2,
+      h3 {
+        font-size: 16px;
+        margin: 4px;
+      }
+      td {
+        padding: 3px;
+      }
+      #controls {
+        max-width: 900px;
+      }
+    </style>
+    <script src="/paper-confirmatory-v1/support.js" defer></script>
+  </head>
+  <body>
+    <h1>Manage entries</h1>
+    <main id="controls">
+      <section>
+        <h2>Region West</h2>
+        <article>
+          <h3>Account</h3>
+          <div role="group">
+            <span>Account</span
+            ><button
+              type="button"
+              data-target="0"
+              data-description="Account in Region West"
+            >
+              Open
+            </button>
+          </div>
+        </article>
+      </section>
+      <section>
+        <h2>Region East</h2>
+        <article>
+          <h3>Account</h3>
+          <div role="group">
+            <span>Account</span
+            ><button
+              type="button"
+              data-target="1"
+              data-description="Account in Region East"
+              data-correct
+            >
+              Open
+            </button>
+          </div>
+        </article>
+      </section>
+      <section>
+        <h2>Region North</h2>
+        <article>
+          <h3>Account</h3>
+          <div role="group">
+            <span>Account</span
+            ><button
+              type="button"
+              data-target="2"
+              data-description="Account in Region North"
+            >
+              Open
+            </button>
+          </div>
+        </article>
+      </section>
+    </main>
+    <p id="result" role="status">Pending</p>
+    <div
+      id="eval-state"
+      hidden
+      data-wrong-targets="0"
+      data-correct-actions="0"
+      data-mutations="0"
+    ></div>
+  </body>
+</html>
