@@ -18,7 +18,7 @@ inventory is `cohorts/paper-confirmatory-v1.historical.json`; the new runner aud
 
 Use Node v22.23.2 and Chrome for Testing 153.0.8010.12 on loopback port9333 with a
 dedicated headless browser profile. Use the existing TEXT_MODEL_API_KEY environment
-variable/.env without logging it. No second model or automatic repeat extension.
+variable/.env without logging it.
 
 ```sh
 # Before freeze: execute unit, browser, type, lint and build checks, save verification.
