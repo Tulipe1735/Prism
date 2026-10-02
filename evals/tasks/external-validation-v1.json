@@ -1,0 +1,280 @@
+[
+  {
+    "id": "external-table-search",
+    "url": "http://127.0.0.1:9842/datatables/examples/basic_init/zero_config.html",
+    "goal": "Filter the browser table to entries containing Firefox.",
+    "category": "grounding",
+    "success": {
+      "checks": [
+        {
+          "kind": "value",
+          "selector": "#example_filter input",
+          "equals": "Firefox"
+        },
+        {
+          "kind": "text",
+          "selector": "#example tbody tr:first-child td:nth-child(2)",
+          "equals": "Firefox 1.0"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-table-length",
+    "url": "http://127.0.0.1:9842/datatables/examples/basic_init/zero_config.html",
+    "goal": "Set the browser table to show 25 entries per page.",
+    "category": "grounding",
+    "success": {
+      "checks": [
+        {
+          "kind": "value",
+          "selector": "#example_length select",
+          "equals": "25"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-table-next",
+    "url": "http://127.0.0.1:9842/datatables/examples/basic_init/zero_config.html",
+    "goal": "Go to the second page of browser results.",
+    "category": "navigation",
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#example_info",
+          "equals": "Showing 11 to 20 of 57 entries"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-multiple-tables",
+    "url": "http://127.0.0.1:9842/datatables/examples/basic_init/multiple_tables.html",
+    "goal": "Filter only the Gecko based browsers table to entries containing Firefox. Leave the Trident and Webkit tables unfiltered.",
+    "category": "grounding",
+    "success": {
+      "checks": [
+        {
+          "kind": "value",
+          "selector": "#DataTables_Table_0_filter input",
+          "equals": "Firefox"
+        },
+        {
+          "kind": "value",
+          "selector": "#allan_filter input",
+          "equals": ""
+        },
+        {
+          "kind": "value",
+          "selector": "#DataTables_Table_1_filter input",
+          "equals": ""
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-column-filter",
+    "url": "http://127.0.0.1:9842/datatables/examples/api/multi_filter.html",
+    "goal": "Use the browser-column filter to show Firefox entries.",
+    "category": "grounding",
+    "success": {
+      "checks": [
+        {
+          "kind": "value",
+          "selector": "input[name=\"search_browser\"]",
+          "equals": "Firefox"
+        },
+        {
+          "kind": "text",
+          "selector": "#example tbody tr:first-child td:nth-child(2)",
+          "equals": "Firefox 1.0"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-album-navigation",
+    "url": "http://127.0.0.1:9842/docs/5.3/examples/album/index.html",
+    "goal": "Expand the album page navigation so its About and Contact sections are visible.",
+    "category": "navigation",
+    "success": {
+      "checks": [
+        {
+          "kind": "attribute",
+          "selector": "button[aria-controls=\"navbarHeader\"]",
+          "attribute": "aria-expanded",
+          "equals": "true"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-billing-name",
+    "url": "http://127.0.0.1:9842/docs/5.3/examples/checkout/index.html",
+    "goal": "Enter Alex as the first name and Mason as the last name in the billing address form.",
+    "category": "form",
+    "success": {
+      "checks": [
+        {
+          "kind": "value",
+          "selector": "#firstName",
+          "equals": "Alex"
+        },
+        {
+          "kind": "value",
+          "selector": "#lastName",
+          "equals": "Mason"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-billing-address",
+    "url": "http://127.0.0.1:9842/docs/5.3/examples/checkout/index.html",
+    "goal": "Enter 24 Oak Street as the billing address and Apartment 7 as Address 2.",
+    "category": "form",
+    "success": {
+      "checks": [
+        {
+          "kind": "value",
+          "selector": "#address",
+          "equals": "24 Oak Street"
+        },
+        {
+          "kind": "value",
+          "selector": "#address2",
+          "equals": "Apartment 7"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-signin-fields",
+    "url": "http://127.0.0.1:9842/docs/5.3/examples/sign-in/index.html",
+    "goal": "Prepare the sign-in form with email alex@example.com, password DemoPass123, and Remember me checked. Do not submit.",
+    "category": "form",
+    "success": {
+      "checks": [
+        {
+          "kind": "value",
+          "selector": "#floatingInput",
+          "equals": "alex@example.com"
+        },
+        {
+          "kind": "value",
+          "selector": "#floatingPassword",
+          "equals": "DemoPass123"
+        },
+        {
+          "kind": "value",
+          "selector": "#checkDefault:checked",
+          "equals": "remember-me"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-modal-create",
+    "url": "http://127.0.0.1:9842/jquery-ui/demos/dialog/modal-form.html",
+    "goal": "Create a new user named Alex Mason with email alex@example.com and password DemoPass123. Save the user in the Existing Users table.",
+    "category": "long-horizon",
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#users tbody tr:nth-child(2) td:nth-child(1)",
+          "equals": "Alex Mason"
+        },
+        {
+          "kind": "text",
+          "selector": "#users tbody tr:nth-child(2) td:nth-child(2)",
+          "equals": "alex@example.com"
+        },
+        {
+          "kind": "text",
+          "selector": "#users tbody tr:nth-child(2) td:nth-child(3)",
+          "equals": "DemoPass123"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-modal-dismiss",
+    "url": "http://127.0.0.1:9842/jquery-ui/demos/dialog/modal-message.html",
+    "goal": "Acknowledge the Download complete message and dismiss its dialog.",
+    "category": "grounding",
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": ".ui-dialog[style*=\"display: none\"] .ui-dialog-title",
+          "equals": "Download complete"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-accordion",
+    "url": "http://127.0.0.1:9842/jquery-ui/demos/accordion/default.html",
+    "goal": "Expand Section 3 of the accordion to show its list items.",
+    "category": "grounding",
+    "success": {
+      "checks": [
+        {
+          "kind": "attribute",
+          "selector": "#accordion h3:nth-of-type(3)",
+          "attribute": "aria-expanded",
+          "equals": "true"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-tabs",
+    "url": "http://127.0.0.1:9842/jquery-ui/demos/tabs/default.html",
+    "goal": "Open the Aenean lacinia tab.",
+    "category": "navigation",
+    "success": {
+      "checks": [
+        {
+          "kind": "attribute",
+          "selector": "#tabs-3",
+          "attribute": "aria-hidden",
+          "equals": "false"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-dynamic-enable",
+    "url": "https://the-internet.herokuapp.com/dynamic_controls",
+    "goal": "Enable the text input, then enter External validation.",
+    "category": "stale",
+    "success": {
+      "checks": [
+        {
+          "kind": "value",
+          "selector": "#input-example input:not(:disabled)",
+          "equals": "External validation"
+        }
+      ]
+    }
+  },
+  {
+    "id": "external-delayed-content",
+    "url": "https://the-internet.herokuapp.com/dynamic_loading/1",
+    "goal": "Start the example and wait until Hello World! is visible.",
+    "category": "stale",
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#finish:not([style*=\"display:none\"]):not([style*=\"display: none\"]) h4",
+          "equals": "Hello World!"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,270 @@
+{
+  "external-table-search": {
+    "page_type": "table/filter",
+    "source_family": "datatables",
+    "planned_minimum_steps": 1,
+    "goal_characters": 55,
+    "correct_selector": "#example_filter input",
+    "candidate_selector": "#example_wrapper input, #example_wrapper select, #example_wrapper .paginate_enabled_next, #example_wrapper .paginate_enabled_previous, #example_wrapper th",
+    "browser_check": [
+      {
+        "kind": "fill",
+        "selector": "#example_filter input",
+        "text": "Firefox"
+      }
+    ]
+  },
+  "external-table-length": {
+    "page_type": "table/pagination",
+    "source_family": "datatables",
+    "planned_minimum_steps": 1,
+    "goal_characters": 50,
+    "correct_selector": "#example_length select",
+    "candidate_selector": "#example_wrapper input, #example_wrapper select, #example_wrapper .paginate_enabled_next, #example_wrapper .paginate_enabled_previous, #example_wrapper th",
+    "browser_check": [
+      {
+        "kind": "select",
+        "selector": "#example_length select",
+        "value": "25"
+      }
+    ]
+  },
+  "external-table-next": {
+    "page_type": "table/pagination",
+    "source_family": "datatables",
+    "planned_minimum_steps": 1,
+    "goal_characters": 41,
+    "correct_selector": "#example_next",
+    "candidate_selector": "#example_wrapper input, #example_wrapper select, #example_wrapper .paginate_enabled_next, #example_wrapper .paginate_enabled_previous, #example_wrapper th",
+    "browser_check": [
+      {
+        "kind": "click",
+        "selector": "#example_next"
+      }
+    ]
+  },
+  "external-multiple-tables": {
+    "page_type": "multiple tables",
+    "source_family": "datatables",
+    "planned_minimum_steps": 1,
+    "goal_characters": 121,
+    "correct_selector": "#DataTables_Table_0_filter input",
+    "candidate_selector": ".dataTables_filter input, .dataTables_length select, .dataTables_paginate div",
+    "browser_check": [
+      {
+        "kind": "fill",
+        "selector": "#DataTables_Table_0_filter input",
+        "text": "Firefox"
+      }
+    ]
+  },
+  "external-column-filter": {
+    "page_type": "table/repeated fields",
+    "source_family": "datatables",
+    "planned_minimum_steps": 1,
+    "goal_characters": 54,
+    "correct_selector": "input[name=\"search_browser\"]",
+    "candidate_selector": "#example_wrapper input, #example_wrapper select, #example_wrapper th",
+    "browser_check": [
+      {
+        "kind": "fill",
+        "selector": "input[name=\"search_browser\"]",
+        "text": "Firefox"
+      }
+    ]
+  },
+  "external-album-navigation": {
+    "page_type": "cards/navigation",
+    "source_family": "docs",
+    "planned_minimum_steps": 1,
+    "goal_characters": 79,
+    "correct_selector": "button[aria-controls=\"navbarHeader\"]",
+    "candidate_selector": "button, a",
+    "browser_check": [
+      {
+        "kind": "click",
+        "selector": "button[aria-controls=\"navbarHeader\"]"
+      }
+    ]
+  },
+  "external-billing-name": {
+    "page_type": "checkout form/cards",
+    "source_family": "docs",
+    "planned_minimum_steps": 2,
+    "goal_characters": 84,
+    "correct_selector": "#firstName, #lastName",
+    "candidate_selector": "input, select, button",
+    "browser_check": [
+      {
+        "kind": "fill",
+        "selector": "#firstName",
+        "text": "Alex"
+      },
+      {
+        "kind": "fill",
+        "selector": "#lastName",
+        "text": "Mason"
+      }
+    ]
+  },
+  "external-billing-address": {
+    "page_type": "form/repeated fields",
+    "source_family": "docs",
+    "planned_minimum_steps": 2,
+    "goal_characters": 72,
+    "correct_selector": "#address, #address2",
+    "candidate_selector": "input, select, button",
+    "browser_check": [
+      {
+        "kind": "fill",
+        "selector": "#address",
+        "text": "24 Oak Street"
+      },
+      {
+        "kind": "fill",
+        "selector": "#address2",
+        "text": "Apartment 7"
+      }
+    ]
+  },
+  "external-signin-fields": {
+    "page_type": "sign-in form",
+    "source_family": "docs",
+    "planned_minimum_steps": 3,
+    "goal_characters": 115,
+    "correct_selector": "#floatingInput, #floatingPassword, #checkDefault",
+    "candidate_selector": "input, button",
+    "browser_check": [
+      {
+        "kind": "fill",
+        "selector": "#floatingInput",
+        "text": "alex@example.com"
+      },
+      {
+        "kind": "fill",
+        "selector": "#floatingPassword",
+        "text": "DemoPass123"
+      },
+      {
+        "kind": "click",
+        "selector": "#checkDefault"
+      }
+    ]
+  },
+  "external-modal-create": {
+    "page_type": "modal/form/edit-save",
+    "source_family": "jquery-ui",
+    "planned_minimum_steps": 5,
+    "goal_characters": 131,
+    "correct_selector": "#create-user, #name, #email, #password, .ui-dialog-buttonpane button:first-child",
+    "candidate_selector": "button, input",
+    "browser_check": [
+      {
+        "kind": "click",
+        "selector": "#create-user"
+      },
+      {
+        "kind": "fill",
+        "selector": "#name",
+        "text": "Alex Mason"
+      },
+      {
+        "kind": "fill",
+        "selector": "#email",
+        "text": "alex@example.com"
+      },
+      {
+        "kind": "fill",
+        "selector": "#password",
+        "text": "DemoPass123"
+      },
+      {
+        "kind": "click",
+        "selector": ".ui-dialog-buttonpane button:first-child"
+      }
+    ]
+  },
+  "external-modal-dismiss": {
+    "page_type": "modal/overlay",
+    "source_family": "jquery-ui",
+    "planned_minimum_steps": 1,
+    "goal_characters": 65,
+    "correct_selector": ".ui-dialog button",
+    "candidate_selector": "button, a",
+    "browser_check": [
+      {
+        "kind": "click",
+        "selector": ".ui-dialog-buttonpane button"
+      }
+    ]
+  },
+  "external-accordion": {
+    "page_type": "nested sections/list",
+    "source_family": "jquery-ui",
+    "planned_minimum_steps": 1,
+    "goal_characters": 57,
+    "correct_selector": "#accordion h3:nth-of-type(3)",
+    "candidate_selector": "#accordion h3",
+    "browser_check": [
+      {
+        "kind": "click",
+        "selector": "#accordion h3:nth-of-type(3)"
+      }
+    ]
+  },
+  "external-tabs": {
+    "page_type": "tabbed sections",
+    "source_family": "jquery-ui",
+    "planned_minimum_steps": 1,
+    "goal_characters": 28,
+    "correct_selector": "#tabs a[href=\"#tabs-3\"]",
+    "candidate_selector": "#tabs a",
+    "browser_check": [
+      {
+        "kind": "click",
+        "selector": "#tabs a[href=\"#tabs-3\"]"
+      }
+    ]
+  },
+  "external-dynamic-enable": {
+    "page_type": "live/delayed dynamic form",
+    "source_family": "the-internet-live",
+    "planned_minimum_steps": 2,
+    "goal_characters": 54,
+    "correct_selector": "#input-example button, #input-example input",
+    "candidate_selector": "#content button, #content input",
+    "browser_check": [
+      {
+        "kind": "click",
+        "selector": "#input-example button"
+      },
+      {
+        "kind": "wait",
+        "ms": 3500
+      },
+      {
+        "kind": "fill",
+        "selector": "#input-example input",
+        "text": "External validation"
+      }
+    ]
+  },
+  "external-delayed-content": {
+    "page_type": "live/delayed hidden content",
+    "source_family": "the-internet-live",
+    "planned_minimum_steps": 1,
+    "goal_characters": 57,
+    "correct_selector": "#start button",
+    "candidate_selector": "button, a",
+    "browser_check": [
+      {
+        "kind": "click",
+        "selector": "#start button"
+      },
+      {
+        "kind": "wait",
+        "ms": 6000
+      }
+    ]
+  }
+}

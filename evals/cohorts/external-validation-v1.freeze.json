@@ -1,0 +1,986 @@
+{
+  "frozen_at": "2026-10-02T03:59:40.091Z",
+  "controls": {
+    "config": {
+      "study_id": "external-validation-v1",
+      "models": [
+        {
+          "id": "external-validation-v1",
+          "model": "glm-5.3-flash",
+          "baseUrl": "https://opencode.ai/zen/go/v1",
+          "apiKeyEnv": "TEXT_MODEL_API_KEY",
+          "temperature": 0,
+          "topP": 1,
+          "maxTokens": 8192,
+          "reasoning": "provider-default",
+          "maxSteps": 8,
+          "httpRetries": 2,
+          "staleRetries": 5,
+          "viewport": {
+            "width": 1120,
+            "height": 780
+          },
+          "browserVersion": "Chrome/153.0.8010.12",
+          "observation": "action-representation",
+          "variants": [
+            "indexed-local",
+            "indexed-structural",
+            "indexed-adaptive",
+            "raw-selector-reference"
+          ],
+          "tasks": "evals/tasks/external-validation-v1.json",
+          "categories": [
+            "grounding",
+            "navigation",
+            "form",
+            "long-horizon",
+            "stale"
+          ],
+          "fixturePort": 9842,
+          "timeoutMs": 240000,
+          "concurrency": 4,
+          "maxLlmCalls": 6500,
+          "repeats": 3,
+          "modalPolicy": "observed",
+          "repetitionOffset": 0
+        },
+        {
+          "id": "external-validation-v1",
+          "model": "deepseek-v4.1-flash",
+          "baseUrl": "https://opencode.ai/zen/go/v1",
+          "apiKeyEnv": "TEXT_MODEL_API_KEY",
+          "temperature": 0,
+          "topP": 1,
+          "maxTokens": 8192,
+          "reasoning": "provider-default",
+          "maxSteps": 8,
+          "httpRetries": 2,
+          "staleRetries": 5,
+          "viewport": {
+            "width": 1120,
+            "height": 780
+          },
+          "browserVersion": "Chrome/153.0.8010.12",
+          "observation": "action-representation",
+          "variants": [
+            "indexed-local",
+            "indexed-structural",
+            "indexed-adaptive",
+            "raw-selector-reference"
+          ],
+          "tasks": "evals/tasks/external-validation-v1.json",
+          "categories": [
+            "grounding",
+            "navigation",
+            "form",
+            "long-horizon",
+            "stale"
+          ],
+          "fixturePort": 9842,
+          "timeoutMs": 240000,
+          "concurrency": 4,
+          "maxLlmCalls": 6500,
+          "repeats": 3,
+          "modalPolicy": "observed",
+          "repetitionOffset": 0
+        }
+      ],
+      "browser_url": "http://127.0.0.1:9334",
+      "expected_runs": 360
+    },
+    "task_hash": "77d4da969cf655365b21240e6c9116d2a34f3721fbf7bfce0bdd2b211e847fcb",
+    "config_hash": "6f8e015ae3ff3f64f5f98a256a0ecc19ab21292a6157ffdfcab19336445b3669",
+    "metadata_hash": "900b40924b6ddf661f1814951fe38241f551de3fb1cbf9f2405255fc7cd741d7",
+    "protocol_hash": "97f684b0054298212ea357defe7e3803dee3aae204b91910c982413e5f22264c",
+    "historical_inventory_hash": "27d822df61d16e2ed809903a5529b50086cbbbf029547f4eec3c77c835c4259c",
+    "original_method_hash": "979167cfc4cf26c422546b356a60a39685b3a2afbbde19865c019bd466b1a9be",
+    "representation_policy_hash": "366a3b51781a3220333450392787b180c314dbc30f741759e9cf0d570cfb03d2",
+    "extractor_formatter_hash": "7b3c7529180678553fcb2fb46d29de8c3d6ec522d4a2aa8cd21b3af08a1a90d1",
+    "model_formatter_hash": "837fdddedd22b6ff0a9ddbfe8aa55ee43466ecdc25fe42769fff1b0fb54236c5",
+    "system_prompt_hash": "c40b40cd952a0540cc616ac6b491b9e5ee11f84ac6f614cc55585ac116ae9fa4",
+    "task_prompt_hash": "92c06502d1024435f95f8709fa636a5beefe0b5b390832bc7db113c28ab50108",
+    "study_implementation_hash": "a42de123162e2ee7c37e5f189ffe565dd1c99b244ac666d11acb6140cf2bd544",
+    "analysis_hash": "fa5f4b84d78a6f24fd254f218914cfb11ba6380f080797e63f0624b33837dd72",
+    "test_hash": "d0ffe3d2e9f8573c1bb3c86f2a3b919c277c89f70734260ac74fabccf29d8e50",
+    "external_source_hash": "b168ca0c9aaf0c21d4369e95802405c6c71de7d4774dfdd80a49f771648897fb",
+    "lockfile_hash": "0ab051c47ed9b333d3b109b9e60b4e20f0555ed922439aa8269bc6067efe3bee",
+    "browser": {
+      "protocolVersion": "1.3",
+      "product": "Chrome/153.0.8010.12",
+      "revision": "@971a7443b0c9b0a9b2860529b33331b76077ec62",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+      "jsVersion": "15.3.76.4"
+    },
+    "environment": {
+      "platform": "linux",
+      "release": "5.15.167.4-microsoft-standard-WSL2",
+      "arch": "x64",
+      "node": "v22.23.2"
+    },
+    "planned_cells": [
+      "glm-5.3-flash/external-table-search/indexed-local/0",
+      "glm-5.3-flash/external-table-search/indexed-structural/0",
+      "glm-5.3-flash/external-table-search/indexed-adaptive/0",
+      "glm-5.3-flash/external-table-search/raw-selector-reference/0",
+      "glm-5.3-flash/external-table-length/indexed-structural/0",
+      "glm-5.3-flash/external-table-length/indexed-adaptive/0",
+      "glm-5.3-flash/external-table-length/raw-selector-reference/0",
+      "glm-5.3-flash/external-table-length/indexed-local/0",
+      "glm-5.3-flash/external-table-next/indexed-adaptive/0",
+      "glm-5.3-flash/external-table-next/raw-selector-reference/0",
+      "glm-5.3-flash/external-table-next/indexed-local/0",
+      "glm-5.3-flash/external-table-next/indexed-structural/0",
+      "glm-5.3-flash/external-multiple-tables/raw-selector-reference/0",
+      "glm-5.3-flash/external-multiple-tables/indexed-local/0",
+      "glm-5.3-flash/external-multiple-tables/indexed-structural/0",
+      "glm-5.3-flash/external-multiple-tables/indexed-adaptive/0",
+      "glm-5.3-flash/external-column-filter/indexed-local/0",
+      "glm-5.3-flash/external-column-filter/indexed-structural/0",
+      "glm-5.3-flash/external-column-filter/indexed-adaptive/0",
+      "glm-5.3-flash/external-column-filter/raw-selector-reference/0",
+      "glm-5.3-flash/external-album-navigation/indexed-structural/0",
+      "glm-5.3-flash/external-album-navigation/indexed-adaptive/0",
+      "glm-5.3-flash/external-album-navigation/raw-selector-reference/0",
+      "glm-5.3-flash/external-album-navigation/indexed-local/0",
+      "glm-5.3-flash/external-billing-name/indexed-adaptive/0",
+      "glm-5.3-flash/external-billing-name/raw-selector-reference/0",
+      "glm-5.3-flash/external-billing-name/indexed-local/0",
+      "glm-5.3-flash/external-billing-name/indexed-structural/0",
+      "glm-5.3-flash/external-billing-address/raw-selector-reference/0",
+      "glm-5.3-flash/external-billing-address/indexed-local/0",
+      "glm-5.3-flash/external-billing-address/indexed-structural/0",
+      "glm-5.3-flash/external-billing-address/indexed-adaptive/0",
+      "glm-5.3-flash/external-signin-fields/indexed-local/0",
+      "glm-5.3-flash/external-signin-fields/indexed-structural/0",
+      "glm-5.3-flash/external-signin-fields/indexed-adaptive/0",
+      "glm-5.3-flash/external-signin-fields/raw-selector-reference/0",
+      "glm-5.3-flash/external-modal-create/indexed-structural/0",
+      "glm-5.3-flash/external-modal-create/indexed-adaptive/0",
+      "glm-5.3-flash/external-modal-create/raw-selector-reference/0",
+      "glm-5.3-flash/external-modal-create/indexed-local/0",
+      "glm-5.3-flash/external-modal-dismiss/indexed-adaptive/0",
+      "glm-5.3-flash/external-modal-dismiss/raw-selector-reference/0",
+      "glm-5.3-flash/external-modal-dismiss/indexed-local/0",
+      "glm-5.3-flash/external-modal-dismiss/indexed-structural/0",
+      "glm-5.3-flash/external-accordion/raw-selector-reference/0",
+      "glm-5.3-flash/external-accordion/indexed-local/0",
+      "glm-5.3-flash/external-accordion/indexed-structural/0",
+      "glm-5.3-flash/external-accordion/indexed-adaptive/0",
+      "glm-5.3-flash/external-tabs/indexed-local/0",
+      "glm-5.3-flash/external-tabs/indexed-structural/0",
+      "glm-5.3-flash/external-tabs/indexed-adaptive/0",
+      "glm-5.3-flash/external-tabs/raw-selector-reference/0",
+      "glm-5.3-flash/external-dynamic-enable/indexed-structural/0",
+      "glm-5.3-flash/external-dynamic-enable/indexed-adaptive/0",
+      "glm-5.3-flash/external-dynamic-enable/raw-selector-reference/0",
+      "glm-5.3-flash/external-dynamic-enable/indexed-local/0",
+      "glm-5.3-flash/external-delayed-content/indexed-adaptive/0",
+      "glm-5.3-flash/external-delayed-content/raw-selector-reference/0",
+      "glm-5.3-flash/external-delayed-content/indexed-local/0",
+      "glm-5.3-flash/external-delayed-content/indexed-structural/0",
+      "glm-5.3-flash/external-table-search/indexed-structural/1",
+      "glm-5.3-flash/external-table-search/indexed-adaptive/1",
+      "glm-5.3-flash/external-table-search/raw-selector-reference/1",
+      "glm-5.3-flash/external-table-search/indexed-local/1",
+      "glm-5.3-flash/external-table-length/indexed-adaptive/1",
+      "glm-5.3-flash/external-table-length/raw-selector-reference/1",
+      "glm-5.3-flash/external-table-length/indexed-local/1",
+      "glm-5.3-flash/external-table-length/indexed-structural/1",
+      "glm-5.3-flash/external-table-next/raw-selector-reference/1",
+      "glm-5.3-flash/external-table-next/indexed-local/1",
+      "glm-5.3-flash/external-table-next/indexed-structural/1",
+      "glm-5.3-flash/external-table-next/indexed-adaptive/1",
+      "glm-5.3-flash/external-multiple-tables/indexed-local/1",
+      "glm-5.3-flash/external-multiple-tables/indexed-structural/1",
+      "glm-5.3-flash/external-multiple-tables/indexed-adaptive/1",
+      "glm-5.3-flash/external-multiple-tables/raw-selector-reference/1",
+      "glm-5.3-flash/external-column-filter/indexed-structural/1",
+      "glm-5.3-flash/external-column-filter/indexed-adaptive/1",
+      "glm-5.3-flash/external-column-filter/raw-selector-reference/1",
+      "glm-5.3-flash/external-column-filter/indexed-local/1",
+      "glm-5.3-flash/external-album-navigation/indexed-adaptive/1",
+      "glm-5.3-flash/external-album-navigation/raw-selector-reference/1",
+      "glm-5.3-flash/external-album-navigation/indexed-local/1",
+      "glm-5.3-flash/external-album-navigation/indexed-structural/1",
+      "glm-5.3-flash/external-billing-name/raw-selector-reference/1",
+      "glm-5.3-flash/external-billing-name/indexed-local/1",
+      "glm-5.3-flash/external-billing-name/indexed-structural/1",
+      "glm-5.3-flash/external-billing-name/indexed-adaptive/1",
+      "glm-5.3-flash/external-billing-address/indexed-local/1",
+      "glm-5.3-flash/external-billing-address/indexed-structural/1",
+      "glm-5.3-flash/external-billing-address/indexed-adaptive/1",
+      "glm-5.3-flash/external-billing-address/raw-selector-reference/1",
+      "glm-5.3-flash/external-signin-fields/indexed-structural/1",
+      "glm-5.3-flash/external-signin-fields/indexed-adaptive/1",
+      "glm-5.3-flash/external-signin-fields/raw-selector-reference/1",
+      "glm-5.3-flash/external-signin-fields/indexed-local/1",
+      "glm-5.3-flash/external-modal-create/indexed-adaptive/1",
+      "glm-5.3-flash/external-modal-create/raw-selector-reference/1",
+      "glm-5.3-flash/external-modal-create/indexed-local/1",
+      "glm-5.3-flash/external-modal-create/indexed-structural/1",
+      "glm-5.3-flash/external-modal-dismiss/raw-selector-reference/1",
+      "glm-5.3-flash/external-modal-dismiss/indexed-local/1",
+      "glm-5.3-flash/external-modal-dismiss/indexed-structural/1",
+      "glm-5.3-flash/external-modal-dismiss/indexed-adaptive/1",
+      "glm-5.3-flash/external-accordion/indexed-local/1",
+      "glm-5.3-flash/external-accordion/indexed-structural/1",
+      "glm-5.3-flash/external-accordion/indexed-adaptive/1",
+      "glm-5.3-flash/external-accordion/raw-selector-reference/1",
+      "glm-5.3-flash/external-tabs/indexed-structural/1",
+      "glm-5.3-flash/external-tabs/indexed-adaptive/1",
+      "glm-5.3-flash/external-tabs/raw-selector-reference/1",
+      "glm-5.3-flash/external-tabs/indexed-local/1",
+      "glm-5.3-flash/external-dynamic-enable/indexed-adaptive/1",
+      "glm-5.3-flash/external-dynamic-enable/raw-selector-reference/1",
+      "glm-5.3-flash/external-dynamic-enable/indexed-local/1",
+      "glm-5.3-flash/external-dynamic-enable/indexed-structural/1",
+      "glm-5.3-flash/external-delayed-content/raw-selector-reference/1",
+      "glm-5.3-flash/external-delayed-content/indexed-local/1",
+      "glm-5.3-flash/external-delayed-content/indexed-structural/1",
+      "glm-5.3-flash/external-delayed-content/indexed-adaptive/1",
+      "glm-5.3-flash/external-table-search/indexed-adaptive/2",
+      "glm-5.3-flash/external-table-search/raw-selector-reference/2",
+      "glm-5.3-flash/external-table-search/indexed-local/2",
+      "glm-5.3-flash/external-table-search/indexed-structural/2",
+      "glm-5.3-flash/external-table-length/raw-selector-reference/2",
+      "glm-5.3-flash/external-table-length/indexed-local/2",
+      "glm-5.3-flash/external-table-length/indexed-structural/2",
+      "glm-5.3-flash/external-table-length/indexed-adaptive/2",
+      "glm-5.3-flash/external-table-next/indexed-local/2",
+      "glm-5.3-flash/external-table-next/indexed-structural/2",
+      "glm-5.3-flash/external-table-next/indexed-adaptive/2",
+      "glm-5.3-flash/external-table-next/raw-selector-reference/2",
+      "glm-5.3-flash/external-multiple-tables/indexed-structural/2",
+      "glm-5.3-flash/external-multiple-tables/indexed-adaptive/2",
+      "glm-5.3-flash/external-multiple-tables/raw-selector-reference/2",
+      "glm-5.3-flash/external-multiple-tables/indexed-local/2",
+      "glm-5.3-flash/external-column-filter/indexed-adaptive/2",
+      "glm-5.3-flash/external-column-filter/raw-selector-reference/2",
+      "glm-5.3-flash/external-column-filter/indexed-local/2",
+      "glm-5.3-flash/external-column-filter/indexed-structural/2",
+      "glm-5.3-flash/external-album-navigation/raw-selector-reference/2",
+      "glm-5.3-flash/external-album-navigation/indexed-local/2",
+      "glm-5.3-flash/external-album-navigation/indexed-structural/2",
+      "glm-5.3-flash/external-album-navigation/indexed-adaptive/2",
+      "glm-5.3-flash/external-billing-name/indexed-local/2",
+      "glm-5.3-flash/external-billing-name/indexed-structural/2",
+      "glm-5.3-flash/external-billing-name/indexed-adaptive/2",
+      "glm-5.3-flash/external-billing-name/raw-selector-reference/2",
+      "glm-5.3-flash/external-billing-address/indexed-structural/2",
+      "glm-5.3-flash/external-billing-address/indexed-adaptive/2",
+      "glm-5.3-flash/external-billing-address/raw-selector-reference/2",
+      "glm-5.3-flash/external-billing-address/indexed-local/2",
+      "glm-5.3-flash/external-signin-fields/indexed-adaptive/2",
+      "glm-5.3-flash/external-signin-fields/raw-selector-reference/2",
+      "glm-5.3-flash/external-signin-fields/indexed-local/2",
+      "glm-5.3-flash/external-signin-fields/indexed-structural/2",
+      "glm-5.3-flash/external-modal-create/raw-selector-reference/2",
+      "glm-5.3-flash/external-modal-create/indexed-local/2",
+      "glm-5.3-flash/external-modal-create/indexed-structural/2",
+      "glm-5.3-flash/external-modal-create/indexed-adaptive/2",
+      "glm-5.3-flash/external-modal-dismiss/indexed-local/2",
+      "glm-5.3-flash/external-modal-dismiss/indexed-structural/2",
+      "glm-5.3-flash/external-modal-dismiss/indexed-adaptive/2",
+      "glm-5.3-flash/external-modal-dismiss/raw-selector-reference/2",
+      "glm-5.3-flash/external-accordion/indexed-structural/2",
+      "glm-5.3-flash/external-accordion/indexed-adaptive/2",
+      "glm-5.3-flash/external-accordion/raw-selector-reference/2",
+      "glm-5.3-flash/external-accordion/indexed-local/2",
+      "glm-5.3-flash/external-tabs/indexed-adaptive/2",
+      "glm-5.3-flash/external-tabs/raw-selector-reference/2",
+      "glm-5.3-flash/external-tabs/indexed-local/2",
+      "glm-5.3-flash/external-tabs/indexed-structural/2",
+      "glm-5.3-flash/external-dynamic-enable/raw-selector-reference/2",
+      "glm-5.3-flash/external-dynamic-enable/indexed-local/2",
+      "glm-5.3-flash/external-dynamic-enable/indexed-structural/2",
+      "glm-5.3-flash/external-dynamic-enable/indexed-adaptive/2",
+      "glm-5.3-flash/external-delayed-content/indexed-local/2",
+      "glm-5.3-flash/external-delayed-content/indexed-structural/2",
+      "glm-5.3-flash/external-delayed-content/indexed-adaptive/2",
+      "glm-5.3-flash/external-delayed-content/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-table-search/indexed-local/0",
+      "deepseek-v4.1-flash/external-table-search/indexed-structural/0",
+      "deepseek-v4.1-flash/external-table-search/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-table-search/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-table-length/indexed-structural/0",
+      "deepseek-v4.1-flash/external-table-length/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-table-length/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-table-length/indexed-local/0",
+      "deepseek-v4.1-flash/external-table-next/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-table-next/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-table-next/indexed-local/0",
+      "deepseek-v4.1-flash/external-table-next/indexed-structural/0",
+      "deepseek-v4.1-flash/external-multiple-tables/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-multiple-tables/indexed-local/0",
+      "deepseek-v4.1-flash/external-multiple-tables/indexed-structural/0",
+      "deepseek-v4.1-flash/external-multiple-tables/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-column-filter/indexed-local/0",
+      "deepseek-v4.1-flash/external-column-filter/indexed-structural/0",
+      "deepseek-v4.1-flash/external-column-filter/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-column-filter/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-album-navigation/indexed-structural/0",
+      "deepseek-v4.1-flash/external-album-navigation/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-album-navigation/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-album-navigation/indexed-local/0",
+      "deepseek-v4.1-flash/external-billing-name/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-billing-name/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-billing-name/indexed-local/0",
+      "deepseek-v4.1-flash/external-billing-name/indexed-structural/0",
+      "deepseek-v4.1-flash/external-billing-address/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-billing-address/indexed-local/0",
+      "deepseek-v4.1-flash/external-billing-address/indexed-structural/0",
+      "deepseek-v4.1-flash/external-billing-address/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-signin-fields/indexed-local/0",
+      "deepseek-v4.1-flash/external-signin-fields/indexed-structural/0",
+      "deepseek-v4.1-flash/external-signin-fields/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-signin-fields/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-modal-create/indexed-structural/0",
+      "deepseek-v4.1-flash/external-modal-create/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-modal-create/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-modal-create/indexed-local/0",
+      "deepseek-v4.1-flash/external-modal-dismiss/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-modal-dismiss/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-modal-dismiss/indexed-local/0",
+      "deepseek-v4.1-flash/external-modal-dismiss/indexed-structural/0",
+      "deepseek-v4.1-flash/external-accordion/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-accordion/indexed-local/0",
+      "deepseek-v4.1-flash/external-accordion/indexed-structural/0",
+      "deepseek-v4.1-flash/external-accordion/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-tabs/indexed-local/0",
+      "deepseek-v4.1-flash/external-tabs/indexed-structural/0",
+      "deepseek-v4.1-flash/external-tabs/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-tabs/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-dynamic-enable/indexed-structural/0",
+      "deepseek-v4.1-flash/external-dynamic-enable/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-dynamic-enable/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-dynamic-enable/indexed-local/0",
+      "deepseek-v4.1-flash/external-delayed-content/indexed-adaptive/0",
+      "deepseek-v4.1-flash/external-delayed-content/raw-selector-reference/0",
+      "deepseek-v4.1-flash/external-delayed-content/indexed-local/0",
+      "deepseek-v4.1-flash/external-delayed-content/indexed-structural/0",
+      "deepseek-v4.1-flash/external-table-search/indexed-structural/1",
+      "deepseek-v4.1-flash/external-table-search/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-table-search/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-table-search/indexed-local/1",
+      "deepseek-v4.1-flash/external-table-length/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-table-length/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-table-length/indexed-local/1",
+      "deepseek-v4.1-flash/external-table-length/indexed-structural/1",
+      "deepseek-v4.1-flash/external-table-next/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-table-next/indexed-local/1",
+      "deepseek-v4.1-flash/external-table-next/indexed-structural/1",
+      "deepseek-v4.1-flash/external-table-next/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-multiple-tables/indexed-local/1",
+      "deepseek-v4.1-flash/external-multiple-tables/indexed-structural/1",
+      "deepseek-v4.1-flash/external-multiple-tables/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-multiple-tables/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-column-filter/indexed-structural/1",
+      "deepseek-v4.1-flash/external-column-filter/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-column-filter/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-column-filter/indexed-local/1",
+      "deepseek-v4.1-flash/external-album-navigation/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-album-navigation/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-album-navigation/indexed-local/1",
+      "deepseek-v4.1-flash/external-album-navigation/indexed-structural/1",
+      "deepseek-v4.1-flash/external-billing-name/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-billing-name/indexed-local/1",
+      "deepseek-v4.1-flash/external-billing-name/indexed-structural/1",
+      "deepseek-v4.1-flash/external-billing-name/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-billing-address/indexed-local/1",
+      "deepseek-v4.1-flash/external-billing-address/indexed-structural/1",
+      "deepseek-v4.1-flash/external-billing-address/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-billing-address/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-signin-fields/indexed-structural/1",
+      "deepseek-v4.1-flash/external-signin-fields/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-signin-fields/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-signin-fields/indexed-local/1",
+      "deepseek-v4.1-flash/external-modal-create/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-modal-create/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-modal-create/indexed-local/1",
+      "deepseek-v4.1-flash/external-modal-create/indexed-structural/1",
+      "deepseek-v4.1-flash/external-modal-dismiss/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-modal-dismiss/indexed-local/1",
+      "deepseek-v4.1-flash/external-modal-dismiss/indexed-structural/1",
+      "deepseek-v4.1-flash/external-modal-dismiss/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-accordion/indexed-local/1",
+      "deepseek-v4.1-flash/external-accordion/indexed-structural/1",
+      "deepseek-v4.1-flash/external-accordion/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-accordion/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-tabs/indexed-structural/1",
+      "deepseek-v4.1-flash/external-tabs/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-tabs/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-tabs/indexed-local/1",
+      "deepseek-v4.1-flash/external-dynamic-enable/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-dynamic-enable/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-dynamic-enable/indexed-local/1",
+      "deepseek-v4.1-flash/external-dynamic-enable/indexed-structural/1",
+      "deepseek-v4.1-flash/external-delayed-content/raw-selector-reference/1",
+      "deepseek-v4.1-flash/external-delayed-content/indexed-local/1",
+      "deepseek-v4.1-flash/external-delayed-content/indexed-structural/1",
+      "deepseek-v4.1-flash/external-delayed-content/indexed-adaptive/1",
+      "deepseek-v4.1-flash/external-table-search/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-table-search/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-table-search/indexed-local/2",
+      "deepseek-v4.1-flash/external-table-search/indexed-structural/2",
+      "deepseek-v4.1-flash/external-table-length/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-table-length/indexed-local/2",
+      "deepseek-v4.1-flash/external-table-length/indexed-structural/2",
+      "deepseek-v4.1-flash/external-table-length/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-table-next/indexed-local/2",
+      "deepseek-v4.1-flash/external-table-next/indexed-structural/2",
+      "deepseek-v4.1-flash/external-table-next/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-table-next/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-multiple-tables/indexed-structural/2",
+      "deepseek-v4.1-flash/external-multiple-tables/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-multiple-tables/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-multiple-tables/indexed-local/2",
+      "deepseek-v4.1-flash/external-column-filter/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-column-filter/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-column-filter/indexed-local/2",
+      "deepseek-v4.1-flash/external-column-filter/indexed-structural/2",
+      "deepseek-v4.1-flash/external-album-navigation/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-album-navigation/indexed-local/2",
+      "deepseek-v4.1-flash/external-album-navigation/indexed-structural/2",
+      "deepseek-v4.1-flash/external-album-navigation/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-billing-name/indexed-local/2",
+      "deepseek-v4.1-flash/external-billing-name/indexed-structural/2",
+      "deepseek-v4.1-flash/external-billing-name/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-billing-name/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-billing-address/indexed-structural/2",
+      "deepseek-v4.1-flash/external-billing-address/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-billing-address/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-billing-address/indexed-local/2",
+      "deepseek-v4.1-flash/external-signin-fields/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-signin-fields/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-signin-fields/indexed-local/2",
+      "deepseek-v4.1-flash/external-signin-fields/indexed-structural/2",
+      "deepseek-v4.1-flash/external-modal-create/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-modal-create/indexed-local/2",
+      "deepseek-v4.1-flash/external-modal-create/indexed-structural/2",
+      "deepseek-v4.1-flash/external-modal-create/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-modal-dismiss/indexed-local/2",
+      "deepseek-v4.1-flash/external-modal-dismiss/indexed-structural/2",
+      "deepseek-v4.1-flash/external-modal-dismiss/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-modal-dismiss/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-accordion/indexed-structural/2",
+      "deepseek-v4.1-flash/external-accordion/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-accordion/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-accordion/indexed-local/2",
+      "deepseek-v4.1-flash/external-tabs/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-tabs/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-tabs/indexed-local/2",
+      "deepseek-v4.1-flash/external-tabs/indexed-structural/2",
+      "deepseek-v4.1-flash/external-dynamic-enable/raw-selector-reference/2",
+      "deepseek-v4.1-flash/external-dynamic-enable/indexed-local/2",
+      "deepseek-v4.1-flash/external-dynamic-enable/indexed-structural/2",
+      "deepseek-v4.1-flash/external-dynamic-enable/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-delayed-content/indexed-local/2",
+      "deepseek-v4.1-flash/external-delayed-content/indexed-structural/2",
+      "deepseek-v4.1-flash/external-delayed-content/indexed-adaptive/2",
+      "deepseek-v4.1-flash/external-delayed-content/raw-selector-reference/2"
+    ]
+  },
+  "historical_audit": {
+    "checked": 226,
+    "changed": []
+  },
+  "source_archive": {
+    "path": "evals/results/external-validation-v1-source.tar.gz",
+    "sha256": "b93a72b21cdcc0704283c47aca76ac528587c1b571546ccf17d0e71a9b68abad"
+  },
+  "verification": {
+    "verified_at": "2026-10-02T03:59:39.208757+00:00",
+    "unit_and_browser_tests": {
+      "passed": 106,
+      "files": 17,
+      "browser_tests": 10,
+      "live_model_calls": 0
+    },
+    "external_known_control_browser_checks": {
+      "passed": 15,
+      "planned": 15,
+      "live_model_calls": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "build": "passed",
+    "analysis_python_syntax": "passed",
+    "execution_environment": {
+      "node": "v22.23.2",
+      "pnpm": "9.15.9",
+      "chrome": "Chrome/153.0.8010.12",
+      "agent_shell": "WSL bash",
+      "sandbox_startup": "Default sandbox cannot create process; authorized escalation executes normally. Study method/browser settings unchanged."
+    }
+  },
+  "browser_preflight": {
+    "checked_at": "2026-10-02T03:47:12.076Z",
+    "live_model_calls": 0,
+    "browser": {
+      "protocolVersion": "1.3",
+      "product": "Chrome/153.0.8010.12",
+      "revision": "@971a7443b0c9b0a9b2860529b33331b76077ec62",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+      "jsVersion": "15.3.76.4"
+    },
+    "records": [
+      {
+        "task_id": "external-table-search",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "fill",
+            "selector": "#example_filter input",
+            "text": "Firefox"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "Firefox",
+              "actual": "Firefox",
+              "passed": true
+            },
+            {
+              "expected": "Firefox 1.0",
+              "actual": "Firefox 1.0",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-table-length",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "select",
+            "selector": "#example_length select",
+            "value": "25"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "25",
+              "actual": "25",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-table-next",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "click",
+            "selector": "#example_next"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "Showing 11 to 20 of 57 entries",
+              "actual": "Showing 11 to 20 of 57 entries",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-multiple-tables",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "fill",
+            "selector": "#DataTables_Table_0_filter input",
+            "text": "Firefox"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "Firefox",
+              "actual": "Firefox",
+              "passed": true
+            },
+            {
+              "expected": "",
+              "actual": "",
+              "passed": true
+            },
+            {
+              "expected": "",
+              "actual": "",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-column-filter",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "fill",
+            "selector": "input[name=\"search_browser\"]",
+            "text": "Firefox"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "Firefox",
+              "actual": "Firefox",
+              "passed": true
+            },
+            {
+              "expected": "Firefox 1.0",
+              "actual": "Firefox 1.0",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-album-navigation",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "click",
+            "selector": "button[aria-controls=\"navbarHeader\"]"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "true",
+              "actual": "true",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-billing-name",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "fill",
+            "selector": "#firstName",
+            "text": "Alex"
+          },
+          {
+            "kind": "fill",
+            "selector": "#lastName",
+            "text": "Mason"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "Alex",
+              "actual": "Alex",
+              "passed": true
+            },
+            {
+              "expected": "Mason",
+              "actual": "Mason",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-billing-address",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "fill",
+            "selector": "#address",
+            "text": "24 Oak Street"
+          },
+          {
+            "kind": "fill",
+            "selector": "#address2",
+            "text": "Apartment 7"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "24 Oak Street",
+              "actual": "24 Oak Street",
+              "passed": true
+            },
+            {
+              "expected": "Apartment 7",
+              "actual": "Apartment 7",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-signin-fields",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "fill",
+            "selector": "#floatingInput",
+            "text": "alex@example.com"
+          },
+          {
+            "kind": "fill",
+            "selector": "#floatingPassword",
+            "text": "DemoPass123",
+            "prism_eligible": false,
+            "eligibility_error": "Invalid selector: ineligible; no action executed."
+          },
+          {
+            "kind": "click",
+            "selector": "#checkDefault"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "alex@example.com",
+              "actual": "alex@example.com",
+              "passed": true
+            },
+            {
+              "expected": "DemoPass123",
+              "actual": "DemoPass123",
+              "passed": true
+            },
+            {
+              "expected": "remember-me",
+              "actual": "remember-me",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-modal-create",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "click",
+            "selector": "#create-user",
+            "prism_eligible": false,
+            "eligibility_error": "Invalid selector: ineligible; no action executed."
+          },
+          {
+            "kind": "fill",
+            "selector": "#name",
+            "text": "Alex Mason"
+          },
+          {
+            "kind": "fill",
+            "selector": "#email",
+            "text": "alex@example.com"
+          },
+          {
+            "kind": "fill",
+            "selector": "#password",
+            "text": "DemoPass123",
+            "prism_eligible": false,
+            "eligibility_error": "Invalid selector: ineligible; no action executed."
+          },
+          {
+            "kind": "click",
+            "selector": ".ui-dialog-buttonpane button:first-child"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "Alex Mason",
+              "actual": "Alex Mason",
+              "passed": true
+            },
+            {
+              "expected": "alex@example.com",
+              "actual": "alex@example.com",
+              "passed": true
+            },
+            {
+              "expected": "DemoPass123",
+              "actual": "DemoPass123",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-modal-dismiss",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "click",
+            "selector": ".ui-dialog-buttonpane button",
+            "prism_eligible": false,
+            "eligibility_error": "Invalid selector: no-match; no action executed."
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "Download complete",
+              "actual": "Download complete",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-accordion",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "click",
+            "selector": "#accordion h3:nth-of-type(3)",
+            "prism_eligible": false,
+            "eligibility_error": "Invalid selector: ineligible; no action executed."
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "true",
+              "actual": "true",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-tabs",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "click",
+            "selector": "#tabs a[href=\"#tabs-3\"]",
+            "prism_eligible": false,
+            "eligibility_error": "Invalid selector: ineligible; no action executed."
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "false",
+              "actual": "false",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-dynamic-enable",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "click",
+            "selector": "#input-example button"
+          },
+          {
+            "kind": "fill",
+            "selector": "#input-example input",
+            "text": "External validation"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "External validation",
+              "actual": "External validation",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      },
+      {
+        "task_id": "external-delayed-content",
+        "initial_satisfied": false,
+        "passed": true,
+        "steps": [
+          {
+            "kind": "click",
+            "selector": "#start button"
+          }
+        ],
+        "error": null,
+        "evidence": {
+          "checks": [
+            {
+              "expected": "Hello World!",
+              "actual": "Hello World!",
+              "passed": true
+            }
+          ],
+          "wrong_targets": null,
+          "mutation_count": null
+        }
+      }
+    ]
+  }
+}

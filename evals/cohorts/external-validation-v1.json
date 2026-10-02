@@ -1,0 +1,75 @@
+{
+  "study_id": "external-validation-v1",
+  "models": [
+    {
+      "id": "external-validation-v1",
+      "model": "glm-5.3-flash",
+      "baseUrl": "https://opencode.ai/zen/go/v1",
+      "apiKeyEnv": "TEXT_MODEL_API_KEY",
+      "temperature": 0,
+      "topP": 1,
+      "maxTokens": 8192,
+      "reasoning": "provider-default",
+      "maxSteps": 8,
+      "httpRetries": 2,
+      "staleRetries": 5,
+      "viewport": {
+        "width": 1120,
+        "height": 780
+      },
+      "browserVersion": "Chrome/153.0.8010.12",
+      "observation": "action-representation",
+      "variants": [
+        "indexed-local",
+        "indexed-structural",
+        "indexed-adaptive",
+        "raw-selector-reference"
+      ],
+      "tasks": "evals/tasks/external-validation-v1.json",
+      "categories": ["grounding", "navigation", "form", "long-horizon", "stale"],
+      "fixturePort": 9842,
+      "timeoutMs": 240000,
+      "concurrency": 4,
+      "maxLlmCalls": 6500,
+      "repeats": 3,
+      "modalPolicy": "observed",
+      "repetitionOffset": 0
+    },
+    {
+      "id": "external-validation-v1",
+      "model": "deepseek-v4.1-flash",
+      "baseUrl": "https://opencode.ai/zen/go/v1",
+      "apiKeyEnv": "TEXT_MODEL_API_KEY",
+      "temperature": 0,
+      "topP": 1,
+      "maxTokens": 8192,
+      "reasoning": "provider-default",
+      "maxSteps": 8,
+      "httpRetries": 2,
+      "staleRetries": 5,
+      "viewport": {
+        "width": 1120,
+        "height": 780
+      },
+      "browserVersion": "Chrome/153.0.8010.12",
+      "observation": "action-representation",
+      "variants": [
+        "indexed-local",
+        "indexed-structural",
+        "indexed-adaptive",
+        "raw-selector-reference"
+      ],
+      "tasks": "evals/tasks/external-validation-v1.json",
+      "categories": ["grounding", "navigation", "form", "long-horizon", "stale"],
+      "fixturePort": 9842,
+      "timeoutMs": 240000,
+      "concurrency": 4,
+      "maxLlmCalls": 6500,
+      "repeats": 3,
+      "modalPolicy": "observed",
+      "repetitionOffset": 0
+    }
+  ],
+  "browser_url": "http://127.0.0.1:9334",
+  "expected_runs": 360
+}
