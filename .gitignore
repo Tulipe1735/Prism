@@ -12,6 +12,6 @@ coverage/
 __pycache__/
 work/
 evals/results/**/*.jsonl
-evals/results/**/*.jsonl.meta.json
+evals/results/**/*.meta.json
 .DS_Store
 evals/results/**/*.tar.gz
