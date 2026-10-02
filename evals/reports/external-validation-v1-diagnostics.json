@@ -1,0 +1,2913 @@
+{
+  "study_id": "external-validation-v1",
+  "derived_after_execution": true,
+  "models": {
+    "glm-5.3-flash": {
+      "arms": {
+        "indexed-local": {
+          "runs": 45,
+          "grounding_successes": 32,
+          "strict_successes": 20,
+          "wrong_target_executions": 1,
+          "runs_with_wrong_target": 1,
+          "scored_execution_runs": 33,
+          "complete_provider_usage_runs": 42
+        },
+        "indexed-structural": {
+          "runs": 45,
+          "grounding_successes": 33,
+          "strict_successes": 23,
+          "wrong_target_executions": 0,
+          "runs_with_wrong_target": 0,
+          "scored_execution_runs": 33,
+          "complete_provider_usage_runs": 45
+        },
+        "indexed-adaptive": {
+          "runs": 45,
+          "grounding_successes": 38,
+          "strict_successes": 24,
+          "wrong_target_executions": 0,
+          "runs_with_wrong_target": 0,
+          "scored_execution_runs": 38,
+          "complete_provider_usage_runs": 41
+        },
+        "raw-selector-reference": {
+          "runs": 45,
+          "grounding_successes": 38,
+          "strict_successes": 27,
+          "wrong_target_executions": 0,
+          "runs_with_wrong_target": 0,
+          "scored_execution_runs": 38,
+          "complete_provider_usage_runs": 41
+        }
+      },
+      "adaptive_representation_task_reduction_percent": 66.77621621621623,
+      "initial_empty_candidate_runs_by_task": {
+        "external-modal-create": 12,
+        "external-modal-dismiss": 12,
+        "external-accordion": 12,
+        "external-tabs": 11,
+        "external-dynamic-enable": 1
+      },
+      "visible_unoffered_enabled_controls": [
+        {
+          "run_id": "5d0c8961-b80a-4976-aec6-510f51092e08",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "5d0c8961-b80a-4976-aec6-510f51092e08",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "5d0c8961-b80a-4976-aec6-510f51092e08",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c74539e1-0fa9-4dd8-89f8-8f127d132152",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c74539e1-0fa9-4dd8-89f8-8f127d132152",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "5ea37b51-0e42-471a-863b-c27a6b749f99",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "5ea37b51-0e42-471a-863b-c27a6b749f99",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "5ea37b51-0e42-471a-863b-c27a6b749f99",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f050bdbb-d688-41ed-8102-48bdd2d17eda",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f050bdbb-d688-41ed-8102-48bdd2d17eda",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f050bdbb-d688-41ed-8102-48bdd2d17eda",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "33165d9e-f7c0-498a-945a-7243701b1dcf",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "33165d9e-f7c0-498a-945a-7243701b1dcf",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b8bb0b75-3e65-455f-9431-acf608bbf099",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b8bb0b75-3e65-455f-9431-acf608bbf099",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b8bb0b75-3e65-455f-9431-acf608bbf099",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b8bb0b75-3e65-455f-9431-acf608bbf099",
+          "task_id": "external-signin-fields",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b8bb0b75-3e65-455f-9431-acf608bbf099",
+          "task_id": "external-signin-fields",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "86aa29c9-b39d-45d3-a352-4c2963659a85",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "86aa29c9-b39d-45d3-a352-4c2963659a85",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "86aa29c9-b39d-45d3-a352-4c2963659a85",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "e7c0a952-4e2c-4e0a-b5c0-fd4402488a79",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "e7c0a952-4e2c-4e0a-b5c0-fd4402488a79",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "e7c0a952-4e2c-4e0a-b5c0-fd4402488a79",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "6d5b3e75-5755-443e-a6f3-f89248de0439",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "6d5b3e75-5755-443e-a6f3-f89248de0439",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "143c0a8f-afdc-4d77-b6db-7df5dcb7be41",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "143c0a8f-afdc-4d77-b6db-7df5dcb7be41",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "143c0a8f-afdc-4d77-b6db-7df5dcb7be41",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "8fe7510b-c479-4135-b82c-06d7ad41ee81",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "8fe7510b-c479-4135-b82c-06d7ad41ee81",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "8fe7510b-c479-4135-b82c-06d7ad41ee81",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1a943c07-aec7-42d9-857d-d7d0b05cf2c5",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1a943c07-aec7-42d9-857d-d7d0b05cf2c5",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1a943c07-aec7-42d9-857d-d7d0b05cf2c5",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a279ff35-d27d-410b-957a-b60290deaa52",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a279ff35-d27d-410b-957a-b60290deaa52",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a279ff35-d27d-410b-957a-b60290deaa52",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a279ff35-d27d-410b-957a-b60290deaa52",
+          "task_id": "external-modal-create",
+          "observation": 6,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "fe6ace94-0d26-46f7-b920-d7150df5100e",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "fe6ace94-0d26-46f7-b920-d7150df5100e",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "fe6ace94-0d26-46f7-b920-d7150df5100e",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "3815f0ae-b4e9-4856-869a-b1292c18fa03",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "3815f0ae-b4e9-4856-869a-b1292c18fa03",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "3815f0ae-b4e9-4856-869a-b1292c18fa03",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f6a70d93-bb19-4fa6-b9c4-9dcf3487ceae",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f6a70d93-bb19-4fa6-b9c4-9dcf3487ceae",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f6a70d93-bb19-4fa6-b9c4-9dcf3487ceae",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "40b92ca1-4ba1-4f84-b118-a5097ceba34e",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "40b92ca1-4ba1-4f84-b118-a5097ceba34e",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "40b92ca1-4ba1-4f84-b118-a5097ceba34e",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "fa0a60ad-42c0-4dd3-9764-04529cc0223e",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "fa0a60ad-42c0-4dd3-9764-04529cc0223e",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "d7d131ed-19a4-47e8-9ed2-764cbefac5c8",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "d7d131ed-19a4-47e8-9ed2-764cbefac5c8",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "d7d131ed-19a4-47e8-9ed2-764cbefac5c8",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "4fe3b75d-7046-4915-b435-bee1cd094abb",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "4fe3b75d-7046-4915-b435-bee1cd094abb",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "4fe3b75d-7046-4915-b435-bee1cd094abb",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "3cf1ad8a-147c-4e04-8d14-c0352b13b58f",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "3cf1ad8a-147c-4e04-8d14-c0352b13b58f",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "3cf1ad8a-147c-4e04-8d14-c0352b13b58f",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ab6eb534-f4e4-4a88-b7d8-6a5b8a50a6ec",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ab6eb534-f4e4-4a88-b7d8-6a5b8a50a6ec",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ab6eb534-f4e4-4a88-b7d8-6a5b8a50a6ec",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "2326a799-cbd8-40ce-a739-1cd9776b1680",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "2326a799-cbd8-40ce-a739-1cd9776b1680",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "2326a799-cbd8-40ce-a739-1cd9776b1680",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        }
+      ],
+      "visible_unoffered_disabled_controls": [
+        {
+          "run_id": "91db8ef5-2397-4107-b9c5-cb43b5a29a22",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "91db8ef5-2397-4107-b9c5-cb43b5a29a22",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "91db8ef5-2397-4107-b9c5-cb43b5a29a22",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f10ac430-6b25-4ba1-b52b-b72788b71160",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f10ac430-6b25-4ba1-b52b-b72788b71160",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f10ac430-6b25-4ba1-b52b-b72788b71160",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a29a3184-1f21-4474-9971-c93a3188ef5c",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a29a3184-1f21-4474-9971-c93a3188ef5c",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a29a3184-1f21-4474-9971-c93a3188ef5c",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1e53afac-3239-415b-a561-35c6b26fe90f",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1e53afac-3239-415b-a561-35c6b26fe90f",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1e53afac-3239-415b-a561-35c6b26fe90f",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f7f5b0f5-e32d-4d42-8d46-3cde706653b6",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f7f5b0f5-e32d-4d42-8d46-3cde706653b6",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f7f5b0f5-e32d-4d42-8d46-3cde706653b6",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "8ce4c396-d1bd-4e8f-9341-f5b3c3861847",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "8ce4c396-d1bd-4e8f-9341-f5b3c3861847",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "8ce4c396-d1bd-4e8f-9341-f5b3c3861847",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "9ce404b1-1e5a-45b4-9903-3d8386b78f2c",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "9ce404b1-1e5a-45b4-9903-3d8386b78f2c",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "9ce404b1-1e5a-45b4-9903-3d8386b78f2c",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b298ca3d-db49-44b6-a2ac-b5e4c11cbf44",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b298ca3d-db49-44b6-a2ac-b5e4c11cbf44",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b298ca3d-db49-44b6-a2ac-b5e4c11cbf44",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "44d20298-8936-47dd-aa7d-a4b16e1e5d5e",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "44d20298-8936-47dd-aa7d-a4b16e1e5d5e",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "44d20298-8936-47dd-aa7d-a4b16e1e5d5e",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "0d2ad546-ff12-47a6-9e0e-8fcaf1326423",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "0d2ad546-ff12-47a6-9e0e-8fcaf1326423",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "0d2ad546-ff12-47a6-9e0e-8fcaf1326423",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "0d2ad546-ff12-47a6-9e0e-8fcaf1326423",
+          "task_id": "external-dynamic-enable",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "0d2ad546-ff12-47a6-9e0e-8fcaf1326423",
+          "task_id": "external-dynamic-enable",
+          "observation": 2,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c2e45f6e-4a90-4071-b6ad-48b53c070d45",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c2e45f6e-4a90-4071-b6ad-48b53c070d45",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c2e45f6e-4a90-4071-b6ad-48b53c070d45",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        }
+      ],
+      "unoffered_enabled_runs_by_task": {
+        "external-signin-fields": 12,
+        "external-modal-create": 11
+      },
+      "wrong_selection_steps": [
+        {
+          "run_id": "4e66ff0d-9150-42e3-a987-c51a0c333aaa",
+          "task_id": "external-multiple-tables",
+          "variant": "indexed-local",
+          "step": 1,
+          "action": "TYPE_TEXT",
+          "target": "2",
+          "selected_target": {
+            "action_id": "e4",
+            "node": 2,
+            "label": "Search:"
+          },
+          "executed": true
+        }
+      ],
+      "aborted_http_attempts": [
+        {
+          "run_id": "d11eb053-249b-45ac-b619-3538908c9d1b",
+          "task_id": "external-multiple-tables",
+          "variant": "raw-selector-reference",
+          "error": null
+        },
+        {
+          "run_id": "d11eb053-249b-45ac-b619-3538908c9d1b",
+          "task_id": "external-multiple-tables",
+          "variant": "raw-selector-reference",
+          "error": null
+        },
+        {
+          "run_id": "b8bb0b75-3e65-455f-9431-acf608bbf099",
+          "task_id": "external-signin-fields",
+          "variant": "indexed-adaptive",
+          "error": null
+        },
+        {
+          "run_id": "e7c0a952-4e2c-4e0a-b5c0-fd4402488a79",
+          "task_id": "external-modal-create",
+          "variant": "indexed-adaptive",
+          "error": null
+        },
+        {
+          "run_id": "e7c0a952-4e2c-4e0a-b5c0-fd4402488a79",
+          "task_id": "external-modal-create",
+          "variant": "indexed-adaptive",
+          "error": null
+        },
+        {
+          "run_id": "f452d796-4455-41fa-a906-d0018e4b11eb",
+          "task_id": "external-tabs",
+          "variant": "indexed-adaptive",
+          "error": null
+        },
+        {
+          "run_id": "f452d796-4455-41fa-a906-d0018e4b11eb",
+          "task_id": "external-tabs",
+          "variant": "indexed-adaptive",
+          "error": null
+        },
+        {
+          "run_id": "e9d407a4-af16-42f6-a027-b2d490fa673c",
+          "task_id": "external-delayed-content",
+          "variant": "indexed-adaptive",
+          "error": null
+        },
+        {
+          "run_id": "4e66ff0d-9150-42e3-a987-c51a0c333aaa",
+          "task_id": "external-multiple-tables",
+          "variant": "indexed-local",
+          "error": null
+        },
+        {
+          "run_id": "d2f02b8a-e87d-40ad-a4eb-957de00b9316",
+          "task_id": "external-multiple-tables",
+          "variant": "raw-selector-reference",
+          "error": null
+        },
+        {
+          "run_id": "4e66ff0d-9150-42e3-a987-c51a0c333aaa",
+          "task_id": "external-multiple-tables",
+          "variant": "indexed-local",
+          "error": null
+        },
+        {
+          "run_id": "4fe2c906-5278-48a1-99c1-984fa70be15d",
+          "task_id": "external-column-filter",
+          "variant": "raw-selector-reference",
+          "error": null
+        },
+        {
+          "run_id": "d2f02b8a-e87d-40ad-a4eb-957de00b9316",
+          "task_id": "external-multiple-tables",
+          "variant": "raw-selector-reference",
+          "error": null
+        },
+        {
+          "run_id": "4fe2c906-5278-48a1-99c1-984fa70be15d",
+          "task_id": "external-column-filter",
+          "variant": "raw-selector-reference",
+          "error": null
+        },
+        {
+          "run_id": "f6a70d93-bb19-4fa6-b9c4-9dcf3487ceae",
+          "task_id": "external-signin-fields",
+          "variant": "indexed-local",
+          "error": null
+        },
+        {
+          "run_id": "f6a70d93-bb19-4fa6-b9c4-9dcf3487ceae",
+          "task_id": "external-signin-fields",
+          "variant": "indexed-local",
+          "error": null
+        },
+        {
+          "run_id": "d668ea5b-8147-43e9-8f74-5ee300319454",
+          "task_id": "external-multiple-tables",
+          "variant": "raw-selector-reference",
+          "error": null
+        },
+        {
+          "run_id": "d8d9c1e2-58aa-4a4f-808f-accdb60f5204",
+          "task_id": "external-multiple-tables",
+          "variant": "indexed-local",
+          "error": null
+        },
+        {
+          "run_id": "d668ea5b-8147-43e9-8f74-5ee300319454",
+          "task_id": "external-multiple-tables",
+          "variant": "raw-selector-reference",
+          "error": null
+        },
+        {
+          "run_id": "d8d9c1e2-58aa-4a4f-808f-accdb60f5204",
+          "task_id": "external-multiple-tables",
+          "variant": "indexed-local",
+          "error": null
+        }
+      ],
+      "all_finish_reasons": {
+        "stop": 438,
+        "length": 23,
+        "null": 20
+      },
+      "failed_output_runs_with_length_receipt": 23,
+      "failed_output_runs": 60
+    },
+    "deepseek-v4.1-flash": {
+      "arms": {
+        "indexed-local": {
+          "runs": 45,
+          "grounding_successes": 37,
+          "strict_successes": 27,
+          "wrong_target_executions": 2,
+          "runs_with_wrong_target": 2,
+          "scored_execution_runs": 39,
+          "complete_provider_usage_runs": 45
+        },
+        "indexed-structural": {
+          "runs": 45,
+          "grounding_successes": 38,
+          "strict_successes": 24,
+          "wrong_target_executions": 2,
+          "runs_with_wrong_target": 2,
+          "scored_execution_runs": 40,
+          "complete_provider_usage_runs": 45
+        },
+        "indexed-adaptive": {
+          "runs": 45,
+          "grounding_successes": 36,
+          "strict_successes": 27,
+          "wrong_target_executions": 3,
+          "runs_with_wrong_target": 3,
+          "scored_execution_runs": 37,
+          "complete_provider_usage_runs": 45
+        },
+        "raw-selector-reference": {
+          "runs": 45,
+          "grounding_successes": 45,
+          "strict_successes": 35,
+          "wrong_target_executions": 0,
+          "runs_with_wrong_target": 0,
+          "scored_execution_runs": 45,
+          "complete_provider_usage_runs": 45
+        }
+      },
+      "adaptive_representation_task_reduction_percent": 68.3501421284218,
+      "initial_empty_candidate_runs_by_task": {
+        "external-modal-create": 12,
+        "external-modal-dismiss": 12,
+        "external-accordion": 12,
+        "external-tabs": 12
+      },
+      "visible_unoffered_enabled_controls": [
+        {
+          "run_id": "7dc1e496-c12b-4cae-8c2b-7cd0b996d53c",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "7dc1e496-c12b-4cae-8c2b-7cd0b996d53c",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "7dc1e496-c12b-4cae-8c2b-7cd0b996d53c",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "7dc1e496-c12b-4cae-8c2b-7cd0b996d53c",
+          "task_id": "external-signin-fields",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ecc0a7a0-2dc2-456c-8bf7-1e01bdd9d6c5",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ecc0a7a0-2dc2-456c-8bf7-1e01bdd9d6c5",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ecc0a7a0-2dc2-456c-8bf7-1e01bdd9d6c5",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "0b92e543-3d5f-4771-b101-3056635a6507",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "040af593-26dc-469d-8aa6-74a9f985587b",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "040af593-26dc-469d-8aa6-74a9f985587b",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ef403689-6778-4708-bd41-565ebc43585b",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ef403689-6778-4708-bd41-565ebc43585b",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ef403689-6778-4708-bd41-565ebc43585b",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ef403689-6778-4708-bd41-565ebc43585b",
+          "task_id": "external-modal-create",
+          "observation": 6,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "62a5e8f1-ca3f-4be7-a475-e88a877994e3",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "62a5e8f1-ca3f-4be7-a475-e88a877994e3",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "62a5e8f1-ca3f-4be7-a475-e88a877994e3",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c4bc9a1b-accd-4fb2-95ae-82eabb32d37b",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c4bc9a1b-accd-4fb2-95ae-82eabb32d37b",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c4bc9a1b-accd-4fb2-95ae-82eabb32d37b",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c4bc9a1b-accd-4fb2-95ae-82eabb32d37b",
+          "task_id": "external-modal-create",
+          "observation": 6,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1c185b9b-5e67-4dd3-a9a1-16f7a8060d18",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1c185b9b-5e67-4dd3-a9a1-16f7a8060d18",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1c185b9b-5e67-4dd3-a9a1-16f7a8060d18",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1c185b9b-5e67-4dd3-a9a1-16f7a8060d18",
+          "task_id": "external-signin-fields",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "6312f367-e7f6-4b01-8d1c-08d0444389ec",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "6312f367-e7f6-4b01-8d1c-08d0444389ec",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "2f6baeb6-7da1-4bf1-8b0e-f810966d2f64",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "2f6baeb6-7da1-4bf1-8b0e-f810966d2f64",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "2f6baeb6-7da1-4bf1-8b0e-f810966d2f64",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "2f6baeb6-7da1-4bf1-8b0e-f810966d2f64",
+          "task_id": "external-signin-fields",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ee4ffc3e-13d8-408f-8fed-00875916a12e",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ee4ffc3e-13d8-408f-8fed-00875916a12e",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ee4ffc3e-13d8-408f-8fed-00875916a12e",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ee4ffc3e-13d8-408f-8fed-00875916a12e",
+          "task_id": "external-signin-fields",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "75530793-4980-4c7e-baa4-f2cff8f0f5f3",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "75530793-4980-4c7e-baa4-f2cff8f0f5f3",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "75530793-4980-4c7e-baa4-f2cff8f0f5f3",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "d8b0525d-fc1f-43cd-8620-d93c8b7b9769",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "d8b0525d-fc1f-43cd-8620-d93c8b7b9769",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "d8b0525d-fc1f-43cd-8620-d93c8b7b9769",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "6b9b7f7e-f49e-47c5-9492-179ff692622c",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "6b9b7f7e-f49e-47c5-9492-179ff692622c",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "6b9b7f7e-f49e-47c5-9492-179ff692622c",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "6b9b7f7e-f49e-47c5-9492-179ff692622c",
+          "task_id": "external-modal-create",
+          "observation": 5,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ef3c87cb-e5e5-4710-ac84-d2359dee3836",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ef3c87cb-e5e5-4710-ac84-d2359dee3836",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "8da8f734-a78a-4373-9999-2a97496a3cf2",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "8da8f734-a78a-4373-9999-2a97496a3cf2",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "8da8f734-a78a-4373-9999-2a97496a3cf2",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "846ef7e9-dc10-401c-bdf2-ca9d08e129b3",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a164db3f-994e-4983-8a54-1b52312a0e3f",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a164db3f-994e-4983-8a54-1b52312a0e3f",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a164db3f-994e-4983-8a54-1b52312a0e3f",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f8a2ed72-205b-42e4-a546-9ca2c63a4d71",
+          "task_id": "external-signin-fields",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f8a2ed72-205b-42e4-a546-9ca2c63a4d71",
+          "task_id": "external-signin-fields",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f8a2ed72-205b-42e4-a546-9ca2c63a4d71",
+          "task_id": "external-signin-fields",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "f8a2ed72-205b-42e4-a546-9ca2c63a4d71",
+          "task_id": "external-signin-fields",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "floatingPassword",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "bd79ba2d-e79f-4ee0-8a1f-6b79bef231da",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "bd79ba2d-e79f-4ee0-8a1f-6b79bef231da",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "bd79ba2d-e79f-4ee0-8a1f-6b79bef231da",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "bd79ba2d-e79f-4ee0-8a1f-6b79bef231da",
+          "task_id": "external-modal-create",
+          "observation": 6,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c1d00d02-bf2d-42df-9256-34fe6fd21164",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c1d00d02-bf2d-42df-9256-34fe6fd21164",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c1d00d02-bf2d-42df-9256-34fe6fd21164",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "c1d00d02-bf2d-42df-9256-34fe6fd21164",
+          "task_id": "external-modal-create",
+          "observation": 6,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "53352fe6-bf43-4cb9-b4e6-15debcf5e041",
+          "task_id": "external-modal-create",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "53352fe6-bf43-4cb9-b4e6-15debcf5e041",
+          "task_id": "external-modal-create",
+          "observation": 3,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "53352fe6-bf43-4cb9-b4e6-15debcf5e041",
+          "task_id": "external-modal-create",
+          "observation": 4,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "53352fe6-bf43-4cb9-b4e6-15debcf5e041",
+          "task_id": "external-modal-create",
+          "observation": 6,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "53352fe6-bf43-4cb9-b4e6-15debcf5e041",
+          "task_id": "external-modal-create",
+          "observation": 7,
+          "control": {
+            "tag": "INPUT",
+            "id": "password",
+            "visible": true,
+            "disabled": false,
+            "offered": false
+          }
+        }
+      ],
+      "visible_unoffered_disabled_controls": [
+        {
+          "run_id": "bf4669b0-9ec5-4a7e-9197-bda6b1ea1894",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "bf4669b0-9ec5-4a7e-9197-bda6b1ea1894",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "bf4669b0-9ec5-4a7e-9197-bda6b1ea1894",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b4f3ba95-1bfa-47df-a2f5-fa5f543c1381",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b4f3ba95-1bfa-47df-a2f5-fa5f543c1381",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "b4f3ba95-1bfa-47df-a2f5-fa5f543c1381",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ad9c5aa0-23c3-458c-81f5-4f135e259e97",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ad9c5aa0-23c3-458c-81f5-4f135e259e97",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "ad9c5aa0-23c3-458c-81f5-4f135e259e97",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a78a4527-94ba-436d-a052-f6c59feea794",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a78a4527-94ba-436d-a052-f6c59feea794",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a78a4527-94ba-436d-a052-f6c59feea794",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a5c75d55-891a-4920-ae68-78dd2f03a209",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a5c75d55-891a-4920-ae68-78dd2f03a209",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a5c75d55-891a-4920-ae68-78dd2f03a209",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a5c75d55-891a-4920-ae68-78dd2f03a209",
+          "task_id": "external-dynamic-enable",
+          "observation": 2,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "a5c75d55-891a-4920-ae68-78dd2f03a209",
+          "task_id": "external-dynamic-enable",
+          "observation": 2,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "859fbac2-7782-4ed9-b30f-ae4cceda4751",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "859fbac2-7782-4ed9-b30f-ae4cceda4751",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "859fbac2-7782-4ed9-b30f-ae4cceda4751",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1b24acda-d354-4da0-9a5a-393e99727241",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1b24acda-d354-4da0-9a5a-393e99727241",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "1b24acda-d354-4da0-9a5a-393e99727241",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "5d9826db-4648-40dc-9333-850b94261539",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "5d9826db-4648-40dc-9333-850b94261539",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "5d9826db-4648-40dc-9333-850b94261539",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "e11fbdfb-a8ed-401c-aeab-1303c8ffb365",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "e11fbdfb-a8ed-401c-aeab-1303c8ffb365",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "e11fbdfb-a8ed-401c-aeab-1303c8ffb365",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "de323013-50b6-4fa0-b759-2d6fcb161f73",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "de323013-50b6-4fa0-b759-2d6fcb161f73",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "de323013-50b6-4fa0-b759-2d6fcb161f73",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "3938ca76-f28b-4d12-a4ff-5155acc6f23a",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "3938ca76-f28b-4d12-a4ff-5155acc6f23a",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "3938ca76-f28b-4d12-a4ff-5155acc6f23a",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "026d92de-7f93-4e39-9bae-39659a2a0b37",
+          "task_id": "external-dynamic-enable",
+          "observation": 0,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "026d92de-7f93-4e39-9bae-39659a2a0b37",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "INPUT",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        },
+        {
+          "run_id": "026d92de-7f93-4e39-9bae-39659a2a0b37",
+          "task_id": "external-dynamic-enable",
+          "observation": 1,
+          "control": {
+            "tag": "BUTTON",
+            "id": "",
+            "visible": true,
+            "disabled": true,
+            "offered": false
+          }
+        }
+      ],
+      "unoffered_enabled_runs_by_task": {
+        "external-signin-fields": 12,
+        "external-modal-create": 10
+      },
+      "wrong_selection_steps": [
+        {
+          "run_id": "83c34e13-e94a-4338-880c-d157eb82f404",
+          "task_id": "external-multiple-tables",
+          "variant": "indexed-structural",
+          "step": 1,
+          "action": "TYPE_TEXT",
+          "target": "2",
+          "selected_target": {
+            "action_id": "e4",
+            "node": 2,
+            "label": "Search:"
+          },
+          "executed": true
+        },
+        {
+          "run_id": "f6c99076-9415-4ff6-8ec5-bf9a8071f946",
+          "task_id": "external-delayed-content",
+          "variant": "indexed-adaptive",
+          "step": 4,
+          "action": "CLICK",
+          "target": "1",
+          "selected_target": {
+            "action_id": "e1",
+            "node": 2,
+            "label": "Elemental Selenium"
+          },
+          "executed": true
+        },
+        {
+          "run_id": "c300ab05-4c3f-4bbe-ad83-395275d8b50a",
+          "task_id": "external-multiple-tables",
+          "variant": "indexed-local",
+          "step": 1,
+          "action": "TYPE_TEXT",
+          "target": "2",
+          "selected_target": {
+            "action_id": "e4",
+            "node": 2,
+            "label": "Search:"
+          },
+          "executed": true
+        },
+        {
+          "run_id": "a5c75d55-891a-4920-ae68-78dd2f03a209",
+          "task_id": "external-dynamic-enable",
+          "variant": "indexed-adaptive",
+          "step": 2,
+          "action": "CLICK",
+          "target": "2",
+          "selected_target": {
+            "action_id": "e2",
+            "node": 2,
+            "label": "Remove"
+          },
+          "executed": true
+        },
+        {
+          "run_id": "ee7374a3-2665-49f7-8b8a-9ccbc67f017e",
+          "task_id": "external-multiple-tables",
+          "variant": "indexed-adaptive",
+          "step": 1,
+          "action": "TYPE_TEXT",
+          "target": "2",
+          "selected_target": {
+            "action_id": "e4",
+            "node": 2,
+            "label": "Search:"
+          },
+          "executed": true
+        },
+        {
+          "run_id": "1c607f53-a0a8-42f1-b443-bf15265859e9",
+          "task_id": "external-multiple-tables",
+          "variant": "indexed-structural",
+          "step": 1,
+          "action": "TYPE_TEXT",
+          "target": "2",
+          "selected_target": {
+            "action_id": "e4",
+            "node": 2,
+            "label": "Search:"
+          },
+          "executed": true
+        },
+        {
+          "run_id": "64bd4a8f-4812-44bc-8bea-c9c6a36643d7",
+          "task_id": "external-multiple-tables",
+          "variant": "indexed-local",
+          "step": 1,
+          "action": "TYPE_TEXT",
+          "target": "2",
+          "selected_target": {
+            "action_id": "e4",
+            "node": 2,
+            "label": "Search:"
+          },
+          "executed": true
+        }
+      ],
+      "aborted_http_attempts": [],
+      "all_finish_reasons": {
+        "stop": 520,
+        "length": 18
+      },
+      "failed_output_runs_with_length_receipt": 16,
+      "failed_output_runs": 45
+    }
+  }
+}

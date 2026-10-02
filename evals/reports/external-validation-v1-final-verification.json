@@ -1,0 +1,122 @@
+{
+  "study_id": "external-validation-v1",
+  "verified_at": "2026-10-02T08:01:55.673996+00:00",
+  "complete": true,
+  "planned_cells": 360,
+  "unique_terminal_runs": 360,
+  "runs_per_model": {
+    "glm-5.3-flash": 180,
+    "deepseek-v4.1-flash": 180
+  },
+  "task_variant_model_groups": 120,
+  "repeats_per_group": 3,
+  "adaptive_runs_with_trace": 90,
+  "raw_records": 1370,
+  "step_records": 1010,
+  "provider_attempts": 1019,
+  "first_request": "2026-10-02T04:00:29.800Z",
+  "last_request": "2026-10-02T04:52:58.301Z",
+  "frozen_before_all_requests": true,
+  "all_model_request_and_response_ids_match": true,
+  "wrong_target_counter_reconciled": true,
+  "eight_action_budget_respected": true,
+  "historical_files_unchanged": 226,
+  "frozen_hashes": "controls.ts verify passed after all 360 runs; original method, source archive, policy, prompt, browser, environment match",
+  "pre_execution_verification_reused": {
+    "verified_at": "2026-10-02T03:59:39.208757+00:00",
+    "unit_and_browser_tests": {
+      "passed": 106,
+      "files": 17,
+      "browser_tests": 10,
+      "live_model_calls": 0
+    },
+    "external_known_control_browser_checks": {
+      "passed": 15,
+      "planned": 15,
+      "live_model_calls": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "build": "passed",
+    "analysis_python_syntax": "passed",
+    "execution_environment": {
+      "node": "v22.23.2",
+      "pnpm": "9.15.9",
+      "chrome": "Chrome/153.0.8010.12",
+      "agent_shell": "WSL bash",
+      "sandbox_startup": "Default sandbox cannot create process; authorized escalation executes normally. Study method/browser settings unchanged."
+    }
+  },
+  "credential_scan": "passed",
+  "raw_artifacts": {
+    "evals/results/external-validation-v1-audit.jsonl": {
+      "bytes": 1766764,
+      "sha256": "229901d125d04819f7a00a8c7c4acf5e998e1e40c0977eed1a4ef561a3f3d281"
+    },
+    "evals/results/external-validation-v1-deepseek-v4.1-flash.jsonl": {
+      "bytes": 3260598,
+      "sha256": "6064fff59862c0f6d92d2f3598599f7d984cd358f4bc4c0771b441d22c1b2d13"
+    },
+    "evals/results/external-validation-v1-glm-5.3-flash.jsonl": {
+      "bytes": 2886912,
+      "sha256": "fef1513d392971c92b03baab044f48ba83578e61f19415f9df438f2e0b1aa983"
+    },
+    "evals/results/external-validation-v1-responses.jsonl": {
+      "bytes": 5551375,
+      "sha256": "48c27901b39f893746706c6fa839cb5421409b4bfef47c115cf3629cd0d76036"
+    },
+    "evals/results/external-validation-v1-source.tar.gz": {
+      "bytes": 3310792,
+      "sha256": "b93a72b21cdcc0704283c47aca76ac528587c1b571546ccf17d0e71a9b68abad"
+    },
+    "evals/results/external-validation-v1.meta.json": {
+      "bytes": 24364,
+      "sha256": "cf019ba414f8b033d6ce4a7c81cd0d2e5b782025f902bc6bdba24fa36748dbe4"
+    }
+  },
+  "all_raw_records_schema_validated": 1370,
+  "python_analysis_and_diagnostics_syntax": "passed",
+  "report_sections": "all required sections present",
+  "git_status": "only new study/report artifacts; no tracked modifications",
+  "frozen_controls_reverified_after_report": "passed",
+  "report_artifacts": {
+    "evals/reports/external-validation-v1-adaptive-traces.json": {
+      "sha256": "a01c669be84e0bdd1458de7fd4a681ecb2348ebb173ed26a700c8d6534497ba5",
+      "bytes": 316503
+    },
+    "evals/reports/external-validation-v1-analysis.json": {
+      "sha256": "2d17cc8a06809991aa4a99691cf4da6a8deabc8d0e0e6531796bf4af03453dbf",
+      "bytes": 1223125
+    },
+    "evals/reports/external-validation-v1-browser-preflight.json": {
+      "sha256": "e50bd45e2580b8c697f52e950e141bab3bbf69f4ca410f787b3e5c60195250fe",
+      "bytes": 11041
+    },
+    "evals/reports/external-validation-v1-browser-setup.json": {
+      "sha256": "6e315970efad085cd3b32dfbda6293b62fa463ec31bad6b3913a12f836d55473",
+      "bytes": 10763
+    },
+    "evals/reports/external-validation-v1-diagnostics.json": {
+      "sha256": "5a29adc63b96bdc10bf1a2c442c1b43f573fbcdaf71949d32f8aebb4068a75b9",
+      "bytes": 82860
+    },
+    "evals/reports/external-validation-v1-integrity.json": {
+      "sha256": "ff89b3dabcc264f056fa331840933a66512317e2910c68a442ae9751c9dfcfe9",
+      "bytes": 1239
+    },
+    "evals/reports/external-validation-v1-verification.json": {
+      "sha256": "3ef41a9b61c509ee78e062eecf9facc8f97a1af30ff9a9ca62585625256e2df3",
+      "bytes": 690
+    },
+    "evals/reports/external-validation-v1.md": {
+      "sha256": "a2745eef08cc76dbbb0386582d80608c3027b0e52870f794a68e8c540b7a742a",
+      "bytes": 33376
+    }
+  },
+  "source_archive_audit": {
+    "files": 1058,
+    "live_reference_hashes_match": 2,
+    "manifest_live_path_limitation_documented": true,
+    "environment_files_in_archive": 0
+  }
+}

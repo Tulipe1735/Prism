@@ -1,0 +1,36 @@
+{
+  "complete": true,
+  "unique_cells": 360,
+  "historical": {
+    "checked": 226,
+    "changed": []
+  },
+  "http_attempts": 1019,
+  "artifacts": {
+    "evals/results/external-validation-v1-audit.jsonl": {
+      "sha256": "229901d125d04819f7a00a8c7c4acf5e998e1e40c0977eed1a4ef561a3f3d281",
+      "bytes": 1766764
+    },
+    "evals/results/external-validation-v1-deepseek-v4.1-flash.jsonl": {
+      "sha256": "6064fff59862c0f6d92d2f3598599f7d984cd358f4bc4c0771b441d22c1b2d13",
+      "bytes": 3260598
+    },
+    "evals/results/external-validation-v1-glm-5.3-flash.jsonl": {
+      "sha256": "fef1513d392971c92b03baab044f48ba83578e61f19415f9df438f2e0b1aa983",
+      "bytes": 2886912
+    },
+    "evals/results/external-validation-v1-responses.jsonl": {
+      "sha256": "48c27901b39f893746706c6fa839cb5421409b4bfef47c115cf3629cd0d76036",
+      "bytes": 5551375
+    },
+    "evals/results/external-validation-v1-source.tar.gz": {
+      "sha256": "b93a72b21cdcc0704283c47aca76ac528587c1b571546ccf17d0e71a9b68abad",
+      "bytes": 3310792
+    },
+    "evals/results/external-validation-v1.meta.json": {
+      "sha256": "cf019ba414f8b033d6ce4a7c81cd0d2e5b782025f902bc6bdba24fa36748dbe4",
+      "bytes": 24364
+    }
+  },
+  "usage_complete_runs": 349
+}

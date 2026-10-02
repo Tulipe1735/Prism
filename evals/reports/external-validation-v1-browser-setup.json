@@ -1,0 +1,455 @@
+{
+  "checked_at": "2026-10-02T03:40:47.022Z",
+  "live_model_calls": 0,
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/153.0.8010.12",
+    "revision": "@971a7443b0c9b0a9b2860529b33331b76077ec62",
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+    "jsVersion": "15.3.76.4"
+  },
+  "records": [
+    {
+      "task_id": "external-table-search",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "fill",
+          "selector": "#example_filter input",
+          "text": "Firefox"
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "Firefox",
+            "actual": "Firefox",
+            "passed": true
+          },
+          {
+            "expected": "Firefox 1.0",
+            "actual": "Firefox 1.0",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-table-length",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "select",
+          "selector": "#example_length select",
+          "value": "25"
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "25",
+            "actual": "25",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-table-next",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "click",
+          "selector": "#example_next"
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "Showing 11 to 20 of 57 entries",
+            "actual": "Showing 11 to 20 of 57 entries",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-multiple-tables",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "fill",
+          "selector": "#DataTables_Table_0_filter input",
+          "text": "Firefox"
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "Firefox",
+            "actual": "Firefox",
+            "passed": true
+          },
+          {
+            "expected": "",
+            "actual": "",
+            "passed": true
+          },
+          {
+            "expected": "",
+            "actual": "",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-column-filter",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "fill",
+          "selector": "input[name=\"search_browser\"]",
+          "text": "Firefox"
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "Firefox",
+            "actual": "Firefox",
+            "passed": true
+          },
+          {
+            "expected": "Firefox 1.0",
+            "actual": "Firefox 1.0",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-album-navigation",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "click",
+          "selector": "button[aria-controls=\"navbarHeader\"]"
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "true",
+            "actual": "true",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-billing-name",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "fill",
+          "selector": "#firstName",
+          "text": "Alex"
+        },
+        {
+          "kind": "fill",
+          "selector": "#lastName",
+          "text": "Mason"
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "Alex",
+            "actual": "Alex",
+            "passed": true
+          },
+          {
+            "expected": "Mason",
+            "actual": "Mason",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-billing-address",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "fill",
+          "selector": "#address",
+          "text": "24 Oak Street"
+        },
+        {
+          "kind": "fill",
+          "selector": "#address2",
+          "text": "Apartment 7"
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "24 Oak Street",
+            "actual": "24 Oak Street",
+            "passed": true
+          },
+          {
+            "expected": "Apartment 7",
+            "actual": "Apartment 7",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-signin-fields",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "fill",
+          "selector": "#floatingInput",
+          "text": "alex@example.com"
+        },
+        {
+          "kind": "fill",
+          "selector": "#floatingPassword",
+          "text": "DemoPass123",
+          "prism_eligible": false,
+          "eligibility_error": "Invalid selector: ineligible; no action executed."
+        },
+        {
+          "kind": "click",
+          "selector": "#checkDefault"
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "alex@example.com",
+            "actual": "alex@example.com",
+            "passed": true
+          },
+          {
+            "expected": "DemoPass123",
+            "actual": "DemoPass123",
+            "passed": true
+          },
+          {
+            "expected": "remember-me",
+            "actual": "remember-me",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-modal-create",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "click",
+          "selector": "#create-user",
+          "prism_eligible": false,
+          "eligibility_error": "Invalid selector: ineligible; no action executed."
+        },
+        {
+          "kind": "fill",
+          "selector": "#name",
+          "text": "Alex Mason"
+        },
+        {
+          "kind": "fill",
+          "selector": "#email",
+          "text": "alex@example.com"
+        },
+        {
+          "kind": "fill",
+          "selector": "#password",
+          "text": "DemoPass123",
+          "prism_eligible": false,
+          "eligibility_error": "Invalid selector: ineligible; no action executed."
+        },
+        {
+          "kind": "click",
+          "selector": ".ui-dialog-buttonpane button:first-child"
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "Alex Mason",
+            "actual": "Alex Mason",
+            "passed": true
+          },
+          {
+            "expected": "alex@example.com",
+            "actual": "alex@example.com",
+            "passed": true
+          },
+          {
+            "expected": "DemoPass123",
+            "actual": "DemoPass123",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-modal-dismiss",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "click",
+          "selector": ".ui-dialog-buttonpane button",
+          "prism_eligible": false,
+          "eligibility_error": "Invalid selector: no-match; no action executed."
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "Download complete",
+            "actual": "Download complete",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-accordion",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "click",
+          "selector": "#accordion h3:nth-of-type(3)",
+          "prism_eligible": false,
+          "eligibility_error": "Invalid selector: ineligible; no action executed."
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "true",
+            "actual": "true",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-tabs",
+      "initial_satisfied": false,
+      "passed": true,
+      "steps": [
+        {
+          "kind": "click",
+          "selector": "#tabs a[href=\"#tabs-3\"]",
+          "prism_eligible": false,
+          "eligibility_error": "Invalid selector: ineligible; no action executed."
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "checks": [
+          {
+            "expected": "false",
+            "actual": "false",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-dynamic-enable",
+      "initial_satisfied": false,
+      "passed": false,
+      "steps": [],
+      "error": "Document is navigating",
+      "evidence": {
+        "checks": [
+          {
+            "expected": "External validation",
+            "actual": null,
+            "passed": false
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    },
+    {
+      "task_id": "external-delayed-content",
+      "initial_satisfied": true,
+      "passed": false,
+      "steps": [],
+      "error": "Task goal already satisfied at initial state",
+      "evidence": {
+        "checks": [
+          {
+            "expected": "Hello World!",
+            "actual": "Hello World!",
+            "passed": true
+          }
+        ],
+        "wrong_targets": null,
+        "mutation_count": null
+      }
+    }
+  ]
+}

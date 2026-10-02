@@ -1,0 +1,25 @@
+{
+  "verified_at": "2026-10-02T03:59:39.208757+00:00",
+  "unit_and_browser_tests": {
+    "passed": 106,
+    "files": 17,
+    "browser_tests": 10,
+    "live_model_calls": 0
+  },
+  "external_known_control_browser_checks": {
+    "passed": 15,
+    "planned": 15,
+    "live_model_calls": 0
+  },
+  "typecheck": "passed",
+  "lint": "passed",
+  "build": "passed",
+  "analysis_python_syntax": "passed",
+  "execution_environment": {
+    "node": "v22.23.2",
+    "pnpm": "9.15.9",
+    "chrome": "Chrome/153.0.8010.12",
+    "agent_shell": "WSL bash",
+    "sandbox_startup": "Default sandbox cannot create process; authorized escalation executes normally. Study method/browser settings unchanged."
+  }
+}
