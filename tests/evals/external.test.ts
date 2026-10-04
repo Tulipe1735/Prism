@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { externalAudit, externalFailure } from "../../evals/external/audit.ts";
 import { cellKey } from "../../evals/external/cohort.ts";
-import { design, historicalAudit } from "../../evals/external/controls.ts";
+import { design } from "../../evals/external/controls.ts";
 import { schedule } from "../../evals/runners/cohort.ts";
 
 describe("external validation evaluation controls", () => {
@@ -20,7 +20,6 @@ describe("external validation evaluation controls", () => {
     expect(
       tasks.every((t) => t.preregistered === undefined && t.fixture === undefined),
     ).toBe(true);
-    expect(await historicalAudit()).toMatchObject({ changed: [] });
   });
 
   it("keeps task audit selectors outside standard model task definitions", async () => {

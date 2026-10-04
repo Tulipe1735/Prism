@@ -15,3 +15,6 @@ evals/results/**/*.jsonl
 evals/results/**/*.meta.json
 .DS_Store
 evals/results/**/*.tar.gz
+
+# Machine-specific project MCP configuration
+.codex/config.toml

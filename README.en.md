@@ -1,91 +1,110 @@
 # Prism
 
-English | [简体中文](README.md)
+Prism is a browser-use CLI for an external agent. The agent plans, chooses targets,
+supplies field values and checks task completion. Prism observes the browser, exposes
+target context, validates references and sends one input operation.
 
-Prism is a TypeScript browser-agent CLI. Give it a URL and a goal, and it reads the page
-into a numbered table of visible controls, lets the decision model choose which
-operation to run on which element, and executes over the Chrome DevTools Protocol —
-until the decision model judges the goal achieved.
+Node.js ≥22.19.0 is required. Prism does not call a model or require a model key.
 
-![Prism architecture](docs/architecture.svg)
+## Architecture
 
-## Requirements
+![Prism browser-use CLI for agents architecture](docs/architecture.svg)
 
-- Node.js >= 22.19
-- A Chrome that can be reached over CDP
-- `TYPESAFE_API_KEY`
-- An OpenAI-compatible key (CLI mode only; when the MCP host supports sampling, the
-  host's own model answers field text)
+The external agent makes decisions. Prism exposes observation and relation evidence,
+checks reference and evidence freshness, sends input, and saves receipts. `executed`
+means input acknowledged, not task success. Receipt queries read saved files directly
+without requiring a running broker.
 
-## Install
+[Editable Excalidraw source](docs/architecture.excalidraw)
 
-```bash
-npm install -g @tulipe1735/prism
-```
-
-It ships two executables: `prism` (CLI) and `prism-mcp` (MCP server).
-
-## Connect Chrome
-
-Start Chrome in remote-debugging mode. Chrome 136+ refuses remote debugging on its
-default profile, so use a dedicated profile and sign in there once:
+## Run from source
 
 ```bash
-# macOS
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --remote-debugging-port=9222 --user-data-dir="$HOME/.prism-chrome"
-
-# Linux
-google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.prism-chrome"
-
-# Windows
-"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe" ^
-  --remote-debugging-port=9222 --user-data-dir="%USERPROFILE%\.prism-chrome"
+pnpm install
+pnpm build
+node dist/cli.js --help
 ```
 
-## Use as an MCP server
+Start Chrome with remote debugging and a separate profile. Then run:
 
-`prism-mcp` is a stdio MCP server that exposes a single task-level tool:
-
-| Tool           | Input                                      | Returns                                                                             |
-| -------------- | ------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `browser_task` | `url`, `goal`, `max_steps?`, `record_dir?` | `status`, `reason`, `final_url`, `final_title`, `final_text`, `steps`, `elapsed_ms` |
-
-The host delegates the entire browsing subtask; the observe/decide/act loop, freshness
-checks, budgets, and the verdict are all Prism's job. Each step is reported as an MCP
-progress notification; a cancellation request aborts the run and closes the tab.
-
-When the host declares the `sampling` capability (opencode does), the field text is
-answered by the host's own model through `sampling/createMessage`, and
-`TEXT_MODEL_API_KEY` is not needed; otherwise Prism falls back to `TEXT_MODEL_*`.
-Decisions — which control, which target — always go through TypeSafe and are never
-handed to the host model.
-
-opencode (`opencode.json`):
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "prism": {
-      "type": "local",
-      "command": ["prism-mcp"]
-    }
-  }
-}
+```bash
+node dist/cli.js session open --url https://example.com --browser-url http://127.0.0.1:9222
+node dist/cli.js observe --session <session> --scope local
+node dist/cli.js context --session <session> --observation <observation> --target <ref> --scope relations
+node dist/cli.js act --session <session> --observation <observation> --target <ref> --evidence <evidence> --operation click --request-id decision-1
+node dist/cli.js receipt --session <session> --request-id decision-1
+node dist/cli.js session close --session <session>
+node dist/cli.js daemon stop
 ```
 
-`prism-mcp` must be on PATH (`pnpm link --global` from the repo root), or point
-`command` at `["node", "/absolute/path/to/prism/dist/mcp.js"]`. Other MCP clients work
-the same way. Keys are read from the server process's environment and from `.env` in its
-working directory.
+Replace placeholders with values from the previous JSON response. The package exposes
+`prism` as its executable. Use `prism <command> --help` for examples.
 
-Note: don't pass unset variables through the config as
-`"environment": { "TYPESAFE_API_KEY": "{env:TYPESAFE_API_KEY}" }` — an empty value
-overrides the key of the same name in `.env` and breaks loading.
+## Contracts
 
-## Respect
+- `local`: role, name, value and up to 80 characters of local context.
+- `structural`: container type, up to 120 characters of nearby text and a 48-character
+  section/legend heading.
+- `relations`: Local plus bounded visible ancestor group identities and scope, up to six
+  levels. This is a group extractor, not a complete relation graph.
 
-`src/browser/snapshot.js` comes from
-[browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast) and is used
-under the MIT License. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Each observation issues new target refs and an evidence id. A new observation expires
+old refs. `context` issues evidence for one target. `act` requires that evidence id and
+checks the displayed fields, document and control state before input. Local evidence
+does not bind undisplayed group relations. Validation does not receive a goal or judge
+the agent's choice.
+
+Supported operations: click, fill, select, scroll, wait. Fill requires `--value`, which
+can be empty. A select option has its own offered ref and takes no extra value.
+`act --stdin` accepts a complete command JSON object and cannot be mixed with action
+flags.
+
+An action receipt reports `not_executed`, `executed` or `unknown`. Executed means the
+browser acknowledged the input sequence; it does not mean task success. Reusing the same
+request id and complete action returns the saved receipt without sending input again. A
+changed request using the same id is rejected. Unknown outcomes are never replayed. A
+pending receipt is saved before input, so receipt queries work after the broker exits.
+Missing receipts do not prove input was never requested.
+
+Except help/version, stdout contains one JSON reply; stderr contains diagnostics.
+`--json` is optional. Exit 0 means accepted or queried; 1 means refused or uncertain; 2
+means invalid arguments. A successful receipt query can return an unknown action
+outcome: read the receipt.
+
+The broker owns its browser tabs, serializes commands within each session and closes
+owned tabs after 15 minutes without a command. Session state does not survive broker
+restart. `--state-dir` or `PRISM_STATE_DIR` chooses a private state directory; Linux
+requires user ownership and mode 700. Use the same directory across commands. Event logs
+contain visible page text and may contain field values. `PRISM_BROWSER_URL` sets the
+default Chrome HTTP endpoint. The CLI does not read `.env`.
+
+The first version focuses on offered controls. It has no full-page reading, screenshot,
+frame or shadow-DOM traversal interface. Evidence checking and CDP input are separate
+operations, so changes after the last check remain possible.
+
+## Agent and research use
+
+The agent instructions are in [skills/prism/SKILL.md](skills/prism/SKILL.md). Copy or
+reference them in your chosen agent's skill directory. The old URL+goal route, internal
+task-level model entry and MCP executable have been removed.
+
+```bash
+pnpm typecheck
+pnpm test
+PRISM_EVAL_CHROME=1 pnpm test -- tests/cli/browser-cli.browser.integration.test.ts
+PRISM_EVAL_CHROME=1 PRISM_CLI_TEST_ENTRY=dist/cli.js pnpm test -- tests/cli/browser-cli.browser.integration.test.ts
+```
+
+Browser tests use local pages and no model calls. They default to port 9333; set
+`PRISM_IT_BROWSER_URL` for another endpoint.
+
+Historical evaluation runners remain in `evals/`. Their model-loop modules are not part
+of the packaged CLI. Original data, manifests and frozen archives remain unchanged. This
+checkout is a new method: restore historical archives and pinned materials before
+rerunning old cohorts. Never rewrite an old freeze to approve changed source.
+
+The research question concerns observation and execution contracts for
+relation-dependent grounding. Old representation results do not establish performance
+benefits for this CLI or its execution contract. See the
+[implementation record](docs/research/browser-cli-implementation-2026-10-04.md) and
+[Chinese README](README.md).
