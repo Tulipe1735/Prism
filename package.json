@@ -9,7 +9,7 @@
   },
   "type": "module",
   "bin": {
-    "prism": "./dist/cli.js"
+    "prism": "dist/cli.js"
   },
   "files": [
     "dist",
