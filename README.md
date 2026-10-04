@@ -1,5 +1,7 @@
 # Prism
 
+[English](README.en.md) | 简体中文
+
 Prism 是供外部 agent 使用的 browser-use
 CLI。外部 agent 负责规划、选择目标、填写内容和判断任务是否完成；Prism 负责观察浏览器、返回目标上下文、校验动作引用和执行单步输入。
 
@@ -15,13 +17,18 @@ key，也不会自行调用模型。Node.js 要求 ≥22.19.0。
 
 [可编辑 Excalidraw 源图](docs/architecture.excalidraw)
 
-## 从源码运行
+## 安装
 
 ```bash
-pnpm install
-pnpm build
-node dist/cli.js --help
+npm install -g @tulipe1735/prism
 ```
+
+也可以使用 `pnpm add -g @tulipe1735/prism`。包提供 `prism` 可执行入口。 `prism --help`
+显示当前接口。
+
+npm 上的 0.1.4 早于本文描述的接口。要使用本文的命令，先从源码构建。
+
+## 连接 Chrome
 
 先启动带独立用户配置目录的 Chrome，并启用远程调试。例如 Linux：
 
@@ -29,22 +36,37 @@ node dist/cli.js --help
 google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.prism-chrome"
 ```
 
-以下命令用 `node dist/cli.js` 运行。将包的 `prism` 入口放入 PATH 后，可直接使用
-`prism`。已经运行的 Chrome 可以用 `--browser-url http://127.0.0.1:9333` 指定。
+已经运行的 Chrome 可以用 `--browser-url http://127.0.0.1:9333` 指定。
+
+## 使用
+
+以下命令直接使用 `prism`。从源码构建时改用 `node dist/cli.js`。
 
 ```bash
-node dist/cli.js session open --url https://example.com --browser-url http://127.0.0.1:9222
-node dist/cli.js observe --session <返回的-session> --scope local
-node dist/cli.js context --session <session> --observation <observation> --target <ref> --scope relations
-node dist/cli.js act --session <session> --observation <observation> --target <ref> --evidence <evidence> --operation click --request-id decision-1
-node dist/cli.js receipt --session <session> --request-id decision-1
-node dist/cli.js session close --session <session>
-node dist/cli.js daemon stop
+prism session open --url https://example.com --browser-url http://127.0.0.1:9222
+prism observe --session <返回的-session> --scope local
+prism context --session <session> --observation <observation> --target <ref> --scope relations
+prism act --session <session> --observation <observation> --target <ref> --evidence <evidence> --operation click --request-id decision-1
+prism receipt --session <session> --request-id decision-1
+prism session close --session <session>
+prism daemon stop
 ```
 
 尖括号字段必须替换成上一条输出中的真实值。`act` 的 `evidence` 使用 `observe` 或该目标的
 `context` 返回的标识。一个 select 选项对应一个动作引用；复制其 `ref`，使用
 `--operation select`，不额外传 value。`fill` 必须传 `--value`，允许空字符串。
+
+## 从源码运行
+
+贡献者需要 Node.js ≥22.19.0 与 pnpm：
+
+```bash
+pnpm install
+pnpm build
+node dist/cli.js --help
+```
+
+`pnpm dev` 直接在源码上运行命令，不生成 `dist/`。
 
 ## 观察与执行契约
 
@@ -98,7 +120,7 @@ Exit code：0 表示命令被接受或查询成功；1 表示拒绝或结果未�
 复杂填值可以用 stdin，避免手工拼接 shell 引号：
 
 ```bash
-node dist/cli.js act --stdin < action.json
+prism act --stdin < action.json
 ```
 
 `action.json` 是完整命令对象：

@@ -1,5 +1,7 @@
 # Prism
 
+[简体中文](README.md) | English
+
 Prism is a browser-use CLI for an external agent. The agent plans, chooses targets,
 supplies field values and checks task completion. Prism observes the browser, exposes
 target context, validates references and sends one input operation.
@@ -17,7 +19,48 @@ without requiring a running broker.
 
 [Editable Excalidraw source](docs/architecture.excalidraw)
 
+## Install
+
+```bash
+npm install -g @tulipe1735/prism
+```
+
+`pnpm add -g @tulipe1735/prism` works too. The package installs the `prism` executable.
+`prism --help` lists the current interface.
+
+npm publishes 0.1.4, which predates the interface in this document. Build from source to
+use the commands below.
+
+## Connect Chrome
+
+Start Chrome with remote debugging and a separate profile. For example, on Linux:
+
+```bash
+google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.prism-chrome"
+```
+
+Point `--browser-url http://127.0.0.1:9333` at an already running Chrome.
+
+## Use
+
+The commands below call `prism` directly. Replace it with `node dist/cli.js` after a
+source build.
+
+```bash
+prism session open --url https://example.com --browser-url http://127.0.0.1:9222
+prism observe --session <session> --scope local
+prism context --session <session> --observation <observation> --target <ref> --scope relations
+prism act --session <session> --observation <observation> --target <ref> --evidence <evidence> --operation click --request-id decision-1
+prism receipt --session <session> --request-id decision-1
+prism session close --session <session>
+prism daemon stop
+```
+
+Replace placeholders with values from the previous JSON response.
+
 ## Run from source
+
+Contributors need Node.js ≥22.19.0 and pnpm:
 
 ```bash
 pnpm install
@@ -25,20 +68,7 @@ pnpm build
 node dist/cli.js --help
 ```
 
-Start Chrome with remote debugging and a separate profile. Then run:
-
-```bash
-node dist/cli.js session open --url https://example.com --browser-url http://127.0.0.1:9222
-node dist/cli.js observe --session <session> --scope local
-node dist/cli.js context --session <session> --observation <observation> --target <ref> --scope relations
-node dist/cli.js act --session <session> --observation <observation> --target <ref> --evidence <evidence> --operation click --request-id decision-1
-node dist/cli.js receipt --session <session> --request-id decision-1
-node dist/cli.js session close --session <session>
-node dist/cli.js daemon stop
-```
-
-Replace placeholders with values from the previous JSON response. The package exposes
-`prism` as its executable. Use `prism <command> --help` for examples.
+`pnpm dev` runs commands from source without producing `dist/`.
 
 ## Contracts
 
