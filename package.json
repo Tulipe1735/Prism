@@ -1,8 +1,7 @@
 {
   "name": "@tulipe1735/prism",
   "version": "0.1.4",
-  "mcpName": "io.github.Tulipe1735/prism",
-  "description": "A TypeScript browser-use CLI agent with a dynamic, indexed action space.",
+  "description": "Browser-use CLI for external agents with observation-bound targets and execution receipts.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -10,15 +9,15 @@
   },
   "type": "module",
   "bin": {
-    "prism": "./dist/cli.js",
-    "prism-mcp": "./dist/mcp.js"
+    "prism": "./dist/cli.js"
   },
   "files": [
     "dist",
+    "skills",
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "tsup src/interfaces/cli.ts src/interfaces/mcp.ts --format esm --clean --sourcemap --no-splitting && node -e \"require('node:fs').copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
+    "build": "tsup src/interfaces/cli.ts src/interfaces/daemon.ts --format esm --clean --sourcemap --no-splitting && node -e \"require('node:fs').copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
     "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/interfaces/cli.ts",
     "eval": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/cli.ts",
     "eval:report": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/report-cli.ts",
@@ -35,7 +34,6 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
     "chrome-remote-interface": "0.34.0",
     "zod": "^4.6.5"
   },

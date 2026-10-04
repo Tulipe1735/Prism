@@ -29,3 +29,4 @@ This is a single-context project. See `docs/agents/domain.md`.
   documentation and types.
 - Make architectural decisions for the long term. Do not accept a stopgap that only
   works for now and is meant to be replaced later.
+- Answer by ASD-STE100 standards

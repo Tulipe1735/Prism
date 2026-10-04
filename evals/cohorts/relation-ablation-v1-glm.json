@@ -1,0 +1,38 @@
+{
+  "id": "relation-ablation-v1",
+  "study": "P0-A/P0-B",
+  "model": "glm-5.3-flash",
+  "baseUrl": "https://opencode.ai/zen/go/v1",
+  "apiKeyEnv": "TEXT_MODEL_API_KEY",
+  "temperature": 0,
+  "topP": 1,
+  "maxTokens": 8192,
+  "reasoning": "provider-default",
+  "repeats": 1,
+  "maxSteps": 8,
+  "httpRetries": 2,
+  "viewport": {
+    "width": 1120,
+    "height": 780
+  },
+  "browserVersion": "Chrome/153.0.8010.52",
+  "observation": "action-representation",
+  "modalPolicy": "observed",
+  "arms": [
+    "indexed-local",
+    "indexed-unbound",
+    "indexed-bound",
+    "indexed-structural"
+  ],
+  "tasks": "evals/tasks/relation-ablation-v1.json",
+  "fixturePort": 9842,
+  "timeoutMs": 240000,
+  "concurrency": 4,
+  "maxLlmCalls": 4200,
+  "primaryContrast": [
+    "indexed-bound",
+    "indexed-unbound"
+  ],
+  "credentialLabel": "zen-personal",
+  "sameEndpointAsHistory": true
+}
