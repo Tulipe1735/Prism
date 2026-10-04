@@ -1,0 +1,1778 @@
+[
+  {
+    "id": "r1a-l",
+    "url": "/relation-ablation-v1/85efc88d1522d2b7.html",
+    "goal": "Edit Item 7.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r1",
+      "family": "section",
+      "condition": "local",
+      "position": 1,
+      "entity": "Item 7",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r1a-g",
+    "url": "/relation-ablation-v1/85efc88d1522d2b7.html",
+    "goal": "Edit the control for Alpha.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r1",
+      "family": "section",
+      "condition": "group",
+      "position": 1,
+      "entity": "Item 7",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r1b-l",
+    "url": "/relation-ablation-v1/bd8241dbb1b59c3b.html",
+    "goal": "Edit Item 7.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r1",
+      "family": "section",
+      "condition": "local",
+      "position": 2,
+      "entity": "Item 7",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r1b-g",
+    "url": "/relation-ablation-v1/bd8241dbb1b59c3b.html",
+    "goal": "Edit the control for Gamma.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r1",
+      "family": "section",
+      "condition": "group",
+      "position": 2,
+      "entity": "Item 7",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r1c-l",
+    "url": "/relation-ablation-v1/a3654371516c5231.html",
+    "goal": "Edit Item 7.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r1",
+      "family": "section",
+      "condition": "local",
+      "position": 3,
+      "entity": "Item 7",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r1c-g",
+    "url": "/relation-ablation-v1/a3654371516c5231.html",
+    "goal": "Edit the control for Beta.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r1",
+      "family": "section",
+      "condition": "group",
+      "position": 3,
+      "entity": "Item 7",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r2a-l",
+    "url": "/relation-ablation-v1/c7ed24bac33a6a46.html",
+    "goal": "Edit Item 12.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r2",
+      "family": "section",
+      "condition": "local",
+      "position": 1,
+      "entity": "Item 12",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r2a-g",
+    "url": "/relation-ablation-v1/c7ed24bac33a6a46.html",
+    "goal": "Edit the control for Gamma.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r2",
+      "family": "section",
+      "condition": "group",
+      "position": 1,
+      "entity": "Item 12",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r2b-l",
+    "url": "/relation-ablation-v1/36eaa8190e0c73fd.html",
+    "goal": "Edit Item 12.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r2",
+      "family": "section",
+      "condition": "local",
+      "position": 2,
+      "entity": "Item 12",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r2b-g",
+    "url": "/relation-ablation-v1/36eaa8190e0c73fd.html",
+    "goal": "Edit the control for Beta.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r2",
+      "family": "section",
+      "condition": "group",
+      "position": 2,
+      "entity": "Item 12",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r2c-l",
+    "url": "/relation-ablation-v1/fc5c200d65802d8d.html",
+    "goal": "Edit Item 12.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r2",
+      "family": "section",
+      "condition": "local",
+      "position": 3,
+      "entity": "Item 12",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r2c-g",
+    "url": "/relation-ablation-v1/fc5c200d65802d8d.html",
+    "goal": "Edit the control for Alpha.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r2",
+      "family": "section",
+      "condition": "group",
+      "position": 3,
+      "entity": "Item 12",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r3a-l",
+    "url": "/relation-ablation-v1/685ce7ac1df790b9.html",
+    "goal": "Edit Item 31.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r3",
+      "family": "legend",
+      "condition": "local",
+      "position": 1,
+      "entity": "Item 31",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r3a-g",
+    "url": "/relation-ablation-v1/685ce7ac1df790b9.html",
+    "goal": "Edit the control for Beta.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r3",
+      "family": "legend",
+      "condition": "group",
+      "position": 1,
+      "entity": "Item 31",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r3b-l",
+    "url": "/relation-ablation-v1/c9882346288bf7df.html",
+    "goal": "Edit Item 31.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r3",
+      "family": "legend",
+      "condition": "local",
+      "position": 2,
+      "entity": "Item 31",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r3b-g",
+    "url": "/relation-ablation-v1/c9882346288bf7df.html",
+    "goal": "Edit the control for Alpha.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r3",
+      "family": "legend",
+      "condition": "group",
+      "position": 2,
+      "entity": "Item 31",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r3c-l",
+    "url": "/relation-ablation-v1/a28350da1e28770d.html",
+    "goal": "Edit Item 31.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r3",
+      "family": "legend",
+      "condition": "local",
+      "position": 3,
+      "entity": "Item 31",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r3c-g",
+    "url": "/relation-ablation-v1/a28350da1e28770d.html",
+    "goal": "Edit the control for Gamma.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r3",
+      "family": "legend",
+      "condition": "group",
+      "position": 3,
+      "entity": "Item 31",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r4a-l",
+    "url": "/relation-ablation-v1/3e3f1866fa4fddd2.html",
+    "goal": "Edit Item 7.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r4",
+      "family": "legend",
+      "condition": "local",
+      "position": 1,
+      "entity": "Item 7",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r4a-g",
+    "url": "/relation-ablation-v1/3e3f1866fa4fddd2.html",
+    "goal": "Edit the control for Alpha.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r4",
+      "family": "legend",
+      "condition": "group",
+      "position": 1,
+      "entity": "Item 7",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r4b-l",
+    "url": "/relation-ablation-v1/fba426f5829b2295.html",
+    "goal": "Edit Item 7.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r4",
+      "family": "legend",
+      "condition": "local",
+      "position": 2,
+      "entity": "Item 7",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r4b-g",
+    "url": "/relation-ablation-v1/fba426f5829b2295.html",
+    "goal": "Edit the control for Gamma.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r4",
+      "family": "legend",
+      "condition": "group",
+      "position": 2,
+      "entity": "Item 7",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r4c-l",
+    "url": "/relation-ablation-v1/e164b26a7c816776.html",
+    "goal": "Edit Item 7.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r4",
+      "family": "legend",
+      "condition": "local",
+      "position": 3,
+      "entity": "Item 7",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r4c-g",
+    "url": "/relation-ablation-v1/e164b26a7c816776.html",
+    "goal": "Edit the control for Beta.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r4",
+      "family": "legend",
+      "condition": "group",
+      "position": 3,
+      "entity": "Item 7",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r5a-l",
+    "url": "/relation-ablation-v1/762f1d38b4cfdc05.html",
+    "goal": "Edit Item 12.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r5",
+      "family": "nested",
+      "condition": "local",
+      "position": 1,
+      "entity": "Item 12",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r5a-g",
+    "url": "/relation-ablation-v1/762f1d38b4cfdc05.html",
+    "goal": "Edit the control for Gamma.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r5",
+      "family": "nested",
+      "condition": "group",
+      "position": 1,
+      "entity": "Item 12",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r5b-l",
+    "url": "/relation-ablation-v1/46dce68a1d7b3e51.html",
+    "goal": "Edit Item 12.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r5",
+      "family": "nested",
+      "condition": "local",
+      "position": 2,
+      "entity": "Item 12",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r5b-g",
+    "url": "/relation-ablation-v1/46dce68a1d7b3e51.html",
+    "goal": "Edit the control for Beta.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r5",
+      "family": "nested",
+      "condition": "group",
+      "position": 2,
+      "entity": "Item 12",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r5c-l",
+    "url": "/relation-ablation-v1/5871479ba28db414.html",
+    "goal": "Edit Item 12.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r5",
+      "family": "nested",
+      "condition": "local",
+      "position": 3,
+      "entity": "Item 12",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r5c-g",
+    "url": "/relation-ablation-v1/5871479ba28db414.html",
+    "goal": "Edit the control for Alpha.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r5",
+      "family": "nested",
+      "condition": "group",
+      "position": 3,
+      "entity": "Item 12",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r6a-l",
+    "url": "/relation-ablation-v1/c501e42838abd0eb.html",
+    "goal": "Edit Item 31.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r6",
+      "family": "nested",
+      "condition": "local",
+      "position": 1,
+      "entity": "Item 31",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r6a-g",
+    "url": "/relation-ablation-v1/c501e42838abd0eb.html",
+    "goal": "Edit the control for Beta.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r6",
+      "family": "nested",
+      "condition": "group",
+      "position": 1,
+      "entity": "Item 31",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r6b-l",
+    "url": "/relation-ablation-v1/77decedb2df9ad4f.html",
+    "goal": "Edit Item 31.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r6",
+      "family": "nested",
+      "condition": "local",
+      "position": 2,
+      "entity": "Item 31",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r6b-g",
+    "url": "/relation-ablation-v1/77decedb2df9ad4f.html",
+    "goal": "Edit the control for Alpha.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r6",
+      "family": "nested",
+      "condition": "group",
+      "position": 2,
+      "entity": "Item 31",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r6c-l",
+    "url": "/relation-ablation-v1/66cdac8366733cf0.html",
+    "goal": "Edit Item 31.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r6",
+      "family": "nested",
+      "condition": "local",
+      "position": 3,
+      "entity": "Item 31",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r6c-g",
+    "url": "/relation-ablation-v1/66cdac8366733cf0.html",
+    "goal": "Edit the control for Gamma.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r6",
+      "family": "nested",
+      "condition": "group",
+      "position": 3,
+      "entity": "Item 31",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 31 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r7a-l",
+    "url": "/relation-ablation-v1/111a40dd36c04b66.html",
+    "goal": "Edit Item 7.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r7",
+      "family": "table",
+      "condition": "local",
+      "position": 1,
+      "entity": "Item 7",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r7a-g",
+    "url": "/relation-ablation-v1/111a40dd36c04b66.html",
+    "goal": "Edit the control for Alpha.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r7",
+      "family": "table",
+      "condition": "group",
+      "position": 1,
+      "entity": "Item 7",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r7b-l",
+    "url": "/relation-ablation-v1/99c063ab7f5791a1.html",
+    "goal": "Edit Item 7.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r7",
+      "family": "table",
+      "condition": "local",
+      "position": 2,
+      "entity": "Item 7",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r7b-g",
+    "url": "/relation-ablation-v1/99c063ab7f5791a1.html",
+    "goal": "Edit the control for Gamma.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r7",
+      "family": "table",
+      "condition": "group",
+      "position": 2,
+      "entity": "Item 7",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r7c-l",
+    "url": "/relation-ablation-v1/2a6eb42a49223caf.html",
+    "goal": "Edit Item 7.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r7",
+      "family": "table",
+      "condition": "local",
+      "position": 3,
+      "entity": "Item 7",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r7c-g",
+    "url": "/relation-ablation-v1/2a6eb42a49223caf.html",
+    "goal": "Edit the control for Beta.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r7",
+      "family": "table",
+      "condition": "group",
+      "position": 3,
+      "entity": "Item 7",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 7 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r8a-l",
+    "url": "/relation-ablation-v1/fdefab323849760b.html",
+    "goal": "Edit Item 12.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r8",
+      "family": "table",
+      "condition": "local",
+      "position": 1,
+      "entity": "Item 12",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r8a-g",
+    "url": "/relation-ablation-v1/fdefab323849760b.html",
+    "goal": "Edit the control for Gamma.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r8",
+      "family": "table",
+      "condition": "group",
+      "position": 1,
+      "entity": "Item 12",
+      "group": "Gamma"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Gamma"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r8b-l",
+    "url": "/relation-ablation-v1/740be201130f306f.html",
+    "goal": "Edit Item 12.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r8",
+      "family": "table",
+      "condition": "local",
+      "position": 2,
+      "entity": "Item 12",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r8b-g",
+    "url": "/relation-ablation-v1/740be201130f306f.html",
+    "goal": "Edit the control for Beta.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r8",
+      "family": "table",
+      "condition": "group",
+      "position": 2,
+      "entity": "Item 12",
+      "group": "Beta"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Beta"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r8c-l",
+    "url": "/relation-ablation-v1/8f65e622f9836f03.html",
+    "goal": "Edit Item 12.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "unique",
+      "minimum_level": "compact"
+    },
+    "design": {
+      "page": "r8",
+      "family": "table",
+      "condition": "local",
+      "position": 3,
+      "entity": "Item 12",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  },
+  {
+    "id": "r8c-g",
+    "url": "/relation-ablation-v1/8f65e622f9836f03.html",
+    "goal": "Edit the control for Alpha.",
+    "category": "grounding",
+    "preregistered": {
+      "ambiguity_class": "structural",
+      "minimum_level": "structural"
+    },
+    "design": {
+      "page": "r8",
+      "family": "table",
+      "condition": "group",
+      "position": 3,
+      "entity": "Item 12",
+      "group": "Alpha"
+    },
+    "success": {
+      "checks": [
+        {
+          "kind": "text",
+          "selector": "#result",
+          "equals": "Completed: Item 12 in Alpha"
+        },
+        {
+          "kind": "attribute",
+          "selector": "#eval-state",
+          "attribute": "data-correct-actions",
+          "equals": "1"
+        }
+      ],
+      "wrongTargetCounter": {
+        "selector": "#eval-state",
+        "attribute": "data-wrong-targets"
+      }
+    }
+  }
+]

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Manage entries</title>
+    <style>
+      body {
+        font: 16px sans-serif;
+        margin: 20px;
+      }
+      article,
+      section,
+      fieldset,
+      li,
+      tr,
+      [role="group"],
+      [role="row"] {
+        margin: 6px;
+        padding: 4px;
+      }
+      button {
+        display: inline-block;
+        padding: 8px;
+        margin: 4px;
+      }
+      h1,
+      h3 {
+        font-size: 16px;
+        margin: 4px;
+      }
+    </style>
+    <script src="/relation-ablation-v1/support.js" defer></script>
+  </head>
+  <body>
+    <main id="controls">
+      <table>
+        <tbody>
+      <tr>
+        <th scope="rowgroup">Beta</th>
+        <td><div role="row">
+          <h4>Item 31</h4>
+          <button type="button" data-target="Item 31" data-description="Item 31 in Beta">Item 31</button>
+        </div></td>
+      </tr>
+      <tr>
+        <th scope="rowgroup">Gamma</th>
+        <td><div role="row">
+          <h4>Item 7</h4>
+          <button type="button" data-target="Item 7" data-description="Item 7 in Gamma" data-correct>Item 7</button>
+        </div></td>
+      </tr>
+      <tr>
+        <th scope="rowgroup">Alpha</th>
+        <td><div role="row">
+          <h4>Item 12</h4>
+          <button type="button" data-target="Item 12" data-description="Item 12 in Alpha">Item 12</button>
+        </div></td>
+      </tr>
+        </tbody>
+      </table>
+    </main>
+    <p id="result" role="status">Pending</p>
+    <div
+      id="eval-state"
+      hidden
+      data-wrong-targets="0"
+      data-correct-actions="0"
+      data-mutations="0"
+    ></div>
+  </body>
+</html>
