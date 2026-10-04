@@ -1,6 +1,6 @@
 {
   "name": "@tulipe1735/prism",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Browser-use CLI for external agents with observation-bound targets and execution receipts.",
   "license": "MIT",
   "repository": {
