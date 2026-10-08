@@ -33,6 +33,24 @@ npm install -g @tulipe1735/prism
 
 也可以使用 `pnpm add -g @tulipe1735/prism`。包提供 `prism` 可执行入口。
 
+## 让 agent 安装
+
+将下面的提示词发给你的 agent，让它安装 Prism 并接入自身：
+
+```text
+Install Prism for browser work:
+1. Run `npm install -g @tulipe1735/prism` and check `prism --version`.
+2. Copy `$(npm root -g)/@tulipe1735/prism/skills/prism` into your skills
+   directory, for example `~/.config/opencode/skills/prism` for opencode or
+   `~/.claude/skills/prism` for Claude Code.
+3. Copy `$(npm root -g)/@tulipe1735/prism/commands/prism.md` into your commands
+   directory, for example `~/.config/opencode/commands/prism.md` for opencode or
+   `~/.claude/commands/prism.md` for Claude Code.
+4. Restart, then use the prism skill or `/prism <url>` for browser tasks.
+```
+
+agent 必须能运行 shell 命令并修改自己的配置目录。
+
 ## 使用
 
 ```bash
