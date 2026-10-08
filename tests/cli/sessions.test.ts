@@ -176,6 +176,18 @@ describe("observation and execution contracts", () => {
     expect(receipt(reply).outcome).toBe("executed");
     expect(browser.act).toHaveBeenCalledTimes(1);
   });
+  it("checks displayed group orientation before dispatching input", async () => {
+    const { manager, command, browser, capture } = await setup();
+    const relation: EvidenceCapture["relations"][string][number] =
+      capture.relations["1"]![0]!;
+    relation.layout = "vertical";
+    const reply = await manager.handle(command);
+    expect(receipt(reply)).toMatchObject({
+      outcome: "not_executed",
+      code: "EVIDENCE_CHANGED",
+    });
+    expect(browser.act).not.toHaveBeenCalled();
+  });
   it("writes the pending receipt before dispatch, and never repeats uncertain input", async () => {
     const { manager, command, browser, directory } = await setup();
     browser.act.mockImplementation(async () => {

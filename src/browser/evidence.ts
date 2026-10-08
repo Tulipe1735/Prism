@@ -1,6 +1,7 @@
 import type { SnapshotAction } from "../shared/types.ts";
 import type {
   ActionRelations,
+  RelationEntry,
   Representation,
   TargetContext,
 } from "./representation.ts";
@@ -71,7 +72,7 @@ export interface TargetEvidence {
     nearby_text?: string;
     section?: string;
   };
-  relations?: { text: string; scope: string }[];
+  relations?: Omit<RelationEntry, "tag">[];
 }
 export function targetEvidence(
   action: SnapshotAction,
@@ -97,7 +98,13 @@ export function targetEvidence(
     ),
     context: displayed,
     ...(scope === "relations"
-      ? { relations: relations.map(({ text, scope }) => ({ text, scope })) }
+      ? {
+          relations: relations.map(({ text, scope, layout }) => ({
+            text,
+            scope,
+            ...(layout ? { layout } : {}),
+          })),
+        }
       : {}),
   };
 }

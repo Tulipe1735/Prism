@@ -12,6 +12,7 @@ export interface RelationEntry {
   tag: number;
   text: string;
   scope: string;
+  layout?: "horizontal" | "vertical";
 }
 export type ActionRelations = Record<string, RelationEntry[]>;
 export const CONTEXT_LIMITS = { local: 80, nearby: 120, section: 48, ancestors: 6 };
@@ -141,27 +142,98 @@ export function extractRelationsInPage(nodes: number[]): ActionRelations {
     !el.closest(
       '[hidden],[aria-hidden="true"],[inert],script,style,template,noscript',
     ) && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
-  const collapsed = (el: any): string =>
-    (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, groupLimit);
+  const collapsed = (el: any): string => {
+    // Read rendered text so hidden descendants cannot supply a public group label.
+    // eslint-disable-next-line unicorn/prefer-dom-node-text-content
+    return (el.innerText ?? "").replace(/\s+/g, " ").trim().slice(0, groupLimit);
+  };
   // A group's identity element must be its direct child, so a nested candidate container's
   // own text can never be reported as the group identity.
-  const identity = (el: any): string => {
+  const identity = (el: any, control: any): string => {
+    const labels = (el.getAttribute("aria-labelledby") ?? "")
+      .split(/\s+/)
+      .map((id: string) => page.document.getElementById(id))
+      .filter((label: any) => label && visible(label))
+      .map(collapsed)
+      .join(" ")
+      .slice(0, groupLimit);
+    if (labels) return labels;
     const direct = [...el.children];
-    for (const tag of ["legend", "caption", "h1", "h2", "h3", "h4", "th"]) {
+    for (const tag of ["legend", "caption", "h1", "h2", "h3", "h4"]) {
       const found = direct.find((child: any) => child.tagName === tag.toUpperCase());
       if (found && visible(found)) {
         const text = collapsed(found);
         if (text) return text;
       }
     }
-    for (const tag of ["P", "SPAN", "STRONG", "EM", "DT", "SUMMARY"]) {
-      const found = direct.find((child: any) => child.tagName === tag);
-      if (found && visible(found)) {
-        const text = collapsed(found);
-        if (text) return text;
-      }
+    // Column headers do not name the row. Only an explicit, unique row header
+    // can name controls in that same row, excluding controls in nested rows.
+    if (el.matches("tr") && control.closest("tr") === el) {
+      const headers = direct.filter(
+        (child: any) => child.matches('th[scope="row"]') && visible(child),
+      );
+      if (headers.length === 1) return collapsed(headers[0]);
     }
     return "";
+  };
+  const tableIdentity = (el: any, control: any): string => {
+    if (el.matches("body,html,main")) return "";
+    const tables = el.matches("table") ? [el] : [...el.querySelectorAll("table")];
+    if (tables.length !== 1 || !visible(tables[0])) return "";
+    const table = tables[0];
+    const controlled = (control.getAttribute("aria-controls") ?? "")
+      .split(/\s+/)
+      .filter(Boolean);
+    // A shared layout wrapper does not make a control a table member.
+    if (
+      !table.contains(control) &&
+      !(controlled.length === 1 && table.id && controlled[0] === table.id)
+    )
+      return "";
+    const caption = table.caption;
+    if (caption && visible(caption) && collapsed(caption))
+      return collapsed(caption);
+    const heading = el.previousElementSibling;
+    if (
+      heading &&
+      visible(heading) &&
+      (heading.matches("h1,h2,h3,h4,h5,h6,[role='heading']") ||
+        (heading.tagName === "P" &&
+          Number(page.getComputedStyle(heading).fontWeight) >= 600))
+    )
+      return collapsed(heading);
+    return "";
+  };
+  // Describe only clearly aligned groups. A grid or mixed layout has no orientation.
+  const layout = (el: any): "horizontal" | "vertical" | undefined => {
+    if (!el.matches("fieldset,[role='group']")) return;
+    const children = (root: any): any[] =>
+      [...root.children].filter(
+        (child: any) =>
+          !child.matches("legend,h1,h2,h3,h4,h5,h6,[role='heading']") && visible(child),
+      );
+    let items = children(el);
+    for (let depth = 0; items.length === 1 && depth < 3; depth++) {
+      const nested = children(items[0]);
+      if (!nested.length) break;
+      items = nested;
+    }
+    const rects = items
+      .map((item: any) => item.getBoundingClientRect())
+      .filter((rect: any) => rect.width > 0 && rect.height > 0);
+    if (rects.length < 2) return;
+    const spread = (values: number[]): number =>
+      Math.max(...values) - Math.min(...values);
+    if (
+      spread(rects.map((r: any) => r.y + r.height / 2)) <= 2 &&
+      spread(rects.map((r: any) => r.x)) > 2
+    )
+      return "horizontal";
+    if (
+      spread(rects.map((r: any) => r.y)) > 2 &&
+      ["left", "right"].some((edge) => spread(rects.map((r: any) => r[edge])) <= 2)
+    )
+      return "vertical";
   };
   const scopeName = (el: any): string =>
     el.getAttribute("role") ??
@@ -211,18 +283,28 @@ export function extractRelationsInPage(nodes: number[]): ActionRelations {
     const seen = new Set<string>();
     let ancestor = element.parentElement;
     for (let depth = 1; ancestor && depth <= depthLimit; depth++) {
-      if (!ancestor.matches(scopes) || !visible(ancestor)) {
+      if (!visible(ancestor)) {
         ancestor = ancestor.parentElement;
         continue;
       }
-      const text = identity(ancestor);
-      const scope = scopeName(ancestor);
+      const tableText = tableIdentity(ancestor, element);
+      const text = ancestor.matches(scopes)
+        ? identity(ancestor, element) || tableText
+        : tableText;
+      const scope =
+        tableText && text === tableText ? "table-region" : scopeName(ancestor);
+      const orientation = text ? layout(ancestor) : undefined;
       ancestor = ancestor.parentElement;
       if (!text || seen.has(text)) continue;
-      if (own.has(text)) continue;
+      if (own.has(text) && !orientation) continue;
       seen.add(text);
       // Nearest group first; deeper groups describe the candidate more specifically.
-      found.unshift({ tag: next(text), text, scope });
+      found.unshift({
+        tag: next(text),
+        text,
+        scope,
+        ...(orientation ? { layout: orientation } : {}),
+      });
     }
     if (found.length) relations[String(node)] = found;
   }
