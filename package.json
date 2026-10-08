@@ -14,6 +14,7 @@
   "files": [
     "dist",
     "skills",
+    "commands",
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {

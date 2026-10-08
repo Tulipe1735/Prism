@@ -35,6 +35,24 @@ npm install -g @tulipe1735/prism
 
 `pnpm add -g @tulipe1735/prism` works too. The package installs the `prism` executable.
 
+## Let an agent install it
+
+Give your agent this prompt to install Prism and connect it to itself:
+
+```text
+Install Prism for browser work:
+1. Run `npm install -g @tulipe1735/prism` and check `prism --version`.
+2. Copy `$(npm root -g)/@tulipe1735/prism/skills/prism` into your skills
+   directory, for example `~/.config/opencode/skills/prism` for opencode or
+   `~/.claude/skills/prism` for Claude Code.
+3. Copy `$(npm root -g)/@tulipe1735/prism/commands/prism.md` into your commands
+   directory, for example `~/.config/opencode/commands/prism.md` for opencode or
+   `~/.claude/commands/prism.md` for Claude Code.
+4. Restart, then use the prism skill or `/prism <url>` for browser tasks.
+```
+
+The agent needs shell access and write access to its own configuration directory.
+
 ## Use
 
 ```bash
