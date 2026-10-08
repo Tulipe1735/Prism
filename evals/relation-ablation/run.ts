@@ -7,7 +7,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import process from "node:process";
 import { connectBrowser, parseBrowserUrl } from "../../src/browser/connect.ts";
 import { openBrowserSession } from "../../src/browser/session.ts";
-import { actionSpace } from "../../src/runtime/action-space.ts";
+import { actionSpace } from "../runtime/action-space.ts";
 import { resultWriter } from "../runners/cohort.ts";
 import { fixtureRoot, hashTree, startFixtures } from "../runners/fixtures.ts";
 import { digest, SYSTEM_PROMPT, TASK_PROMPT_FORMAT } from "../runners/model.ts";

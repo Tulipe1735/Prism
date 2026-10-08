@@ -1,10 +1,10 @@
 import type { BrowserSession } from "../../src/browser/session.ts";
-import type { AgentDependencies, ChooseInput } from "../../src/runtime/agent.ts";
+import type { AgentDependencies, ChooseInput } from "../runtime/agent.ts";
 import type { Decision } from "../../src/shared/types.ts";
 import type { Cohort, EvalTask, Provider, Variant } from "../schema.ts";
 import type { Collector } from "./collector.ts";
 import process from "node:process";
-import { choose } from "../../src/runtime/decision.ts";
+import { choose } from "../runtime/decision.ts";
 import { ConfigError } from "../../src/shared/errors.ts";
 import { assessTarget, chatDecision } from "./model.ts";
 import { representationFor } from "./representation.ts";

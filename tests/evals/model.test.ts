@@ -1,4 +1,4 @@
-import type { ChooseInput } from "../../src/runtime/agent.ts";
+import type { ChooseInput } from "../../evals/runtime/agent.ts";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";

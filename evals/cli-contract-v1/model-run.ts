@@ -7,7 +7,7 @@ import process from "node:process";
 import { parseArgs } from "node:util";
 import { connectBrowser, parseBrowserUrl } from "../../src/browser/connect.ts";
 import { commandSchema } from "../../src/cli/protocol.ts";
-import { sessionHeaders } from "../../src/runtime/text-helper.ts";
+import { sessionHeaders } from "../runtime/text-helper.ts";
 import { oracleExpression, pages } from "./design.ts";
 import { modelAnalyze } from "./model-analyze.ts";
 import {

@@ -1,4 +1,4 @@
-import type { AgentEvent, StaleEvent } from "../../src/runtime/agent.ts";
+import type { AgentEvent, StaleEvent } from "../runtime/agent.ts";
 import type { Decision } from "../../src/shared/types.ts";
 import type {
   EvalTask,
@@ -7,7 +7,7 @@ import type {
   StepRecord,
   SummaryRecord,
 } from "../schema.ts";
-import { validateChoice } from "../../src/runtime/decision.ts";
+import { validateChoice } from "../runtime/decision.ts";
 import { representationCost } from "./representation.ts";
 
 export type RunIdentity = Pick<

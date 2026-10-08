@@ -4,8 +4,8 @@ import type {
   OperationSpace,
   TargetContextLike,
 } from "./relations.ts";
-import { actionSpace } from "../../src/runtime/action-space.ts";
-import { decisionOperations } from "../../src/runtime/decision.ts";
+import { actionSpace } from "../runtime/action-space.ts";
+import { decisionOperations } from "../runtime/decision.ts";
 import { actionEvidence } from "../runners/representation.ts";
 import {
   extractRelationsInPage,

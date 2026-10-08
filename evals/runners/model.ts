@@ -1,16 +1,16 @@
 import type { BrowserSession } from "../../src/browser/session.ts";
-import type { ChooseInput } from "../../src/runtime/agent.ts";
+import type { ChooseInput } from "../runtime/agent.ts";
 import type { Decision, Snapshot, SnapshotAction } from "../../src/shared/types.ts";
 import type { Cohort, ModelInput } from "../schema.ts";
 import type { Collector } from "./collector.ts";
 import { createHash } from "node:crypto";
-import { actionSpace } from "../../src/runtime/action-space.ts";
+import { actionSpace } from "../runtime/action-space.ts";
 import {
   decisionOperations,
   parseDecisionResponse,
   validateChoice,
-} from "../../src/runtime/decision.ts";
-import { sessionHeaders } from "../../src/runtime/text-helper.ts";
+} from "../runtime/decision.ts";
+import { sessionHeaders } from "../runtime/text-helper.ts";
 import { InvalidActionError, ModelOutputError } from "../../src/shared/errors.ts";
 import { postJson } from "../../src/shared/http.ts";
 import { ProviderFailureError } from "../failures.ts";

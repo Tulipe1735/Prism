@@ -1,8 +1,8 @@
 import type { Snapshot } from "../../src/shared/types.ts";
 import type { ArmPayload } from "./input.ts";
 import process from "node:process";
-import { parseDecisionResponse } from "../../src/runtime/decision.ts";
-import { sessionHeaders } from "../../src/runtime/text-helper.ts";
+import { parseDecisionResponse } from "../runtime/decision.ts";
+import { sessionHeaders } from "../runtime/text-helper.ts";
 import { postJson } from "../../src/shared/http.ts";
 import { digest, SYSTEM_PROMPT } from "../runners/model.ts";
 

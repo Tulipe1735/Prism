@@ -1,4 +1,4 @@
-import type { ChooseInput } from "../../src/runtime/agent.ts";
+import type { ChooseInput } from "../../evals/runtime/agent.ts";
 import { readFile } from "node:fs/promises";
 import { expect, it } from "vitest";
 import { schedule } from "../../evals/runners/cohort.ts";

@@ -1,4 +1,4 @@
-import type { ChooseInput } from "../../src/runtime/agent.ts";
+import type { ChooseInput } from "../../evals/runtime/agent.ts";
 import type { SnapshotAction } from "../../src/shared/types.ts";
 import { readFile } from "node:fs/promises";
 import { expect, it } from "vitest";
@@ -7,7 +7,7 @@ import { schedule } from "../../evals/runners/cohort.ts";
 import { modelInput } from "../../evals/runners/model.ts";
 import { representationFor } from "../../evals/runners/representation.ts";
 import { cohortSchema, parseTasks } from "../../evals/schema.ts";
-import { actionSpace } from "../../src/runtime/action-space.ts";
+import { actionSpace } from "../../evals/runtime/action-space.ts";
 
 const action = (node: number, label = "Delete", role = "button"): SnapshotAction => ({
   id: `e${node}`,

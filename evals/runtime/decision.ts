@@ -1,7 +1,7 @@
-import type { Decision, HistoryEntry, Snapshot } from "../shared/types.ts";
+import type { Decision, HistoryEntry, Snapshot } from "../../src/shared/types.ts";
 import process from "node:process";
-import { ModelOutputError } from "../shared/errors.ts";
-import { postJson } from "../shared/http.ts";
+import { ModelOutputError } from "../../src/shared/errors.ts";
+import { postJson } from "../../src/shared/http.ts";
 import { actionSpace } from "./action-space.ts";
 import { NEXT_ACTION, TARGET } from "./prompts.ts";
 

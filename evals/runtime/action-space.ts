@@ -1,4 +1,4 @@
-import type { ActionSpace, BrowserElement, SnapshotAction } from "../shared/types.ts";
+import type { ActionSpace, BrowserElement, SnapshotAction } from "../../src/shared/types.ts";
 
 const OPERATIONS: Record<string, string> = {
   click: "CLICK",

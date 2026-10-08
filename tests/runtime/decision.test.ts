@@ -1,7 +1,7 @@
 import type { Snapshot } from "../../src/shared/types.ts";
 
 import { describe, expect, it, vi } from "vitest";
-import { choose, validateChoice } from "../../src/runtime/decision.ts";
+import { choose, validateChoice } from "../../evals/runtime/decision.ts";
 
 function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
   return {

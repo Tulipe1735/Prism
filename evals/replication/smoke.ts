@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import process from "node:process";
 import { connectBrowser, parseBrowserUrl } from "../../src/browser/connect.ts";
-import { sessionHeaders } from "../../src/runtime/text-helper.ts";
+import { sessionHeaders } from "../runtime/text-helper.ts";
 import { postJson } from "../../src/shared/http.ts";
 import { digest, SYSTEM_PROMPT } from "../runners/model.ts";
 import { cohortSchema } from "../schema.ts";

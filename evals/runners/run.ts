@@ -1,6 +1,6 @@
 import type { BrowserConnection } from "../../src/browser/connect.ts";
 import type { BrowserSession } from "../../src/browser/session.ts";
-import type { AgentResult } from "../../src/runtime/agent.ts";
+import type { AgentResult } from "../runtime/agent.ts";
 import type { FailureStage } from "../failures.ts";
 import type {
   Cohort,
@@ -17,7 +17,7 @@ import { appendFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import process from "node:process";
 import { openBrowserSession } from "../../src/browser/session.ts";
-import { runAgent } from "../../src/runtime/agent.ts";
+import { runAgent } from "../runtime/agent.ts";
 import { VERSION } from "../../src/shared/version.ts";
 import { classifyFailure } from "../failures.ts";
 import { stepSchema, summarySchema } from "../schema.ts";

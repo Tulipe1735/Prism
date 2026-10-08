@@ -16,7 +16,7 @@ import {
   parseExperimentTasks,
 } from "../../evals/relation-ablation/schema.ts";
 import { formatTarget } from "../../evals/runners/representation.ts";
-import { validateChoice } from "../../src/runtime/decision.ts";
+import { validateChoice } from "../../evals/runtime/decision.ts";
 
 const context = {
   context: "Item 7",

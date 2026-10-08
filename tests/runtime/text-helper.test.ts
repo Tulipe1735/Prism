@@ -6,7 +6,7 @@ import {
   fieldText,
   samplingText,
   type TextContext,
-} from "../../src/runtime/text-helper.ts";
+} from "../../evals/runtime/text-helper.ts";
 
 function mockJsonFetch(body: unknown): ReturnType<typeof vi.fn> {
   return vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));
