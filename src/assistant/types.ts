@@ -42,6 +42,7 @@ export interface TaskInput {
   effort?: Effort;
   conversationId?: string;
   source?: string;
+  confirmedMemoryIds?: string[];
 }
 
 export interface Usage {
@@ -75,6 +76,8 @@ export interface TaskRecord {
   costCny: number;
   error?: string;
   artifacts?: string[];
+  messages?: ModelMessage[];
+  confirmedMemoryIds?: string[];
 }
 
 export interface Delivery {
@@ -119,6 +122,7 @@ export interface ModelMessage {
 export interface ModelReply {
   message: ModelMessage;
   usage: Usage;
+  finishReason?: string;
 }
 
 export interface Model {
