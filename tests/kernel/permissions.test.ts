@@ -50,10 +50,14 @@ function write(path: string, content: string): string {
   return JSON.stringify({ path, content });
 }
 
-/** Stands in for the browser tool 06 adds: it declares the page action. */
+/**
+ * Stands in for a tool that drives a browser: the real tools of 06 need a
+ * running engine, while this test only checks how the policy treats the
+ * declared action.
+ */
 const browserActTool: Tool = {
-  name: "browser_act",
-  description: "Test stand-in for the browser action tool.",
+  name: "test_browser_action",
+  description: "Test stand-in for a browser action tool.",
   parameters: {
     type: "object",
     properties: { action: { type: "string" } },
@@ -362,7 +366,11 @@ it("leaves browser actions alone by default and asks when the setting is on", as
     answers: [
       {
         toolCalls: [
-          { id: "call_1", name: "browser_act", arguments: '{"action":"click"}' },
+          {
+            id: "call_1",
+            name: "test_browser_action",
+            arguments: '{"action":"click"}',
+          },
         ],
       },
       { text: ["Done."] },
@@ -382,7 +390,7 @@ it("leaves browser actions alone by default and asks when the setting is on", as
   );
   if (requested.type !== "approval.requested")
     throw new Error("Expected an approval request");
-  expect(requested).toMatchObject({ tool: "browser_act" });
+  expect(requested).toMatchObject({ tool: "test_browser_action" });
   expect(requested.reason).toContain("approval");
   expect(requested.target).toContain("https://example.com/");
   expect(requested.impact).toContain("click");
@@ -403,7 +411,11 @@ it("runs browser actions without approval when the setting is off", async () => 
     answers: [
       {
         toolCalls: [
-          { id: "call_1", name: "browser_act", arguments: '{"action":"click"}' },
+          {
+            id: "call_1",
+            name: "test_browser_action",
+            arguments: '{"action":"click"}',
+          },
         ],
       },
       { text: ["Done."] },

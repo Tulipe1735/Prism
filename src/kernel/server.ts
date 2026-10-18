@@ -7,6 +7,8 @@ import type { SkillToolRoots } from "./tools.ts";
 import type { PermissionScope } from "./types.ts";
 import { Buffer } from "node:buffer";
 import { createServer } from "node:http";
+import { join } from "node:path";
+import { createBrowserTools } from "./browser-tools.ts";
 import {
   Kernel,
   KernelError,
@@ -44,7 +46,18 @@ export interface RunningKernel {
 export async function startKernel(
   options: KernelServerOptions,
 ): Promise<RunningKernel> {
-  const kernel = new Kernel(options);
+  // The preset capabilities join the registry before the kernel serves anything.
+  const browser = createBrowserTools({
+    directory: join(options.config.dataDir, "browser"),
+    engine: options.config.browser.engine,
+    ...(options.config.browser.endpoint === undefined
+      ? {}
+      : { endpoint: options.config.browser.endpoint }),
+  });
+  const kernel = new Kernel({
+    ...options,
+    tools: [...browser.tools, ...(options.tools ?? [])],
+  });
   const clients = new Set<ServerResponse>();
   const unsubscribe = kernel.subscribe((event) => {
     for (const client of clients) writeEvent(client, event);
@@ -77,6 +90,7 @@ export async function startKernel(
     for (const client of clients) client.end();
     clients.clear();
     await kernel.close();
+    await browser.close();
     const draining = new Promise<void>((resolve) => server.close(() => resolve()));
     server.closeAllConnections();
     await draining;

@@ -2,7 +2,13 @@ import type { RunningKernel } from "../../src/kernel/server.ts";
 import type { SessionSummary } from "../../src/kernel/session.ts";
 import { afterEach, expect, it } from "vitest";
 import { VERSION } from "../../src/shared/version.ts";
-import { api, connectEvents, type KernelHarness, readSessionLog, startTestKernel } from "./harness.ts";
+import {
+  api,
+  connectEvents,
+  type KernelHarness,
+  readSessionLog,
+  startTestKernel,
+} from "./harness.ts";
 
 let harness: KernelHarness | undefined;
 

@@ -4,6 +4,7 @@ import type { CommandConfig, CompactionConfig } from "../../src/kernel/config.ts
 import type { KernelEvent } from "../../src/kernel/events.ts";
 import type { SessionEntry } from "../../src/kernel/session.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
+import type { SkillToolRoots } from "../../src/kernel/tools.ts";
 import type { PermissionScope } from "../../src/kernel/types.ts";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -22,6 +23,14 @@ export interface FakeAnswer {
   status?: number;
   /** Keep the stream open after the deltas until the client aborts. */
   hold?: boolean;
+  /**
+   * Computes this answer from the request, for scripts that must read a
+   * previous tool result (for example, a browser target reference).
+   */
+  respond?: (request: ModelRequest) => {
+    text?: string[];
+    toolCalls?: { id: string; name: string; arguments: string }[];
+  };
 }
 
 export interface ModelRequest {
@@ -68,8 +77,26 @@ export async function startFakeModel(answers: FakeAnswer[]): Promise<FakeModel> 
       raw += chunk.toString();
     });
     request.on("end", () => {
-      requests.push(JSON.parse(raw) as ModelRequest);
-      const answer = remaining.shift() ?? { text: [] };
+      const parsed = JSON.parse(raw) as ModelRequest;
+      requests.push(parsed);
+      const scripted = remaining.shift() ?? { text: [] };
+      let answer: FakeAnswer;
+      try {
+        answer =
+          scripted.respond === undefined
+            ? scripted
+            : { ...scripted, ...(scripted.respond(parsed) ?? {}) };
+      } catch (error) {
+        // A script that cannot read the previous result fails the request like
+        // a real model error would, instead of hanging the loop.
+        response.writeHead(500, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            error: { message: `scripted answer failed: ${String(error)}` },
+          }),
+        );
+        return;
+      }
       response.on("error", () => {});
       if (answer.status !== undefined) {
         response.writeHead(answer.status, { "content-type": "application/json" });
@@ -259,7 +286,6 @@ export interface KernelHarness {
   home: string;
   cleanup: () => Promise<void>;
 }
-
 /** The session log as it sits on disk, the way the workbench would replay it. */
 export async function readSessionLog(
   dataDir: string,
@@ -289,11 +315,15 @@ export async function startTestKernel(
     browserActionsNeedApproval?: boolean;
     /** Written to `<dataDir>/config.json` before the kernel loads it. */
     configFile?: Record<string, unknown>;
+    /** Written to `<dataDir>/mcp.json` before the kernel loads it. */
+    mcpConfig?: unknown;
     workspace?: string;
     /** Overrides for `compaction` in the kernel config. */
     compaction?: Partial<CompactionConfig>;
     /** Overrides for `command` in the kernel config. */
     command?: Partial<CommandConfig>;
+    /** Overrides the bundled skills root; the real one resolves by default. */
+    skillRoots?: SkillToolRoots;
   } = {},
 ): Promise<KernelHarness> {
   const base = await mkdtemp(join(tmpdir(), "prism-kernel-"));
@@ -313,6 +343,12 @@ export async function startTestKernel(
       JSON.stringify(options.configFile),
       "utf8",
     );
+  if (options.mcpConfig !== undefined)
+    await writeFile(
+      join(dataDir, "mcp.json"),
+      JSON.stringify(options.mcpConfig),
+      "utf8",
+    );
   const model = await startFakeModel(options.answers ?? []);
   const config = await loadConfig({
     dataDir,
@@ -329,7 +365,7 @@ export async function startTestKernel(
       ? {}
       : { browserActionsNeedApproval: options.browserActionsNeedApproval }),
     ...(options.tools === undefined ? {} : { tools: options.tools }),
-    skillRoots: { home, bundled },
+    skillRoots: options.skillRoots ?? { home, bundled },
     instructionRoots: { home },
   });
   return {
