@@ -1,3 +1,4 @@
+import { PERMISSION_SCOPES } from "../../kernel/types.ts";
 import {
   type Artifact,
   type DiffLine,
@@ -27,8 +28,6 @@ const ROLE_LABELS: Record<string, string> = {
   assistant: "助手",
   system: "系统",
 };
-
-const PERMISSION_SCOPES = ["read-only", "workspace-write", "full-access"] as const;
 
 /** Escapes every value that reaches the DOM; session and model text is untrusted. */
 export function escapeHtml(text: string): string {

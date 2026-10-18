@@ -2,6 +2,7 @@ import type { KernelEvent } from "../../kernel/events.ts";
 import type { KernelSettings, KernelStatusReport } from "../../kernel/kernel.ts";
 import type { SessionEntry, SessionSummary } from "../../kernel/session.ts";
 import type { PermissionScope } from "../../kernel/types.ts";
+import { readSseData } from "../../shared/sse.ts";
 
 /** Milliseconds before the client reopens the event stream (matches the kernel's retry hint). */
 const RETRY_MS = 2_000;
@@ -195,38 +196,17 @@ export class KernelClient {
 }
 
 /**
- * Turns the kernel's SSE body into events. Frames are separated by a blank
- * line, `:` lines are comments (the keep-alive) and `data:` lines of one frame
- * are joined before parsing. The body is read chunk by chunk: browsers do not
- * make streams async-iterable.
+ * Turns the kernel's SSE body into events. Frames are read by
+ * `readSseData`; a frame that is not a `KernelEvent` is skipped.
  */
 export async function* parseSse(
   body: ReadableStream<Uint8Array>,
 ): AsyncGenerator<KernelEvent> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    if (value === undefined) continue;
-    buffer += decoder.decode(value, { stream: true });
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary !== -1) {
-      const frame = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      boundary = buffer.indexOf("\n\n");
-      const data = frame
-        .split("\n")
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice("data:".length).trim())
-        .join("\n");
-      if (data === "") continue;
-      try {
-        yield JSON.parse(data) as KernelEvent;
-      } catch {
-        // A frame that is not JSON is not part of the contract; skip it.
-      }
+  for await (const data of readSseData(body)) {
+    try {
+      yield JSON.parse(data) as KernelEvent;
+    } catch {
+      // A frame that is not JSON is not part of the contract; skip it.
     }
   }
 }

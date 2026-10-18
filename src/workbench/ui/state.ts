@@ -1,6 +1,7 @@
 import type { KernelEvent, KernelStatus } from "../../kernel/events.ts";
 import type { KernelSettings } from "../../kernel/kernel.ts";
 import type { SessionEntry, SessionSummary } from "../../kernel/session.ts";
+import { compareSessions } from "../../kernel/session.ts";
 import {
   groupSessions,
   isTaskRunning,
@@ -246,9 +247,7 @@ function upsert(sessions: SessionSummary[], session: SessionSummary): SessionSum
 }
 
 function sortSessions(sessions: SessionSummary[]): SessionSummary[] {
-  return [...sessions].sort(
-    (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
-  );
+  return [...sessions].sort(compareSessions);
 }
 
 function withoutLogged(

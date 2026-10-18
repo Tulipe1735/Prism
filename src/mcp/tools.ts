@@ -6,6 +6,7 @@
  * never throw: failures come back as an error result so the model can react.
  */
 import type { ToolParameters } from "../kernel/tool.ts";
+import { asRecord } from "../shared/records.ts";
 
 /** Renders MCP `callTool` content as model-visible text. */
 export function toolResultText(result: unknown): string {
@@ -39,10 +40,4 @@ export function toolParameters(schema: unknown): ToolParameters {
   if (typeof record?.additionalProperties === "boolean")
     parameters.additionalProperties = record.additionalProperties;
   return parameters;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
 }

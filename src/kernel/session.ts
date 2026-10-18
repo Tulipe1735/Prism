@@ -97,6 +97,11 @@ export interface SessionSummary {
   leafId: string | null;
 }
 
+/** Newest activity first; the id breaks ties, so the order is total. */
+export function compareSessions(a: SessionSummary, b: SessionSummary): number {
+  return b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id);
+}
+
 /** One model-ready message rebuilt from the log, oldest first. */
 export interface ContextMessage {
   role: MessageRole;

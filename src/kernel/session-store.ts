@@ -13,6 +13,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { z } from "zod";
 
 import {
+  compareSessions,
   SESSION_FORMAT_VERSION,
   type SessionEntry,
   type SessionEntryInput,
@@ -205,9 +206,7 @@ export class SessionStore {
       if (workspace && log.header.workspace !== workspace) continue;
       summaries.push(summarize(log));
     }
-    return summaries.sort(
-      (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
-    );
+    return summaries.sort(compareSessions);
   }
 
   async delete(sessionId: string): Promise<boolean> {

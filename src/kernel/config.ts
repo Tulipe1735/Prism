@@ -5,6 +5,7 @@ import process from "node:process";
 import { z } from "zod";
 
 import { ConfigError } from "../shared/errors.ts";
+import { asRecord } from "../shared/records.ts";
 import {
   BROWSER_ENGINES,
   type BrowserEngine,
@@ -211,14 +212,8 @@ async function readRawConfig(path: string): Promise<Record<string, unknown>> {
   });
   if (text === null) return {};
   try {
-    return asRecord(JSON.parse(text));
+    return asRecord(JSON.parse(text)) ?? {};
   } catch (error) {
     throw new ConfigError(`${path} is not valid JSON: ${(error as Error).message}`);
   }
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? { ...(value as Record<string, unknown>) }
-    : {};
 }

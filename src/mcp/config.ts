@@ -8,6 +8,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ConfigError } from "../shared/errors.ts";
+import { asRecord } from "../shared/records.ts";
 
 /** A server Prism starts as a child process and talks to over stdin/stdout. */
 export interface McpStdioServerConfig {
@@ -109,12 +110,6 @@ function parseServer(value: unknown, path: string, name: string): McpServerConfi
   }
 
   throw new ConfigError(`${where} needs a "transport" of "stdio" or "http".`);
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
 }
 
 function stringList(value: unknown, where: string, field: string): string[] {

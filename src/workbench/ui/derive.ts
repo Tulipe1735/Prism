@@ -3,6 +3,7 @@ import type {
   SessionEntry,
   SessionSummary,
 } from "../../kernel/session.ts";
+import { compareSessions } from "../../kernel/session.ts";
 
 /** Sessions of one workspace, most recent first. */
 export interface SessionGroup {
@@ -43,9 +44,7 @@ export function searchSessions(
 }
 
 function byUpdated(sessions: SessionSummary[]): SessionSummary[] {
-  return [...sessions].sort(
-    (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
-  );
+  return [...sessions].sort(compareSessions);
 }
 
 /**
