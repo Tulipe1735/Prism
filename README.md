@@ -2,79 +2,75 @@
 
 [English](README.en.md) | 简体中文
 
-Prism 是供外部 agent 使用的 browser-use
-CLI。外部 agent 负责规划、选择目标和判断任务是否完成；Prism 负责观察浏览器、返回目标上下文、校验动作引用和执行单步输入。Prism 不需要模型 API
-key，也不会自行调用模型。
+一个为长期自用构建的个人研究 Agent。每天筛选值得读的论文与项目，围绕研究问题比较不同方法，并把讨论中的进展带到下一次任务。
 
-## 架构
+Prism 自己运行任务循环，使用 DeepSeek 调用工具、核查来源和保存成果。飞书中的情报与问答角色共用研究状态；已登录的本地浏览器负责翱翔门户任务。
 
-![Prism browser-use CLI for agents 架构](docs/architecture.svg)
+代码：[任务循环](src/assistant/runtime.ts) · [角色提示词](src/assistant/prompts.ts) ·
+[编排](src/assistant/service.ts)
 
-外部 agent 负责决策；Prism 提供观察与关系证据，检查引用及证据是否仍有效，再执行输入并保存回执。`executed`
-表示输入确认，不表示任务成功。
+## 能做什么
 
-[可编辑 Excalidraw 源图](docs/architecture.excalidraw)
+- **研究晨报**：北京时间10:00，结合 Gmail 论文订阅与 GitHub
+  Trending；质量优先，无推荐则静默。
+- **深入研究**：查找替代路线，比较机制、假设、实验、成本与限制；核查、修订，最长20分钟。
+- **个人资料**：Notion 同步为 Markdown，手动导入 Markdown、文本 PDF 和简历；引用原始位置。
+- **持续使用**：两个角色共享进展、偏好和纠正规则；推送、已读与掌握分别记录。
+- **课程学习**：结合课程记录与 nwpu-cram；本地门户操作保留观察、确认和执行回执。
 
-## 先决条件
+代码：[来源](src/assistant/connectors.ts) · [资料](src/assistant/library.ts) ·
+[状态](src/assistant/store.ts) · [课程](src/assistant/courses.ts) ·
+[本地工作端](src/assistant/local.ts)
 
-- Node.js ≥22.19.0
-- 可连接远程调试端口的 Chrome。Chrome
-  136+ 的默认 profile 不允许远程调试，因此使用独立配置目录：
+## 运行
 
-```bash
-google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.prism-chrome"
-```
-
-## 安装
-
-```bash
-npm install -g @tulipe1735/prism
-```
-
-也可以使用 `pnpm add -g @tulipe1735/prism`。包提供 `prism` 可执行入口。
-
-## 让 agent 安装
-
-将下面的提示词发给你的 agent，让它安装 Prism 并接入自身：
-
-```text
-Install Prism for browser work:
-1. Run `npm install -g @tulipe1735/prism` and check `prism --version`.
-2. Copy `$(npm root -g)/@tulipe1735/prism/skills/prism` into your skills
-   directory, for example `~/.config/opencode/skills/prism` for opencode or
-   `~/.claude/skills/prism` for Claude Code.
-3. Copy `$(npm root -g)/@tulipe1735/prism/commands/prism.md` into your commands
-   directory, for example `~/.config/opencode/commands/prism.md` for opencode or
-   `~/.claude/commands/prism.md` for Claude Code.
-4. Restart, then use the prism skill or `/prism <url>` for browser tasks.
-```
-
-agent 必须能运行 shell 命令并修改自己的配置目录。
-
-## 使用
-
-```bash
-prism session open --url https://example.com --browser-url http://127.0.0.1:9222
-prism observe --session <session> --scope local
-prism context --session <session> --observation <observation> --target <ref> --scope relations
-prism act --session <session> --observation <observation> --target <ref> --evidence <evidence> --operation click --request-id decision-1
-prism receipt --session <session> --request-id decision-1
-prism session close --session <session>
-```
-
-尖括号字段必须替换成上一条输出中的真实值。每次 `observe`
-返回新的 observation、evidence 与 target refs；旧观察立即失效。`prism <命令> --help`
-显示参数与示例。供外部 agent 使用的完整说明在
-[skills/prism/SKILL.md](skills/prism/SKILL.md)。
-
-## 从源码运行
-
-贡献者需要 pnpm：
+需要 Node.js ≥22.19 和 pnpm。
 
 ```bash
 pnpm install
 pnpm build
-node dist/cli.js --help
+cp .env.example .env
+# 填写 DeepSeek API、实际固定月费及需要的接入配置
+node --env-file=.env dist/agent.js init
+node --env-file=.env dist/agent.js doctor
+node --env-file=.env dist/agent.js ask "比较我的研究资料中的不同 Agent 路线" --deep
+node --env-file=.env dist/agent.js serve
 ```
 
-`pnpm dev` 直接在源码上运行命令，不生成 `dist/`。
+首次接入飞书、Notion、Gmail 与云端部署，见[运行指南](docs/assistant.md)。固定费用与模型调用共用每月50元预算上限；用量按配置价格估算，账单需定期核对。
+
+代码：[入口](src/assistant/cli.ts) · [配置](src/assistant/config.ts) ·
+[飞书](src/assistant/feishu.ts) · [部署](compose.assistant.yaml)
+
+## 架构
+
+![Prism 个人研究助手架构](docs/architecture.svg)
+
+[可编辑 Excalidraw 源图](docs/architecture.excalidraw) ·
+[代码索引](docs/architecture.md) · [领域词汇](GLOSSARY.md)
+
+代码：[核心模块](src/assistant) · [浏览器 CLI](src/interfaces/cli.ts) ·
+[回执与会话](src/cli/sessions.ts)
+
+## 开发状态
+
+当前为开发预览。受控集成测试覆盖任务、引用、共享状态、同步、预算和交付。真实账号收发、云端常驻、个人 Notion/Gmail 导入与翱翔门户查询仍须配置凭据后实测，尚未上线。
+
+已有浏览器 CLI 通过 `prism` 使用，参见[浏览器指南](docs/browser-cli.md)与
+[agent skill](skills/prism/SKILL.md)。
+
+代码：[集成测试](tests/assistant) · [研究对照评测](evals/assistant/README.md) ·
+[浏览器测试](tests/cli)
+
+## 开发
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+MIT License。README 的组织方式参考
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。
+
+代码：[测试配置](vitest.config.ts) · [构建入口](tsup.config.ts)
