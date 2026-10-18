@@ -2,6 +2,7 @@ import { isIP } from "node:net";
 
 import { UnsafeTargetError, WebFetchError } from "../shared/errors.ts";
 import { VERSION } from "../shared/version.ts";
+import { extractHtml } from "./html.ts";
 import { isPublicAddress, systemResolver, type AddressResolver } from "./target.ts";
 
 export interface WebFetchOptions {
@@ -41,13 +42,35 @@ export async function webFetch(options: WebFetchOptions): Promise<WebPage> {
       ...(options.signal ? [options.signal] : []),
     ]),
   });
+  return readPage(url, response);
+}
+
+async function readPage(url: URL, response: Response): Promise<WebPage> {
+  const body = await response.text();
+  const contentType = response.headers.get("content-type");
+  const kind = bodyKind(contentType, body);
+  if (kind === "binary")
+    throw new WebFetchError(
+      `Fetching ${url.href} returned unsupported content type ${contentType}; only text pages are fetched.`,
+    );
+  const content = kind === "html" ? extractHtml(body, url.href) : { title: "", text: body };
   return {
     url: url.href,
-    title: "",
-    text: await response.text(),
+    title: content.title,
+    text: kind === "html" ? content.text : content.text.trim(),
     truncated: false,
-    contentType: response.headers.get("content-type"),
+    contentType,
   };
+}
+
+/** Chooses how to read a response body; unknown types fall back to sniffing the text. */
+function bodyKind(contentType: string | null, body: string): "html" | "text" | "binary" {
+  const type = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (type === "text/html" || type === "application/xhtml+xml") return "html";
+  if (type === "") return body.trimStart().startsWith("<") ? "html" : "text";
+  if (type.startsWith("text/") || type === "application/json" || type.endsWith("+json"))
+    return "text";
+  return "binary";
 }
 
 function parseUrl(raw: string): URL {
