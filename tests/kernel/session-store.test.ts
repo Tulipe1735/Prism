@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -189,6 +189,16 @@ describe("session store", () => {
     expect(dirname(await store.filePath(alpha.id))).not.toBe(
       dirname(await store.filePath(beta.id)),
     );
+  });
+
+  it("rejects a session log with a corrupted line", async () => {
+    const header = await store.create({ workspace: "/work/demo" });
+    const path = await store.filePath(header.id);
+    await appendFile(path, "{not json}\n");
+
+    await expect(store.read(header.id)).rejects.toMatchObject({
+      code: "INVALID_SESSION_LOG",
+    });
   });
 
   it("deletes a session and refuses unknown session ids", async () => {
