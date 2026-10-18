@@ -1,3 +1,5 @@
+import type { KernelSettings } from "../../kernel/kernel.ts";
+import { BROWSER_ENGINES, PERMISSION_SCOPES } from "../../kernel/types.ts";
 import {
   type Artifact,
   type DiffLine,
@@ -27,8 +29,6 @@ const ROLE_LABELS: Record<string, string> = {
   assistant: "助手",
   system: "系统",
 };
-
-const PERMISSION_SCOPES = ["read-only", "workspace-write", "full-access"] as const;
 
 /** Escapes every value that reaches the DOM; session and model text is untrusted. */
 export function escapeHtml(text: string): string {
@@ -113,7 +113,10 @@ export function renderChatHeader(state: UiState): string {
     return `<span class="muted">选择一个会话，或在工作区里新建会话。</span>`;
   return `<strong>${escapeHtml(session.title ?? "（未命名会话）")}</strong> · ${escapeHtml(
     session.workspace,
-  )} · ${session.entryCount} 条`;
+  )} · ${session.entryCount} 条
+  <button type="button" data-action="compact"${
+    state.taskRunning ? " disabled" : ""
+  } title="把较早的上下文换成一条摘要；原始条目保留">压缩上下文</button>`;
 }
 
 export function renderTaskState(state: UiState): string {
@@ -234,12 +237,10 @@ export function renderSettings(state: UiState): string {
   const settings = state.settings;
   if (settings === null) return `<h2>设置</h2><p class="empty">尚未读取内核设置。</p>`;
   return `<h2>设置</h2>
+${renderModelSettings(settings)}
+${renderEngineSettings(settings)}
+${renderSearchSettings(settings)}
 <dl class="kv">
-  <dt>模型端点</dt><dd>${escapeHtml(settings.model.baseUrl)}</dd>
-  <dt>模型</dt><dd>${escapeHtml(settings.model.model)}</dd>
-  <dt>模型密钥</dt><dd>${settings.model.hasApiKey ? "已设置" : "未设置"}</dd>
-  <dt>浏览器引擎</dt><dd>${escapeHtml(settings.browser.engine)}</dd>
-  <dt>搜索来源</dt><dd>${escapeHtml(settings.search.provider)}</dd>
   <dt>数据目录</dt><dd>${escapeHtml(settings.dataDir)}</dd>
 </dl>
 <h2>权限范围</h2>
@@ -258,9 +259,56 @@ ${PERMISSION_SCOPES.map((scope) => renderScopeButton(scope, settings.permissions
   }</button>
 </div>
 <p class="empty">浏览器动作需要审批（US-30）；开启后内核为每个浏览器动作弹一次审批卡片。</p>
-<p class="empty">其余设置只读：改动写在 ${escapeHtml(
+<p class="empty">改动写入 ${escapeHtml(
     settings.dataDir,
-  )}/config.json。</p>`;
+  )}/config.json，并在下一次请求、搜索或浏览器会话生效。</p>`;
+}
+
+/** Model endpoint, name and key; the key is never read back from the kernel. */
+function renderModelSettings(settings: KernelSettings): string {
+  return `<h2>模型</h2>
+<form data-action="settings-form" data-section="model">
+  <label>端点 <input name="baseUrl" value="${escapeHtml(
+    settings.model.baseUrl,
+  )}" autocomplete="off"></label>
+  <label>模型 <input name="model" value="${escapeHtml(
+    settings.model.model,
+  )}" autocomplete="off"></label>
+  <label>密钥 <input name="apiKey" type="password" placeholder="${
+    settings.model.hasApiKey ? "已设置（留空不改）" : "未设置"
+  }" autocomplete="off"></label>
+  <button type="submit">保存模型</button>
+</form>`;
+}
+
+/** Browser engines the kernel can run; the next session uses the chosen one. */
+function renderEngineSettings(settings: KernelSettings): string {
+  return `<h2>浏览器引擎</h2>
+<div class="row">
+${BROWSER_ENGINES.map((engine) => renderEngineButton(engine, settings.browser.engine)).join("\n")}
+</div>
+<p class="empty">Chromium 可接管已登录的 Chrome/Edge（config.json 的 browser.endpoint）。</p>`;
+}
+
+/** Search source; an unknown provider name needs an explicit endpoint. */
+function renderSearchSettings(settings: KernelSettings): string {
+  return `<h2>搜索来源</h2>
+<form data-action="settings-form" data-section="search">
+  <label>来源 <input name="provider" value="${escapeHtml(
+    settings.search.provider,
+  )}" autocomplete="off"></label>
+  <label>端点 <input name="baseUrl" value="${escapeHtml(
+    settings.search.baseUrl ?? "",
+  )}" placeholder="可留空：沿用当前端点（默认用来源自己的）" autocomplete="off"></label>
+  <button type="submit">保存搜索</button>
+</form>`;
+}
+
+function renderEngineButton(engine: string, current: string): string {
+  const active = engine === current;
+  return `<button type="button" data-action="set-engine" data-engine="${engine}" aria-pressed="${active}"${
+    active ? ' class="primary"' : ""
+  }>${escapeHtml(engine)}</button>`;
 }
 
 function renderScopeButton(scope: string, current: string): string {

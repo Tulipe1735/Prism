@@ -166,6 +166,19 @@ it("changes the settings the kernel lets the workbench change", async () => {
       browser: { actionsNeedApproval: true },
     });
 
+    // Model, engine and search source are editable too; the key never comes back.
+    const switched = await client.updateSettings({
+      model: { model: "deepseek-reasoner", apiKey: "sk-written" },
+      browser: { engine: "firefox" },
+      search: { provider: "deepseek", baseUrl: "https://gateway.example.com" },
+    });
+    expect(switched).toMatchObject({
+      model: { model: "deepseek-reasoner", hasApiKey: true },
+      browser: { engine: "firefox", actionsNeedApproval: true },
+      search: { provider: "deepseek", baseUrl: "https://gateway.example.com" },
+    });
+    expect(JSON.stringify(switched)).not.toContain("sk-written");
+
     const refused = await client
       .updateSettings({ permissions: { scope: "wide-open" } } as never)
       .catch((error: unknown) => error);
@@ -292,6 +305,30 @@ it("answers an approval request and reports the outcome", async () => {
       ),
     ).toBeDefined();
     close();
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+it("compacts the open session on request and reports what happened", async () => {
+  const harness = await startTestKernel({
+    answers: [{ text: ["Done."] }],
+  });
+  try {
+    const client = new KernelClient({ baseUrl: harness.kernel.url });
+    const session = await client.createSession({ workspace: harness.workspace });
+    await client.sendMessage(session.id, "a short task");
+    await waitFor(
+      async () => !isTaskRunning((await client.readSession(session.id)).entries),
+      "the finished turn",
+    );
+
+    // Two entries are well inside the keep window: nothing to compact.
+    expect(await client.compactSession(session.id)).toMatchObject({
+      compacted: false,
+    });
+    const entries = (await client.readSession(session.id)).entries;
+    expect(entries.some((entry) => entry.type === "compaction")).toBe(false);
   } finally {
     await harness.cleanup();
   }

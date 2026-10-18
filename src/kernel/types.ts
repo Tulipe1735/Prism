@@ -24,3 +24,8 @@ export type ExecutionTarget = (typeof EXECUTION_TARGETS)[number];
 export const BROWSER_ENGINES = ["chromium", "firefox", "webkit"] as const;
 
 export type BrowserEngine = (typeof BROWSER_ENGINES)[number];
+
+/** True when `value` is one of the three engine literals (config and requests). */
+export function isBrowserEngine(value: unknown): value is BrowserEngine {
+  return (BROWSER_ENGINES as readonly string[]).includes(value as string);
+}

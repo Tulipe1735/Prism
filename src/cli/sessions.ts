@@ -11,11 +11,11 @@ import { performance } from "node:perf_hooks";
 import { connectBrowser, parseBrowserUrl } from "../browser/connect.ts";
 import {
   captureEvidence,
-  digest,
   readTargetEvidence,
   targetEvidence,
 } from "../browser/evidence.ts";
 import { openBrowserSession, StalePageError } from "../browser/session.ts";
+import { digest } from "../shared/digest.ts";
 import { ContractError, failure, success } from "./protocol.ts";
 import { readReceipt, saveReceipt } from "./receipts.ts";
 

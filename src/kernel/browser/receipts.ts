@@ -1,13 +1,13 @@
-import type { SnapshotActionKind } from "../../shared/types.ts";
-import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
-import { join } from "node:path";
-import { digest } from "./evidence.ts";
-
 /**
- * A durable record of what happened to one browser action. `unknown` means input
- * may have reached the browser; it never proves that the task succeeded.
+ * The kernel's view of a browser action receipt.
+ *
+ * Format and storage live in `src/shared/receipts.ts`, together with the
+ * browser CLI's copy (`src/cli/receipts.ts`): the CLI validates every field of
+ * a receipt it reads, while the kernel reads the receipts it wrote itself.
  */
+import type { SnapshotActionKind } from "../../shared/types.ts";
+import { readReceiptFile, saveReceiptFile } from "../../shared/receipts.ts";
+
 export interface Receipt {
   session: string;
   request_id: string;
@@ -23,45 +23,14 @@ export interface Receipt {
   message: string;
 }
 
-export function receiptPath(
-  directory: string,
-  session: string,
-  request: string,
-): string {
-  return join(directory, "receipts", `${digest([session, request])}.json`);
-}
-
-export async function readReceipt(
+export function readReceipt(
   directory: string,
   session: string,
   request: string,
 ): Promise<Receipt | null> {
-  try {
-    return JSON.parse(
-      await readFile(receiptPath(directory, session, request), "utf8"),
-    ) as Receipt;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
-  }
+  return readReceiptFile<Receipt>(directory, session, request, (raw) => raw as Receipt);
 }
 
-/** Persist an unknown receipt before input, then atomically replace it after acknowledgement. */
 export async function saveReceipt(directory: string, receipt: Receipt): Promise<void> {
-  const root = join(directory, "receipts");
-  await mkdir(root, { recursive: true, mode: 0o700 });
-  const path = receiptPath(directory, receipt.session, receipt.request_id);
-  const temp = `${path}.${randomUUID()}.tmp`;
-  try {
-    const file = await open(temp, "wx", 0o600);
-    try {
-      await file.writeFile(`${JSON.stringify(receipt)}\n`);
-      await file.sync();
-    } finally {
-      await file.close();
-    }
-    await rename(temp, path);
-  } finally {
-    await unlink(temp).catch(() => {});
-  }
+  await saveReceiptFile(directory, receipt);
 }

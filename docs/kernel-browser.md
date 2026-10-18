@@ -21,7 +21,7 @@
 | `session.ts`  | 单个页面会话：观察、`samePage`/`fresh` 新鲜度、单步动作执行、输入后的稳定读策略                                                                   |
 | `evidence.ts` | 一次同步页面采样：快照、目标上下文、关系证据、只读状态与覆盖信息                                                                                  |
 | `tool.ts`     | 浏览器会话管理、目标引用、证据校验、动作校验、输入回执、动作后观察                                                                                |
-| `receipts.ts` | 回执的持久化：先写 pending 再输入，确认后原子替换                                                                                                 |
+| `receipts.ts` | 回执的类型与读取；文件格式与原子写入由 CLI 共用（`src/shared/receipts.ts`）                                                                       |
 
 注册进内核（工具注册表与联调）由 `02-kernel-loop.md`、`12-verification.md` 完成。
 
@@ -35,8 +35,8 @@
   `connectOverCDP` 连接；内核侧在 `config.json` 的 `browser.endpoint` 填该地址。Chrome
   136+ 不允许在默认 profile 上开启远程调试。关闭会话只关闭内核自有的标签页并断开连接，不关闭用户的浏览器。
 - 引擎与接管地址都写在 `<数据目录>/config.json` 的 `browser` 段（`engine`、
-  `actionsNeedApproval`、`endpoint`）；`actionsNeedApproval` 也可以在运行中经
-  `PUT /settings` 切换，其余字段只读。
+  `actionsNeedApproval`、`endpoint`）；`engine` 与 `actionsNeedApproval`
+  也可以在运行中经 `PUT /settings` 切换（下一次 `browser_open` 生效），`endpoint` 只读。
 
 ## 保留的语义
 
@@ -60,10 +60,11 @@
 
 ## 内核工具形态（联调）
 
-内核注册的工具：`read_file`、`write_file`、`list_directory`、`glob`、`grep`、`command`、
-`skill`、`echo`，加上浏览器（`browser_open`、`browser_observe`、`browser_context`、
+内核注册的工具：`read_file`、`write_file`、`list_directory`、`glob`、`grep`、
+`run_command`、`skill`，加上浏览器（`browser_open`、`browser_observe`、`browser_context`、
 `browser_act`、`browser_receipt`、`browser_close`）、联网检索（`web_search`、
-`web_fetch`）与 MCP 服务器提供的工具。模型看到的只是注册表，新增工具无需改循环。
+`web_fetch`）与 MCP 服务器提供的工具。测试 harness 另注册占位工具 `echo`
+驱动任务循环；内核出厂不包含它。模型看到的只是注册表，新增工具无需改循环。
 
 - `browser_open` 与 `browser_act` 声明 `browser-action`
   效果：审批开关打开时逐个走 04 的审批通道；`browser_observe`、`browser_context`、`browser_receipt`

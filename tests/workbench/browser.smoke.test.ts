@@ -161,11 +161,20 @@ describe.runIf(enabled)("workbench in a real browser", () => {
         await page.locator("#artifacts .diff .remove").first().textContent(),
       ).toContain("-  return 1;");
 
-      // Settings are the effective kernel settings; the scope switch writes through.
+      // Settings are the effective kernel settings; the fields write through.
       await page.click('[data-view="settings"]');
       const settings = await page.locator("#settings").textContent();
-      expect(settings).toContain("scripted-model");
       expect(settings).toContain(harness.dataDir);
+      expect(
+        await page
+          .locator('#settings form[data-section="model"] input[name="model"]')
+          .inputValue(),
+      ).toBe("scripted-model");
+      expect(
+        await page
+          .locator('#settings form[data-section="model"] input[name="baseUrl"]')
+          .inputValue(),
+      ).toBe(harness.model.baseUrl);
       await page.click('button[data-action="set-scope"][data-scope="read-only"]');
       await page.waitForSelector(
         'button[data-action="set-scope"][data-scope="read-only"][aria-pressed="true"]',
@@ -178,6 +187,21 @@ describe.runIf(enabled)("workbench in a real browser", () => {
       expect(harness.kernel.kernel.settings().permissions.scope).toBe(
         "workspace-write",
       );
+      // The engine switch reaches the kernel without a restart.
+      await page.click('button[data-action="set-engine"][data-engine="firefox"]');
+      await page.waitForSelector(
+        'button[data-action="set-engine"][data-engine="firefox"][aria-pressed="true"]',
+      );
+      expect(harness.kernel.kernel.settings().browser.engine).toBe("firefox");
+      await page.click('button[data-action="set-engine"][data-engine="chromium"]');
+      await page.waitForSelector(
+        'button[data-action="set-engine"][data-engine="chromium"][aria-pressed="true"]',
+      );
+
+      // Manual compaction is offered on the open session; a short log has
+      // nothing to compact, and the kernel says so without touching the log.
+      await page.click('button[data-action="compact"]');
+      await page.waitForSelector("#notice >> text=没有可压缩的内容");
 
       // Rename, search and delete act on the session list.
       await page.click('[data-action="rename-session"]');

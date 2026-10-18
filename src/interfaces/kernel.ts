@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 
 import { loadConfig } from "../kernel/config.ts";
 import { startKernel } from "../kernel/server.ts";
+import { parsePort } from "../shared/args.ts";
 import { VERSION } from "../shared/version.ts";
 
 const HELP = `Prism kernel ${VERSION} — task loop, tools and sessions over local HTTP/SSE
@@ -49,14 +50,6 @@ async function main(): Promise<void> {
   };
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
-}
-
-function parsePort(value: string | undefined): number {
-  if (value === undefined) return 0;
-  const port = Number(value);
-  if (!Number.isInteger(port) || port < 0 || port > 65_535)
-    throw new Error(`--port must be an integer between 0 and 65535, received ${value}`);
-  return port;
 }
 
 void main().catch((error: unknown) => {

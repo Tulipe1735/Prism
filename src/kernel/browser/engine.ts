@@ -12,7 +12,6 @@ export interface EngineOptions {
   engine?: BrowserEngine;
   /** Chromium only: take over a running Chrome/Edge over CDP. */
   endpoint?: string;
-  headless?: boolean;
 }
 
 export interface EngineHandle {
@@ -43,7 +42,8 @@ export async function openEngine(options: EngineOptions = {}): Promise<EngineHan
   }
   let browser: Browser;
   try {
-    browser = await type.launch({ headless: options.headless ?? true });
+    // The kernel's tabs belong to the kernel: they never take the user's focus.
+    browser = await type.launch({ headless: true });
   } catch (error) {
     throw launchProblem(name, error);
   }

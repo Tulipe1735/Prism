@@ -1,6 +1,7 @@
 import type { ModelConfig } from "./config.ts";
 import type { ContextMessage, MessageRole } from "./session.ts";
 import type { ToolParameters } from "./tool.ts";
+import { readSseData } from "../shared/sse.ts";
 
 /** One model-ready message, in the shape the loop builds from the session log. */
 export interface ChatMessage {
@@ -85,30 +86,12 @@ export async function* streamChat(
   if (response.body === null) throw new ModelError("Model response has no body");
 
   const calls = new Map<number, AccumulatedCall>();
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true }).replaceAll("\r\n", "\n");
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary !== -1) {
-      const frame = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      boundary = buffer.indexOf("\n\n");
-      const data = frame
-        .split("\n")
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice("data:".length).trim())
-        .join("\n");
-      if (data === "") continue;
-      if (data === "[DONE]") {
-        yield* completeCalls(calls);
-        return;
-      }
-      for (const event of readChunk(data, calls)) yield event;
+  for await (const data of readSseData(response.body)) {
+    if (data === "[DONE]") {
+      yield* completeCalls(calls);
+      return;
     }
+    for (const event of readChunk(data, calls)) yield event;
   }
   yield* completeCalls(calls);
 }

@@ -1,3 +1,4 @@
+import type { PermissionAction } from "../../src/kernel/permissions.ts";
 import type { SessionEntry, SessionSummary } from "../../src/kernel/session.ts";
 import type { TimelineStep, ToolStep } from "../../src/workbench/ui/derive.ts";
 import { expect, it } from "vitest";
@@ -79,6 +80,26 @@ function toolResult(
     callId,
     content,
     isError,
+  });
+}
+
+/** A tool call that carries the effects its tool declared (04). */
+function toolCallWithEffects(
+  callId: string,
+  name: string,
+  args: unknown,
+  effects: PermissionAction[],
+  parentId: string | null,
+): SessionEntry {
+  return entry({
+    type: "tool_call",
+    id: id("call"),
+    parentId,
+    timestamp: "2026-10-18T09:00:01.000Z",
+    callId,
+    name,
+    arguments: JSON.stringify(args),
+    effects,
   });
 }
 
@@ -292,6 +313,31 @@ it("keeps the written content when a tool result carries no diff", () => {
   });
 });
 
+it("prefers the effects a tool call declared over reading its name", () => {
+  // A name that reads as a read-only tool, but the call declares a file write.
+  const writer = toolCallWithEffects(
+    "call-1",
+    "read_then_save",
+    { path: "notes/todo.md" },
+    [{ kind: "file-write", path: "/home/demo/app/notes/todo.md" }],
+    null,
+  );
+  const writerResult = toolResult("call-1", "saved", false, writer.id);
+  // A name that reads as a writer, but the call only drives a browser.
+  const browser = toolCallWithEffects(
+    "call-2",
+    "edit_file",
+    { path: "src/app.ts" },
+    [{ kind: "browser-action", action: "click", target: "https://example.com/" }],
+    writerResult.id,
+  );
+  const browserResult = toolResult("call-2", "clicked", false, browser.id);
+
+  expect(toChanges([writer, writerResult, browser, browserResult])).toMatchObject([
+    { path: "notes/todo.md", tool: "read_then_save", state: "ok" },
+  ]);
+});
+
 it("reads the task state from the last log entry", () => {
   const user = message("user", "start", null);
   const call = toolCall("call-1", "echo", { text: "hi" }, user.id);
@@ -397,13 +443,24 @@ it("derives changes from the real file tools of the kernel", async () => {
       path: "src/generated.ts",
       tool: "write_file",
       state: "ok",
-      diff: null,
-      written: "export const generated = true;\n",
+      added: 1,
+      removed: 0,
+      written: null,
     });
+    // The write carries its own diff, so the view does not fall back to the
+    // content argument of the call.
+    expect(changes[0]?.diff?.map((line) => line.kind)).toEqual([
+      "meta",
+      "meta",
+      "hunk",
+      "add",
+    ]);
     expect(changes[0]?.result).toContain("Wrote 31 characters");
+    expect(changes[0]?.result).toContain("+++ b/src/generated.ts");
     expect(toArtifacts(log.entries)[0]).toMatchObject({
       path: "src/generated.ts",
       calls: 1,
+      added: 1,
     });
   } finally {
     await harness.cleanup();

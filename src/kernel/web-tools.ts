@@ -1,4 +1,4 @@
-import type { SearchProvider, SearchResult } from "../web/search.ts";
+import type { SearchResult } from "../web/search.ts";
 import type { AddressResolver } from "../web/target.ts";
 import type { Tool } from "./tool.ts";
 import { webFetch } from "../web/fetch.ts";
@@ -12,8 +12,11 @@ import { missingArgument, readNumber, readString } from "./tool-support.ts";
  * reserved targets in every scope (SSRF).
  */
 export interface WebToolsOptions {
-  /** Search source, the `search` section of the kernel configuration. */
-  search: {
+  /**
+   * The search source in effect, read on every call so the workbench can
+   * change it without restarting the kernel.
+   */
+  search: () => {
     provider: string;
     apiKey?: string;
     baseUrl?: string;
@@ -31,10 +34,6 @@ export interface WebFetchOverrides {
 }
 
 export function createWebTools(options: WebToolsOptions): Tool[] {
-  // Built on the first call: a kernel without a search key still starts and
-  // serves every other tool.
-  let provider: SearchProvider | undefined;
-
   const search: Tool = {
     name: "web_search",
     description:
@@ -57,7 +56,9 @@ export function createWebTools(options: WebToolsOptions): Tool[] {
       if (query === undefined || query === "") return missingArgument("query");
       const count = readNumber(args, "count");
       try {
-        provider ??= createSearchProvider(options.search);
+        // Built per call: a kernel without a search key still starts and serves
+        // every other tool, and reports the missing key when search is used.
+        const provider = createSearchProvider(options.search());
         const results = await provider.search({
           query,
           signal: context.signal,

@@ -5,6 +5,7 @@ import process from "node:process";
 import { z } from "zod";
 
 import { ConfigError } from "../shared/errors.ts";
+import { asRecord } from "../shared/records.ts";
 import {
   BROWSER_ENGINES,
   type BrowserEngine,
@@ -72,7 +73,10 @@ export interface PrismConfigOverrides {
 
 /** Settings a running kernel may change; other sections stay as they are. */
 export interface ConfigPatch {
-  browser?: { actionsNeedApproval?: boolean };
+  model?: Partial<ModelConfig>;
+  /** `endpoint` is start-time only: it decides how the engine is taken over. */
+  browser?: Partial<Pick<BrowserConfig, "engine" | "actionsNeedApproval">>;
+  search?: Partial<Pick<SearchConfig, "provider" | "baseUrl">>;
   permissions?: { scope?: PermissionScope };
 }
 
@@ -180,15 +184,15 @@ export async function saveConfigPatch(
 ): Promise<void> {
   const path = configPath(dataDir);
   const existing = await readRawConfig(path);
-  const merged = {
-    ...existing,
-    ...(patch.browser === undefined
-      ? {}
-      : { browser: { ...asRecord(existing.browser), ...patch.browser } }),
-    ...(patch.permissions === undefined
-      ? {}
-      : { permissions: { ...asRecord(existing.permissions), ...patch.permissions } }),
-  };
+  const merged: Record<string, unknown> = { ...existing };
+  if (patch.model !== undefined)
+    merged.model = { ...asRecord(existing.model), ...patch.model };
+  if (patch.browser !== undefined)
+    merged.browser = { ...asRecord(existing.browser), ...patch.browser };
+  if (patch.search !== undefined)
+    merged.search = { ...asRecord(existing.search), ...patch.search };
+  if (patch.permissions !== undefined)
+    merged.permissions = { ...asRecord(existing.permissions), ...patch.permissions };
   const result = configFileSchema.safeParse(merged);
   if (!result.success)
     throw new ConfigError(`${path} is invalid: ${result.error.message}`);
@@ -211,14 +215,8 @@ async function readRawConfig(path: string): Promise<Record<string, unknown>> {
   });
   if (text === null) return {};
   try {
-    return asRecord(JSON.parse(text));
+    return asRecord(JSON.parse(text)) ?? {};
   } catch (error) {
     throw new ConfigError(`${path} is not valid JSON: ${(error as Error).message}`);
   }
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? { ...(value as Record<string, unknown>) }
-    : {};
 }

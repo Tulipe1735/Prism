@@ -97,9 +97,16 @@ it("writes a file the model asks for, creating and replacing files", async () =>
   );
   if (first.type !== "tool.completed") throw new Error("Expected a completed tool");
   expect(first.result).toContain("notes/idea.txt");
-  await events.waitFor(
+  expect(first.result).toContain("--- a/notes/idea.txt");
+  expect(first.result).toContain("-old content");
+  expect(first.result).toContain("+written by the model");
+  const second = await events.waitFor(
     (event) => event.type === "tool.completed" && event.callId === "call_2",
   );
+  if (second.type !== "tool.completed") throw new Error("Expected a completed tool");
+  expect(second.result).toContain("--- /dev/null");
+  expect(second.result).toContain("+++ b/notes/nested/more.txt");
+  expect(second.result).toContain("+nested");
   expect(await readFile(join(workspace, "notes", "idea.txt"), "utf8")).toBe(
     "written by the model",
   );

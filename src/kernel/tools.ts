@@ -1,6 +1,6 @@
 import type { Tool } from "./tool.ts";
-import type { JsonValue } from "./types.ts";
 import { loadSkill, scanSkills } from "../skills/loader.ts";
+import { readString } from "./tool-support.ts";
 
 /** Tools the model may call, keyed by name. */
 export class ToolRegistry {
@@ -24,27 +24,6 @@ export class ToolRegistry {
     return [...this.tools.values()];
   }
 }
-
-/**
- * Placeholder tool from the loop's first slice; 03 adds the real file and
- * command tools and keeps this one for self-tests.
- */
-export const echoTool: Tool = {
-  name: "echo",
-  description: "Returns the given text unchanged. Placeholder tool for smoke tests.",
-  parameters: {
-    type: "object",
-    properties: { text: { type: "string", description: "Text to return." } },
-    required: ["text"],
-    additionalProperties: false,
-  },
-  execute: async (args) => {
-    const text = readString(args, "text");
-    if (text === undefined)
-      return { content: 'The "text" argument must be a string.', isError: true };
-    return { content: text };
-  },
-};
 
 export interface SkillToolRoots {
   /** User home directory holding global skills; defaults to the real home. */
@@ -72,7 +51,7 @@ export function createSkillTool(roots: SkillToolRoots): Tool {
     execute: async (args, context) => {
       const scan = await scanSkills({ workspace: context.workspace, ...roots });
       const name = readString(args, "name");
-      if (name === undefined) {
+      if (name === undefined || name === "") {
         const lines = scan.skills.map(
           (skill) => `- ${skill.name} (${skill.origin}): ${skill.description}`,
         );
@@ -98,12 +77,4 @@ export function createSkillTool(roots: SkillToolRoots): Tool {
       return { content: await loadSkill(skill) };
     },
   };
-}
-
-/** Reads an optional string field from tool arguments the model produced. */
-function readString(args: JsonValue, key: string): string | undefined {
-  if (typeof args !== "object" || args === null || Array.isArray(args))
-    return undefined;
-  const value = args[key];
-  return typeof value === "string" && value !== "" ? value : undefined;
 }

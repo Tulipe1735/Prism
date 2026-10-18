@@ -1,8 +1,10 @@
+import type { PermissionAction } from "../../kernel/permissions.ts";
 import type {
   MessageRole,
   SessionEntry,
   SessionSummary,
 } from "../../kernel/session.ts";
+import { compareSessions } from "../../kernel/session.ts";
 
 /** Sessions of one workspace, most recent first. */
 export interface SessionGroup {
@@ -43,9 +45,7 @@ export function searchSessions(
 }
 
 function byUpdated(sessions: SessionSummary[]): SessionSummary[] {
-  return [...sessions].sort(
-    (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
-  );
+  return [...sessions].sort(compareSessions);
 }
 
 /**
@@ -79,6 +79,8 @@ export interface ToolStep {
   arguments: string;
   /** Path the call touches, when its arguments name one. */
   target?: string;
+  /** What the call declared it would touch; absent when the tool declares nothing. */
+  effects?: PermissionAction[];
   result?: string;
   state: ToolState;
 }
@@ -132,6 +134,7 @@ export function toTimeline(
           name: entry.name,
           arguments: entry.arguments,
           ...(target === undefined ? {} : { target }),
+          ...(entry.effects === undefined ? {} : { effects: entry.effects }),
           ...(result === undefined ? {} : { result }),
           state:
             result === undefined
@@ -206,31 +209,46 @@ export interface FileChange {
   result: string;
 }
 
-/** Tools whose name says they only read; their path arguments are not changes. */
+/** Tools whose name says they only read; used when a call declares no effects. */
 const READ_ONLY =
   /^(?:read|cat|list|ls|glob|grep|search|find|skill|echo|status|observe|screenshot|web_)/i;
 
+/**
+ * The file one tool call changed, or `undefined`. A call that declares effects
+ * decides by them: only a declared file write is a change, whatever the tool is
+ * called. Calls that declare nothing — MCP tools, and logs written before the
+ * effects were recorded — fall back to reading the tool name.
+ */
+function changedFile(step: ToolStep): string | undefined {
+  if (step.effects !== undefined) {
+    for (const effect of step.effects)
+      if (effect.kind === "file-write") return step.target ?? effect.path;
+    return undefined;
+  }
+  return READ_ONLY.test(step.name) ? undefined : step.target;
+}
+
 /** File changes a session made, oldest first. */
 export function toChanges(entries: SessionEntry[]): FileChange[] {
-  return toTimeline(entries)
-    .filter(
-      (step): step is ToolStep =>
-        step.kind === "tool" && step.target !== undefined && !READ_ONLY.test(step.name),
-    )
-    .map((step) => {
-      const diff = parseUnifiedDiff(step.result ?? "");
-      return {
-        path: step.target as string,
-        tool: step.name,
-        callId: step.callId,
-        state: step.state,
-        added: count(diff, "add"),
-        removed: count(diff, "remove"),
-        diff,
-        written: diff === null ? writtenContent(step.arguments) : null,
-        result: step.result ?? "",
-      };
+  const changes: FileChange[] = [];
+  for (const step of toTimeline(entries)) {
+    if (step.kind !== "tool") continue;
+    const path = changedFile(step);
+    if (path === undefined) continue;
+    const diff = parseUnifiedDiff(step.result ?? "");
+    changes.push({
+      path,
+      tool: step.name,
+      callId: step.callId,
+      state: step.state,
+      added: count(diff, "add"),
+      removed: count(diff, "remove"),
+      diff,
+      written: diff === null ? writtenContent(step.arguments) : null,
+      result: step.result ?? "",
     });
+  }
+  return changes;
 }
 
 /** The content argument of a writing tool call, when it carries one. */

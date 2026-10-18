@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import process from "node:process";
 import { parseArgs } from "node:util";
+import { parsePort } from "../../shared/args.ts";
 import { VERSION } from "../../shared/version.ts";
 import { launchKernel, type RunningKernelProcess } from "../kernel-process.ts";
 import { startUiServer } from "../ui-server.ts";
@@ -56,7 +57,7 @@ async function main(): Promise<void> {
   const ui = await startUiServer({
     kernelUrl,
     ...(values["ui-root"] === undefined ? {} : { uiRoot: values["ui-root"] }),
-    ...(values.port === undefined ? {} : { port: parsePort(values.port) }),
+    port: parsePort(values.port),
   });
   process.stdout.write(
     `${JSON.stringify({
@@ -80,13 +81,6 @@ async function main(): Promise<void> {
   };
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
-}
-
-function parsePort(value: string): number {
-  const port = Number(value);
-  if (!Number.isInteger(port) || port < 0 || port > 65_535)
-    throw new Error(`--port must be an integer between 0 and 65535, received ${value}`);
-  return port;
 }
 
 void main().catch((error: unknown) => {

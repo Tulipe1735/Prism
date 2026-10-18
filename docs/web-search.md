@@ -30,7 +30,7 @@ DeepSeek 有公开可用的 Search API，2026-10-18 依据官方文档核实：
 
 | 键          | 默认                       | 说明                                                                                                        |
 | ----------- | -------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `provider`  | `deepseek`                 | 搜索来源，与内核配置 `search.provider` 一致                                                                 |
+| `provider`  | `deepseek`                 | 搜索来源名，与内核配置 `search.provider` 一致；可用 `PUT /settings` 修改                                    |
 | `apiKey`    | 必填                       | 与模型共用 DeepSeek key（内核配置的 `search.apiKey` 或 `model.apiKey`）；缺失时 `createSearchProvider` 报错 |
 | `baseUrl`   | `https://api.deepseek.com` | 可指向网关、代理或自建兼容端点；内核配置 `search.baseUrl` 映射到它                                          |
 | `count`     | `10`                       | 默认结果数，1–50                                                                                            |
@@ -47,13 +47,30 @@ const results = await provider.search({ query: "playwright firefox", count: 5 })
 
 ### 更换来源
 
-内置来源目前只有 `deepseek`；未知名称会抛出 `ConfigError`
-并列出可用来源。DeepSeek 不是唯一路径——替换方式：
+`deepseek` 是唯一带内置端点的来源。**任何其它名称都可以用，只要同时给出显式
+`baseUrl`**：内核按 DeepSeek 兼容端点对待它，向 `<baseUrl>/v1/tools/search` 发同样的
+`POST`（Bearer 鉴权、同样的请求与响应形状）。网关、代理与自建聚合搜索都可以这样接入，不需要改代码：
+
+```json
+{
+  "search": {
+    "provider": "gateway",
+    "baseUrl": "https://gateway.example.com",
+    "apiKey": "<key>"
+  }
+}
+```
+
+也可以在设置面板（或 `PUT /settings`）里改 `search.provider` 与 `search.baseUrl`，下一次
+`web_search` 就使用新来源。只写未知名称而**不给** `baseUrl` 时，`web_search` 返回一条
+`ConfigError` 说明（提示补 `baseUrl`），内核照常启动与服务。
+
+要接入协议不同的来源时：
 
 1. 实现 [`SearchProvider`](../src/web/search.ts)：`name` 与
    `search(request) => Promise<SearchResult[]>`。
 2. 把实例直接交给消费方（工具层只用 `SearchProvider` 接口，不识别具体来源）。
-3. 若要按配置名选择，则把该来源注册进 `createSearchProvider`（当前为单来源分支）。
+3. 若要按配置名选择，则把该来源注册进 [`createSearchProvider`](../src/web/search.ts)。
 
 Brave、Tavily、自建聚合搜索都可以用这个方式接入；`web_fetch`
 无需改动。任何来源都能在测试中用 `fetchImpl` 假响应离线验证。
@@ -114,7 +131,8 @@ API），因此 SSRF 策略、大小与超时都由内核把关。
 
 内核注册形态（`src/kernel/web-tools.ts`）：
 
-- 搜索来源在**第一次调用**时才建立：没有配置 key 的内核照常启动，调用时把配置错误作为工具结果返回，而不是让整个内核起不来。
+- 搜索来源在**每次调用前**按当前设置建立：没有配置 key 的内核照常启动，调用时把配置错误作为工具结果返回；设置面板改动来源或端点后，下一次
+  `web_search` 立即生效。
 - `web_search`
   把每条结果渲染成「标题 / 链接 / 来源与日期 / 摘要」的文本块，模型可以原样引用链接；结果超长按工具结果上限截断。
 - `web_fetch` 返回「标题 / 最终 URL

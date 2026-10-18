@@ -87,10 +87,31 @@ describe("createSearchProvider", () => {
     expect(JSON.parse(String(init.body))).toMatchObject({ count: 10 });
   });
 
-  it("rejects an unknown source with the supported names", () => {
+  it("rejects an unknown source that has no endpoint to call", () => {
     expect(() =>
       createSearchProvider({ provider: "altavista", apiKey: "test-key" }),
-    ).toThrow(/deepseek/);
+    ).toThrow(/baseUrl/);
+  });
+
+  it("treats an unknown source with an explicit base URL as a compatible endpoint", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ results: [] }));
+    const provider = createSearchProvider({
+      provider: "gateway",
+      apiKey: "test-key",
+      baseUrl: "https://gateway.example.com",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    expect(provider.name).toBe("gateway");
+
+    await provider.search({ query: "prism agent" });
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://gateway.example.com/v1/tools/search");
+    expect(init.headers).toMatchObject({ authorization: "Bearer test-key" });
+  });
+
+  it("asks for a key when the source has none", () => {
+    expect(() => createSearchProvider({ provider: "deepseek" })).toThrow(/API key/);
   });
 
   it("surfaces provider failures without inventing results", async () => {

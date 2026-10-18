@@ -1,7 +1,8 @@
 import type { SnapshotActionKind } from "../shared/types.ts";
+import type { EngineOptions } from "./browser/engine.ts";
 import type { ObservationView } from "./browser/tool.ts";
 import type { Tool, ToolResult } from "./tool.ts";
-import type { BrowserEngine, JsonValue } from "./types.ts";
+import type { JsonValue } from "./types.ts";
 import { BrowserTool, BrowserToolError } from "./browser/tool.ts";
 import { missingArgument, readString } from "./tool-support.ts";
 
@@ -18,9 +19,11 @@ import { missingArgument, readString } from "./tool-support.ts";
 export interface BrowserToolsOptions {
   /** Receipts and session records; the kernel uses `<dataDir>/browser`. */
   directory: string;
-  engine?: BrowserEngine;
-  /** Chromium only: take over a running Chrome/Edge over CDP. */
-  endpoint?: string;
+  /**
+   * The engine and takeover endpoint in effect, read before every open so the
+   * workbench can switch the engine without restarting the kernel.
+   */
+  engine: () => EngineOptions;
 }
 
 export interface BrowserTools {

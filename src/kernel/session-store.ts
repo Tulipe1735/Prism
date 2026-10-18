@@ -13,6 +13,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { z } from "zod";
 
 import {
+  compareSessions,
   SESSION_FORMAT_VERSION,
   type SessionEntry,
   type SessionEntryInput,
@@ -45,6 +46,16 @@ const headerSchema = z.object({
   timestamp: z.string().min(1),
 });
 
+const permissionActionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("file-write"), path: z.string().min(1) }),
+  z.object({ kind: z.literal("command"), command: z.string() }),
+  z.object({
+    kind: z.literal("browser-action"),
+    action: z.string().min(1),
+    target: z.string(),
+  }),
+]);
+
 const entrySchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("message"),
@@ -62,6 +73,7 @@ const entrySchema = z.discriminatedUnion("type", [
     callId: z.string().min(1),
     name: z.string().min(1),
     arguments: z.string(),
+    effects: z.array(permissionActionSchema).optional(),
   }),
   z.object({
     type: z.literal("tool_result"),
@@ -147,6 +159,7 @@ export class SessionStore {
             callId: input.callId,
             name: input.name,
             arguments: input.arguments,
+            ...(input.effects === undefined ? {} : { effects: input.effects }),
           };
         case "tool_result":
           return {
@@ -205,9 +218,7 @@ export class SessionStore {
       if (workspace && log.header.workspace !== workspace) continue;
       summaries.push(summarize(log));
     }
-    return summaries.sort(
-      (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
-    );
+    return summaries.sort(compareSessions);
   }
 
   async delete(sessionId: string): Promise<boolean> {

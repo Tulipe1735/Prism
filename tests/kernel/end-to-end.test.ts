@@ -264,7 +264,8 @@ function engineProblem(entries: SessionEntry[]): string | undefined {
 it("searches through the configured source and fetches a page as text", async () => {
   const { kernel, model, workspace, dataDir } = await start({
     configFile: {
-      search: { provider: "deepseek", baseUrl: webOrigin, apiKey: "search-key" },
+      // An unknown name with an explicit endpoint is a compatible source.
+      search: { provider: "gateway", baseUrl: webOrigin, apiKey: "search-key" },
     },
     webFetch: {
       // The controlled service is public: the resolver and transport keep the
