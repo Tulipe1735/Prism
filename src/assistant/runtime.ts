@@ -194,6 +194,12 @@ export class AssistantRuntime {
     if (active) return active.promise;
     const task = this.get(id);
     if (!task) return Promise.reject(new Error(`Unknown task ${id}`));
+    if (
+      task.effort === "deep" &&
+      task.deadlineAt &&
+      Date.parse(task.deadlineAt) <= this.now().getTime()
+    )
+      return Promise.resolve(this.expire(id));
     if (!this.store.claimTask(id)) return Promise.resolve(this.get(id)!);
     if (task.startedAt) this.store.updateTask(id, { startedAt: task.startedAt });
     const controller = new AbortController();
@@ -201,6 +207,24 @@ export class AssistantRuntime {
     this.running.set(id, entry);
     entry.promise = this.execute(id, controller).finally(() => this.running.delete(id));
     return entry.promise;
+  }
+
+  expire(id: string): TaskRecord {
+    const task = this.get(id);
+    if (!task) throw new Error(`Unknown task ${id}`);
+    if (
+      task.effort !== "deep" ||
+      !task.deadlineAt ||
+      Date.parse(task.deadlineAt) > this.now().getTime() ||
+      ["completed", "partial", "failed", "cancelled"].includes(task.status)
+    )
+      return task;
+    const active = this.running.get(id);
+    if (active) {
+      active.controller.abort(new TaskStop("deadline", "达到任务时间上限"));
+      return this.get(id)!;
+    }
+    return this.finish(id, "partial", "达到任务时间上限；已停止新增工作，保留当前成果");
   }
 
   cancel(id: string): TaskRecord {

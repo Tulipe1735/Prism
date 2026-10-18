@@ -1,17 +1,22 @@
 import type { Model, ModelMessage, ToolDefinition } from "../../src/assistant/types.ts";
+import { execFile } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, it } from "vitest";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { afterEach, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { courseMaterials } from "../../src/assistant/courses.ts";
 import { createAssistantServer } from "../../src/assistant/http.ts";
 import { AssistantRuntime } from "../../src/assistant/runtime.ts";
-import { courseMaterials } from "../../src/assistant/courses.ts";
 import { assistantTools, PersonalAssistant } from "../../src/assistant/service.ts";
 import { AssistantStore } from "../../src/assistant/store.ts";
 
 const directories: string[] = [];
 afterEach(async () => {
+  vi.useRealTimers();
   for (const path of directories.splice(0))
     await rm(path, { recursive: true, force: true });
 });
@@ -122,6 +127,306 @@ const staticModel = (content: unknown): Model => ({
   }),
 });
 
+it("observes fresh portal state after an approved action even when the observation command repeats", async () => {
+  const store = await workspace();
+  const observe = { command: "observe", session: "portal", scope: "local" };
+  const action = {
+    command: "act",
+    session: "portal",
+    observation: "o1",
+    target: "t1",
+    evidence: "e1",
+    operation: "click",
+    request_id: "open-courses",
+  };
+  const commands = [observe, action, observe];
+  let round = 0;
+  const runtime = new AssistantRuntime({
+    store,
+    tools: assistantTools(store, {}),
+    model: {
+      complete: async () => ({
+        message:
+          round < commands.length
+            ? {
+                role: "assistant",
+                content: null,
+                tool_calls: [
+                  {
+                    id: `portal-${round}`,
+                    type: "function",
+                    function: {
+                      name: "local_prism",
+                      arguments: JSON.stringify({
+                        command: commands[round++],
+                        summary: "核对门户课表",
+                      }),
+                    },
+                  },
+                ],
+              }
+            : { role: "assistant", content: "已通过新的观察核对课表。" },
+        usage: { inputTokens: 10, outputTokens: 10 },
+      }),
+    },
+  });
+  const app = new PersonalAssistant({ store, runtime, sources: {} });
+  const task = app.submit({ message: "打开课表并核对课程" });
+  await app.drain();
+  const first = store.claimLocal("pc")!;
+  expect(first.command.prism).toEqual(observe);
+  await app.completeLocal(first.id, { observation: "o1" });
+  const pending = store
+    .getTask(task.id)!
+    .messages!.filter((m) => m.role === "tool")
+    .map((m) => JSON.parse(m.content!))
+    .at(-1);
+  app.approve(pending.jobId);
+  const click = store.claimLocal("pc")!;
+  await app.completeLocal(click.id, { receipt: { outcome: "executed" } });
+  const second = store.claimLocal("pc");
+  expect(second).toMatchObject({ status: "claimed", command: { prism: observe } });
+  expect(second?.id).not.toBe(first.id);
+  await app.completeLocal(second!.id, { observation: "o2", courses: ["操作系统"] });
+  expect(store.getTask(task.id)).toMatchObject({
+    status: "completed",
+    answer: "已通过新的观察核对课表。",
+  });
+  await app.drain();
+  store.close();
+});
+
+it.each(["completed", "unknown", "failed"] as const)(
+  "returns the saved %s action outcome on the same request without waiting or replaying",
+  async (status) => {
+    const store = await workspace();
+    const command = {
+      command: "act",
+      session: "portal",
+      observation: "o1",
+      target: "t1",
+      evidence: "e1",
+      operation: "click",
+      request_id: "open-courses",
+    };
+    let round = 0;
+    const model: Model = {
+      complete: async (messages) => ({
+        message:
+          ++round <= 2
+            ? {
+                role: "assistant",
+                content: null,
+                tool_calls: [
+                  {
+                    id: `action-${round}`,
+                    type: "function",
+                    function: {
+                      name: "local_prism",
+                      arguments: JSON.stringify({
+                        command,
+                        summary: round === 1 ? "打开课表" : "核对刚才的打开课表动作",
+                      }),
+                    },
+                  },
+                ],
+              }
+            : {
+                role: "assistant",
+                content: messages.filter((m) => m.role === "tool").at(-1)!.content,
+              },
+        usage: { inputTokens: 10, outputTokens: 10 },
+      }),
+    };
+    const runtime = new AssistantRuntime({
+      store,
+      model,
+      tools: assistantTools(store, {}),
+    });
+    const app = new PersonalAssistant({ store, runtime, sources: {} });
+    const task = app.submit({ message: "打开课表后核对动作回执" });
+    await app.drain();
+    const pending = store
+      .getTask(task.id)!
+      .messages!.filter((m) => m.role === "tool")
+      .map((m) => JSON.parse(m.content!))
+      .at(-1);
+    app.approve(pending.jobId);
+    const job = store.claimLocal("pc")!;
+    const savedResult = { receipt: { outcome: status }, marker: "saved-original" };
+    await app.completeLocal(job.id, savedResult, status);
+    const final = store.getTask(task.id)!;
+    expect(final.status).toBe("completed");
+    expect(JSON.parse(final.answer)).toMatchObject({
+      status,
+      result: savedResult,
+      jobId: job.id,
+    });
+    expect(store.claimLocal("pc")).toBeUndefined();
+    await app.drain();
+    store.close();
+  },
+);
+
+it("confirms the exact local action through the CLI without model credentials and makes the parent claimable", async () => {
+  const store = await workspace();
+  const task = store.createTask({ message: "确认后打开课程页" });
+  const command = {
+    command: "act",
+    session: "portal",
+    observation: "o1",
+    target: "t1",
+    evidence: "e1",
+    operation: "click",
+    request_id: "cli-confirm",
+  };
+  const job = store.enqueueLocal(task.id, {
+    prism: command,
+    approved: false,
+    summary: "打开课程页",
+  });
+  store.updateTask(task.id, { status: "awaiting-confirmation" });
+  await promisify(execFile)(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      fileURLToPath(new URL("../../src/assistant/cli.ts", import.meta.url)),
+      "confirm",
+      job.id,
+    ],
+    { env: { ASSISTANT_DATA_DIR: store.directory } },
+  );
+  expect(store.getTask(task.id)?.status).toBe("waiting-device");
+  expect(store.claimLocal("pc")).toMatchObject({
+    id: job.id,
+    command: { approved: true, prism: command },
+  });
+  store.close();
+});
+
+it("ends a paused deep task at its original deadline and delivers the saved result without new model work", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-10-18T02:00:00Z"));
+  const store = await workspace();
+  const delivered: string[] = [];
+  const task = store.createTask({
+    message: "研究过程中核对本地课程",
+    effort: "deep",
+    source: "feishu:qa:owner",
+  });
+  store.updateTask(task.id, {
+    status: "waiting-device",
+    deadlineAt: "2026-10-18T02:20:00Z",
+    answer: "已核查原始论文，等待课程证据；当前成果仍有缺口。",
+  });
+  const model: Model = {
+    complete: async () => {
+      throw new Error("Expired tasks must not start model work");
+    },
+  };
+  const runtime = new AssistantRuntime({ store, model });
+  const app = new PersonalAssistant({
+    store,
+    runtime,
+    sources: {},
+    send: async (body) => {
+      delivered.push(body);
+      return { id: "expired-result" };
+    },
+  });
+  app.recover();
+  await vi.advanceTimersByTimeAsync(20 * 60_000);
+  await app.drain();
+  expect(store.getTask(task.id)).toMatchObject({
+    status: "partial",
+    deadlineAt: "2026-10-18T02:20:00Z",
+    answer: expect.stringContaining("已核查原始论文"),
+  });
+  expect(delivered).toHaveLength(1);
+  expect(delivered[0]).toContain("partial");
+  expect(delivered[0]).toContain("已核查原始论文");
+  store.close();
+});
+
+it("restores the original deep deadline after a real device pause and restart", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-10-18T02:00:00Z"));
+  let store = await workspace();
+  const directory = store.directory;
+  const bodies: string[] = [];
+  let requests = 0;
+  const model: Model = {
+    complete: async () => {
+      requests++;
+      return {
+        message: {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "local",
+              type: "function",
+              function: {
+                name: "local_prism",
+                arguments: JSON.stringify({
+                  command: { command: "observe", session: "portal", scope: "local" },
+                  summary: "核对课程",
+                }),
+              },
+            },
+          ],
+        },
+        usage: { inputTokens: 10, outputTokens: 10 },
+      };
+    },
+  };
+  const send = async (body: string) => {
+    bodies.push(body);
+    return { id: `delivery-${bodies.length}` };
+  };
+  const runtime = new AssistantRuntime({
+    store,
+    model,
+    tools: assistantTools(store, {}),
+  });
+  const app = new PersonalAssistant({ store, runtime, sources: {}, send });
+  const task = app.submit({
+    message: "研究过程中核对课程",
+    effort: "deep",
+    source: "feishu:qa:owner",
+  });
+  await app.drain();
+  expect(store.getTask(task.id)).toMatchObject({
+    status: "waiting-device",
+    deadlineAt: "2026-10-18T02:20:00.000Z",
+  });
+  store.updateTask(task.id, { answer: "暂停前保存的研究线索，证据仍有缺口。" });
+  vi.setSystemTime(new Date("2026-10-18T02:10:00Z"));
+  app.close();
+  store.close();
+  store = new AssistantStore(directory);
+  const restored = new PersonalAssistant({
+    store,
+    runtime: new AssistantRuntime({ store, model }),
+    sources: {},
+    send,
+  });
+  restored.recover();
+  await vi.advanceTimersByTimeAsync(10 * 60_000);
+  await restored.drain();
+  expect(requests).toBe(1);
+  expect(store.getTask(task.id)).toMatchObject({
+    status: "partial",
+    deadlineAt: "2026-10-18T02:20:00.000Z",
+    answer: expect.stringContaining("暂停前保存的研究线索"),
+  });
+  expect(bodies.at(-1)).toContain("暂停前保存的研究线索");
+  expect(bodies.at(-1)).toContain("partial");
+  expect(store.claimLocal("late-pc")).toBeUndefined();
+  restored.close();
+  store.close();
+});
+
 it("distinguishes a normal empty recommendation from a source failure", async () => {
   const store = await workspace();
   const now = () => new Date("2026-10-18T02:00:00Z");
@@ -171,6 +476,174 @@ it("does not resend an unknown delivery after timeout or restart", async () => {
   expect(store.getDelivery("brief:2026-10-18")?.status).toBe("unknown");
   expect(store.listMemory().some((m) => m.kind === "reading")).toBe(false);
   store.close();
+});
+
+it("keeps an unknown brief marked sent through HTTP in the recommendation ledger after restart", async () => {
+  let store = await workspace();
+  const directory = store.directory;
+  let sends = 0;
+  const runtime = new AssistantRuntime({ store, model: staticModel(selection) });
+  const app = new PersonalAssistant({
+    store,
+    runtime,
+    now: () => new Date("2026-10-18T02:00:00Z"),
+    sources: { trending: { collect: async () => [project()] } },
+    send: async () => {
+      sends++;
+      throw new Error("Delivery accepted but acknowledgement lost");
+    },
+  });
+  await app.tick();
+  expect(store.getDelivery("brief:2026-10-18")?.status).toBe("unknown");
+  const token = "owner-secret-01234567890123456789";
+  const server = createAssistantServer({
+    store,
+    app,
+    ownerToken: token,
+    workerToken: "worker-secret-01234567890123456789",
+    cancel: (id) => runtime.cancel(id),
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("server missing");
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/deliveries/brief%3A2026-10-18`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "sent", evidence: "已在手机核对完整晨报" }),
+      },
+    );
+    expect(response.status).toBe(200);
+  } finally {
+    await new Promise<void>((done) => server.close(() => done()));
+    app.close();
+    store.close();
+  }
+  store = new AssistantStore(directory);
+  const next = new PersonalAssistant({
+    store,
+    runtime: new AssistantRuntime({ store, model: staticModel(selection) }),
+    now: () => new Date("2026-10-19T02:00:00Z"),
+    sources: { trending: { collect: async () => [project()] } },
+    send: async () => {
+      sends++;
+      return { id: "duplicate" };
+    },
+  });
+  await next.tick();
+  expect(sends).toBe(1);
+  expect(store.getDelivery("brief:2026-10-19")?.status).toBe("silent");
+  next.close();
+  store.close();
+});
+
+it("lets a new phone conversation read the full delivered brief with numbering and recommendation evidence after restart", async () => {
+  let store = await workspace();
+  const directory = store.directory;
+  const second = {
+    ...project(),
+    id: "github:example/second",
+    title: "example/second",
+    url: "https://github.com/example/second",
+  };
+  const items = [
+    selection.items[0]!,
+    {
+      documentId: second.id,
+      takeaway: "按来源核查持久工具技能",
+      reason: "提供独立验证与失败案例",
+      connection: "可用于当前研究的反馈实验",
+    },
+  ];
+  const first = new PersonalAssistant({
+    store,
+    runtime: new AssistantRuntime({ store, model: staticModel({ items }) }),
+    now: () => new Date("2026-10-18T02:00:00Z"),
+    sources: { trending: { collect: async () => [project(), second] } },
+    send: async () => ({ id: "morning" }),
+  });
+  await first.tick();
+  first.close();
+  store.close();
+  store = new AssistantStore(directory);
+  let round = 0;
+  const model: Model = {
+    complete: async (messages) => ({
+      message:
+        ++round === 1
+          ? {
+              role: "assistant",
+              content: null,
+              tool_calls: [
+                {
+                  id: "brief",
+                  type: "function",
+                  function: { name: "brief_history", arguments: "{}" },
+                },
+              ],
+            }
+          : {
+              role: "assistant",
+              content: messages.filter((m) => m.role === "tool").at(-1)!.content,
+            },
+      usage: { inputTokens: 10, outputTokens: 10 },
+    }),
+  };
+  const runtime = new AssistantRuntime({
+    store,
+    model,
+    tools: assistantTools(store, {}),
+  });
+  const app = new PersonalAssistant({ store, runtime, sources: {} });
+  const token = "owner-secret-01234567890123456789";
+  const server = createAssistantServer({
+    store,
+    app,
+    ownerToken: token,
+    workerToken: "worker-secret-01234567890123456789",
+    cancel: (id) => runtime.cancel(id),
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("server missing");
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/tasks`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "解释今天晨报第2项的推荐理由、要点和与我的联系",
+        conversationId: "qa:phone",
+        role: "qa",
+      }),
+    });
+    expect(response.status).toBe(202);
+    const { id } = z.object({ id: z.string() }).parse(await response.json());
+    await app.drain();
+    const outcome = store.getTask(id)!;
+    expect(outcome.status).toBe("completed");
+    const history = JSON.parse(outcome.answer);
+    expect(history).toMatchObject({
+      brief: {
+        key: "brief:2026-10-18",
+        status: "sent",
+        body: expect.stringContaining("1. example/agent"),
+      },
+    });
+    expect(history.brief.body).toContain("2. example/second");
+    expect(history.brief.body).toContain("要点：按来源核查持久工具技能");
+    expect(history.brief.body).toContain("推荐理由：提供独立验证与失败案例");
+    expect(history.brief.body).toContain("与你的联系：可用于当前研究的反馈实验");
+    expect(history.brief.body).toContain("https://github.com/example/second");
+  } finally {
+    await new Promise<void>((done) => server.close(() => done()));
+    app.close();
+    store.close();
+  }
 });
 
 it("deduplicates an already delivered paper across Gmail and arXiv source IDs", async () => {

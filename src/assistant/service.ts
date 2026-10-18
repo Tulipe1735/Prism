@@ -81,6 +81,7 @@ export class PersonalAssistant {
   private readonly send?: SendMessage;
   private ticking = false;
   private readonly running = new Set<Promise<unknown>>();
+  private readonly deadlines = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(options: {
     store: AssistantStore;
@@ -118,6 +119,32 @@ export class PersonalAssistant {
     await Promise.allSettled([...this.running]);
   }
 
+  close(): void {
+    for (const timer of this.deadlines.values()) clearTimeout(timer);
+    this.deadlines.clear();
+  }
+
+  private trackDeadline(task: TaskRecord): void {
+    const previous = this.deadlines.get(task.id);
+    if (previous) clearTimeout(previous);
+    this.deadlines.delete(task.id);
+    if (task.effort !== "deep" || !task.deadlineAt || terminal.has(task.status)) return;
+    const expire = (): void => {
+      this.deadlines.delete(task.id);
+      const current = this.store.getTask(task.id);
+      if (!current || terminal.has(current.status)) return;
+      this.runtime.expire(task.id);
+      this.background(this.finish(task.id));
+    };
+    const remaining = Date.parse(task.deadlineAt) - this.now().getTime();
+    if (remaining <= 0) expire();
+    else {
+      const timer = setTimeout(expire, remaining);
+      timer.unref();
+      this.deadlines.set(task.id, timer);
+    }
+  }
+
   scheduleTick(): void {
     this.background(this.tick());
   }
@@ -140,6 +167,7 @@ export class PersonalAssistant {
           answer: task.answer || "服务中断，尚无完整成果。",
         });
       } else if (task.status === "queued") this.background(this.finish(task.id));
+      else this.trackDeadline(task);
     }
     for (const delivery of this.store.listDeliveries()) {
       if (delivery.status === "pending" && !delivery.body)
@@ -151,7 +179,9 @@ export class PersonalAssistant {
   }
 
   private async finish(id: string): Promise<TaskRecord> {
-    const task = await this.runtime.run(id);
+    let task = await this.runtime.run(id);
+    this.trackDeadline(task);
+    task = this.store.getTask(id)!;
     if (task.status === "queued" || task.status === "running") return task;
     if (this.send && task.source.startsWith("feishu:")) {
       const pending = task.messages
@@ -225,23 +255,26 @@ export class PersonalAssistant {
       }
       if (errors.length) throw new Error(errors.join("；"));
       const allDocuments = this.store.listDocuments();
-      const pushed = new Set(
-        this.store
+      const delivered = this.store
+        .listDeliveries()
+        .filter(
+          (delivery) =>
+            delivery.key.startsWith("brief:") &&
+            ["sent", "unknown"].includes(delivery.status),
+        );
+      const pushed = new Set([
+        ...this.store
           .listMemory()
-          .filter(
-            (m) =>
-              m.id.startsWith("pushed:") ||
-              (m.id.startsWith("brief-item:") &&
-                this.store.getDelivery(`brief:${m.id.split(":")[1]}`)?.status ===
-                  "unknown"),
-          )
+          .filter((m) => m.id.startsWith("pushed:"))
           .flatMap((m) => m.sourceDocumentIds ?? []),
-      );
-      const pushedCanonical = new Set(
-        allDocuments
+        ...delivered.flatMap((delivery) => delivery.sourceDocumentIds ?? []),
+      ]);
+      const pushedCanonical = new Set([
+        ...allDocuments
           .filter((d) => pushed.has(d.id))
           .map((d) => String(d.metadata?.canonicalId ?? d.id)),
-      );
+        ...delivered.flatMap((delivery) => delivery.canonicalIds ?? []),
+      ]);
       const documents = allDocuments.filter(
         (d) =>
           d.active !== false &&
@@ -282,7 +315,18 @@ export class PersonalAssistant {
         return this.store.getDelivery(key);
       }
       const body = `${date} · 研究晨报\n\n${selected.map((item, i) => `${i + 1}. ${item.doc.title}\n${item.doc.url}\n要点：${item.takeaway}\n推荐理由：${item.reason}\n与你的联系：${item.connection}`).join("\n\n")}\n\n可直接追问条目或发送 /deep 开展方法对比。推送不代表已读或掌握。`;
-      this.store.updateDelivery(key, { body, status: "pending" });
+      this.store.updateDelivery(key, {
+        body,
+        status: "pending",
+        sourceDocumentIds: selected.map((item) => item.doc.id),
+        canonicalIds: [
+          ...new Set(
+            selected.map((item) =>
+              String(item.doc.metadata?.canonicalId ?? item.doc.id),
+            ),
+          ),
+        ],
+      });
       // Persist discoveries independently of reading evidence. Recorded before send,
       // with an explicit pending label; actual delivery status lives in the outbox.
       for (const item of selected)
@@ -366,9 +410,7 @@ export class PersonalAssistant {
   }
 
   approve(id: string): LocalJob {
-    const job = this.store.approveLocal(id);
-    this.store.updateTask(job.taskId, { status: "waiting-device" });
-    return job;
+    return this.store.approveLocal(id);
   }
 
   completeLocal(
@@ -418,6 +460,44 @@ export class PersonalAssistant {
 
 export function assistantTools(store: AssistantStore, sources: Sources): AgentTool[] {
   return [
+    {
+      definition: {
+        name: "brief_history",
+        description:
+          "只读晨报交付记录，保留原始编号、要点、推荐理由、与你的联系和来源链接。追问第几项时先读取此记录。date 可指定北京时间 YYYY-MM-DD；省略则取最近一份已发送或发送结果未知的晨报。",
+        parameters: {
+          type: "object",
+          properties: { date: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" } },
+          additionalProperties: false,
+        },
+      },
+      execute: async (args, context) => {
+        context.signal.throwIfAborted();
+        const { date } = z
+          .object({
+            date: z
+              .string()
+              .regex(/^\d{4}-\d{2}-\d{2}$/)
+              .optional(),
+          })
+          .strict()
+          .parse(args);
+        const brief = store
+          .listDeliveries()
+          .filter(
+            (delivery) =>
+              delivery.key.startsWith("brief:") &&
+              (date
+                ? delivery.key === `brief:${date}`
+                : ["sent", "unknown"].includes(delivery.status)),
+          )
+          .at(-1);
+        return {
+          brief: brief ?? null,
+          note: "sent 表示已交付；unknown 表示发送结果未知，不能声称已交付；pending 仅表示已准备。原始晨报编号与正文保留不变，推送不代表已读或掌握。",
+        };
+      },
+    },
     {
       definition: {
         name: "research_search",
@@ -507,12 +587,24 @@ export function assistantTools(store: AssistantStore, sources: Sources): AgentTo
           summary,
           approved: !critical,
         });
+        if (["completed", "unknown", "failed"].includes(job.status))
+          return {
+            status: job.status,
+            jobId: job.id,
+            result: job.result,
+            command: job.command.prism,
+            instruction:
+              job.status === "unknown"
+                ? "动作结果未知，只能先查 receipt 和页面，不可重放业务动作。"
+                : "已返回原请求持久化的回执；不得自动重放动作，须观察页面核对业务结果。",
+          };
+        const needsConfirmation = job.command.approved !== true;
         return {
-          status: critical ? "awaiting-confirmation" : "waiting-device",
+          status: needsConfirmation ? "awaiting-confirmation" : "waiting-device",
           jobId: job.id,
-          summary,
-          command,
-          instruction: critical
+          summary: job.command.summary,
+          command: job.command.prism,
+          instruction: needsConfirmation
             ? `请用户核对完整内容后发送 /confirm ${job.id}，改动内容必须重新确认。`
             : "请在已登录浏览器的电脑启动 local-worker；未完成前不能声称课程查询成功。",
         };

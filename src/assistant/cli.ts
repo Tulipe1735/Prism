@@ -230,8 +230,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     app.recover();
     feishu.start(app, store, (id) => runtime.cancel(id));
     const tick = (): void => {
-      if (config.feishu.some((bot) => bot.role === "intelligence"))
-        app.scheduleTick();
+      if (config.feishu.some((bot) => bot.role === "intelligence")) app.scheduleTick();
     };
     const timer = setInterval(tick, 30_000);
     tick();
@@ -241,6 +240,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     await new Promise<void>((done) => {
       const stop = (): void => {
         clearInterval(timer);
+        app.close();
         feishu.close();
         server.close(() => done());
         for (const task of store.listTasks())
