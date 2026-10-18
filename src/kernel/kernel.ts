@@ -1,13 +1,15 @@
 import type { PrismConfig } from "./config.ts";
 
 import type { KernelEvent, KernelStatus } from "./events.ts";
+import type { ApprovalRequest, PermissionSettings } from "./permissions.ts";
 import type { SessionEntry, SessionSummary } from "./session.ts";
-import type { ApprovalRequest, Tool } from "./tool.ts";
+import type { Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
 import type { ExecutionTarget, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { VERSION } from "../shared/version.ts";
 import { runTask } from "./loop.ts";
+import { PermissionPolicy } from "./permissions.ts";
 import { SessionStore } from "./session-store.ts";
 import { createSkillTool, echoTool, ToolRegistry } from "./tools.ts";
 
@@ -32,6 +34,8 @@ export interface KernelOptions {
   /** Roots of the skill scan; tests point them at temporary directories. */
   skillRoots?: SkillToolRoots;
   scope?: PermissionScope;
+  /** Forces browser actions through approval, independent of the scope. */
+  browserActionsNeedApproval?: boolean;
   target?: ExecutionTarget;
 }
 
@@ -59,7 +63,8 @@ export class Kernel {
   readonly tools: ToolRegistry;
   readonly skillRoots: SkillToolRoots;
   readonly target: ExecutionTarget;
-  scope: PermissionScope;
+  /** Live permission settings: every task and tool call reads this object. */
+  readonly permissions: PermissionPolicy;
   status: KernelStatus = "ready";
 
   private readonly listeners = new Set<(event: KernelEvent) => void>();
@@ -81,7 +86,10 @@ export class Kernel {
       createSkillTool(this.skillRoots),
       ...(options.tools ?? []),
     ]);
-    this.scope = options.scope ?? "workspace-write";
+    this.permissions = new PermissionPolicy({
+      scope: options.scope ?? "workspace-write",
+      browserActionsNeedApproval: options.browserActionsNeedApproval ?? false,
+    });
     this.target = options.target ?? "wsl";
   }
 
@@ -109,7 +117,7 @@ export class Kernel {
       model: { baseUrl, model, hasApiKey: apiKey !== undefined && apiKey !== "" },
       browser: { engine: this.config.browser.engine },
       search: { provider: this.config.search.provider },
-      permissions: { scope: this.scope },
+      permissions: { scope: this.permissions.scope },
     };
   }
 
@@ -166,7 +174,7 @@ export class Kernel {
       kernel: this,
       sessionId,
       workspace: session.workspace,
-      scope: this.scope,
+      scope: this.permissions.scope,
       target: this.target,
       signal: controller.signal,
     })

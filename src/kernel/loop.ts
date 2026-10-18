@@ -2,7 +2,7 @@ import type { SkillSummary } from "../skills/loader.ts";
 
 import type { Kernel } from "./kernel.ts";
 import type { ChatMessage } from "./model.ts";
-import type { ToolResult } from "./tool.ts";
+import type { ToolContext, ToolResult } from "./tool.ts";
 import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { scanSkills } from "../skills/loader.ts";
@@ -185,16 +185,26 @@ async function executeTool(
   const tool = kernel.tools.get(call.name);
   if (tool === undefined)
     return { content: `Unknown tool "${call.name}".`, isError: true };
+  const args = parseArguments(call.arguments);
+  const context: ToolContext = {
+    sessionId,
+    workspace: run.workspace,
+    scope: kernel.permissions.scope,
+    permissions: kernel.permissions,
+    target: run.target,
+    signal: run.signal,
+    requestApproval: (request) =>
+      kernel.requestApproval(sessionId, { tool: tool.name, ...request }),
+  };
   try {
-    return await tool.execute(parseArguments(call.arguments), {
-      sessionId,
-      workspace: run.workspace,
-      scope: run.scope,
-      target: run.target,
-      signal: run.signal,
-      requestApproval: (request) =>
-        kernel.requestApproval(sessionId, { tool: tool.name, ...request }),
-    });
+    // The permission scope is enforced here, before the tool runs: a call
+    // whose action is out of scope needs approval first (ADR-0005).
+    const verdict = await kernel.permissions.authorizeAll(
+      tool.effects?.(args, context) ?? [],
+      { workspace: run.workspace, requestApproval: context.requestApproval },
+    );
+    if (!verdict.allowed) return { content: verdict.refusal, isError: true };
+    return await tool.execute(args, context);
   } catch (error) {
     return {
       content: `Tool "${call.name}" failed: ${error instanceof Error ? error.message : String(error)}`,
