@@ -1,12 +1,14 @@
 import type { SkillSummary } from "../skills/loader.ts";
 
 import type { Kernel } from "./kernel.ts";
+import type { InstructionFile } from "./instructions.ts";
 import type { ChatMessage } from "./model.ts";
 import type { ToolResult } from "./tool.ts";
 import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { scanSkills } from "../skills/loader.ts";
 import { estimateContextTokens } from "./compaction.ts";
+import { instructionNote, instructionPrompt } from "./instructions.ts";
 import { streamChat, toModelMessages } from "./model.ts";
 import { rebuildContext } from "./session.ts";
 
@@ -42,13 +44,24 @@ export async function runTask(run: TaskRun): Promise<void> {
     let compactionFailed = false;
 
     /** The request the loop sends next, rebuilt from the session log. */
-    const requestMessages = async (): Promise<ChatMessage[]> => [
-      {
-        role: "system",
-        content: buildSystemPrompt({ workspace, scope: run.scope, skills }),
-      },
-      ...toModelMessages(rebuildContext((await kernel.store.read(sessionId)).entries)),
-    ];
+    const requestMessages = async (): Promise<ChatMessage[]> => {
+      const files = await kernel.instructions.activeFor(workspace);
+      return [
+        {
+          role: "system",
+          content: buildSystemPrompt({
+            workspace,
+            scope: run.scope,
+            skills,
+            instructions: files,
+          }),
+        },
+        ...toModelMessages(rebuildContext((await kernel.store.read(sessionId)).entries)),
+        ...files
+          .filter((file) => file.scope === "nested")
+          .map((file) => ({ role: "system" as const, content: instructionNote(file) })),
+      ];
+    };
 
     for (let round = 0; round < MAX_MODEL_ROUNDS; round += 1) {
       if (signal.aborted) {
@@ -250,11 +263,12 @@ function truncate(content: string): string {
     : content.slice(0, TOOL_RESULT_LIMIT) + TRUNCATION_NOTICE;
 }
 
-/** Workspace, permission scope and available skills, stated once per task. */
+/** Workspace, permission scope, instructions and skills, stated once per task. */
 export function buildSystemPrompt(input: {
   workspace: string;
   scope: PermissionScope;
   skills: SkillSummary[];
+  instructions?: InstructionFile[];
 }): string {
   const lines = [
     "You are Prism, a coding agent working in the user's own repository.",
@@ -262,6 +276,8 @@ export function buildSystemPrompt(input: {
     `Permission scope: ${input.scope}. Actions outside the scope need one-time user approval; if approval is refused, change your approach or report honestly instead of asking again.`,
     "Use the tools to inspect and change the workspace; answer in the user's language and keep tool output out of your prose unless asked.",
   ];
+  const instructions = instructionPrompt(input.instructions ?? []);
+  if (instructions !== undefined) lines.push(instructions);
   if (input.skills.length > 0) {
     lines.push(
       'Skills available for this workspace; call the "skill" tool with a name to read its instructions before following them:',

@@ -312,6 +312,7 @@ export async function startTestKernel(
     ...(options.scope === undefined ? {} : { scope: options.scope }),
     ...(options.tools === undefined ? {} : { tools: options.tools }),
     skillRoots: { home, bundled },
+    instructionRoots: { home },
   });
   return {
     kernel,

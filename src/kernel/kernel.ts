@@ -2,6 +2,7 @@ import type { PrismConfig } from "./config.ts";
 
 import type { CompactionOutcome, CompactionReason } from "./compaction.ts";
 import type { KernelEvent, KernelStatus } from "./events.ts";
+import type { InstructionRoots } from "./instructions.ts";
 import type { SessionEntry, SessionSummary } from "./session.ts";
 import type { ApprovalRequest, Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
@@ -9,6 +10,7 @@ import type { ExecutionTarget, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { VERSION } from "../shared/version.ts";
 import { compactSession } from "./compaction.ts";
+import { InstructionFiles } from "./instructions.ts";
 import { runTask } from "./loop.ts";
 import { SessionStore } from "./session-store.ts";
 import { createSkillTool, echoTool, ToolRegistry } from "./tools.ts";
@@ -33,6 +35,8 @@ export interface KernelOptions {
   tools?: Tool[];
   /** Roots of the skill scan; tests point them at temporary directories. */
   skillRoots?: SkillToolRoots;
+  /** Roots of the `AGENTS.md` scan; tests point them at temporary directories. */
+  instructionRoots?: InstructionRoots;
   scope?: PermissionScope;
   target?: ExecutionTarget;
 }
@@ -60,6 +64,7 @@ export class Kernel {
   readonly store: SessionStore;
   readonly tools: ToolRegistry;
   readonly skillRoots: SkillToolRoots;
+  readonly instructions: InstructionFiles;
   readonly target: ExecutionTarget;
   scope: PermissionScope;
   status: KernelStatus = "ready";
@@ -78,6 +83,7 @@ export class Kernel {
     this.config = options.config;
     this.store = new SessionStore(options.config.dataDir);
     this.skillRoots = options.skillRoots ?? {};
+    this.instructions = new InstructionFiles(options.instructionRoots ?? {});
     this.tools = new ToolRegistry([
       echoTool,
       createSkillTool(this.skillRoots),
