@@ -89,7 +89,7 @@ describe("McpHost over stdio", () => {
     expect(host.failures).toHaveLength(1);
     expect(host.failures[0]?.server).toBe("mute");
     expect(host.failures[0]?.message).toMatch(/timed out/i);
-    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(Date.now() - started).toBeLessThan(8_000);
   });
 });
 

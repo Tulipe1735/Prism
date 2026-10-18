@@ -113,7 +113,7 @@ async function openServer(
   }
 
   try {
-    await client.connect(transport, { timeout: timeoutMs });
+    await connectWithTimeout(client, transport, timeoutMs);
   } catch (error) {
     await client.close().catch(() => {});
     const detail = stderr.trim();
@@ -124,6 +124,48 @@ async function openServer(
     );
   }
   return { client };
+}
+
+/**
+ * Initializes the server connection with a bounded wait.
+ *
+ * The SDK cannot be asked to time out the initialize request: its own failure
+ * path closes the transport fire-and-forget, which clears the child process
+ * handle before the kill path can use it. Racing the request here lets the
+ * caller close the transport while the process handle is still live, so a
+ * hanging server process is terminated instead of being left behind.
+ */
+async function connectWithTimeout(
+  client: Client,
+  transport: StdioClientTransport | StreamableHTTPClientTransport,
+  timeoutMs: number,
+): Promise<void> {
+  await withTimeout(
+    client.connect(transport),
+    timeoutMs,
+    () => new Error(`initialize timed out after ${timeoutMs} ms`),
+  );
+}
+
+/** Settles when `work` settles; rejects with `timeoutError()` once the limit passes. */
+async function withTimeout(
+  work: Promise<unknown>,
+  timeoutMs: number,
+  timeoutError: () => Error,
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(timeoutError()), timeoutMs);
+    work.then(
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 async function listTools(
