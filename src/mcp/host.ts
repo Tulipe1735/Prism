@@ -6,13 +6,14 @@
  * a failure; it never blocks or breaks the other servers or the kernel loop.
  */
 import type { Buffer } from "node:buffer";
+import type { Tool, ToolResult } from "../kernel/tool.ts";
+import type { JsonValue } from "../kernel/types.ts";
 import type { McpConfig, McpServerConfig } from "./config.ts";
-import type { McpTool, McpToolResult } from "./tools.ts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { VERSION } from "../shared/version.ts";
-import { toolResultIsError, toolResultText } from "./tools.ts";
+import { toolParameters, toolResultIsError, toolResultText } from "./tools.ts";
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
 /** How much server stderr is kept to explain a startup failure. */
@@ -35,12 +36,12 @@ interface OpenServer {
 
 export class McpHost {
   readonly #servers: OpenServer[];
-  readonly #tools: McpTool[];
+  readonly #tools: Tool[];
   readonly #failures: McpServerFailure[];
 
   private constructor(
     servers: OpenServer[],
-    tools: McpTool[],
+    tools: Tool[],
     failures: McpServerFailure[],
   ) {
     this.#servers = servers;
@@ -55,7 +56,7 @@ export class McpHost {
   ): Promise<McpHost> {
     const timeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
     const servers: OpenServer[] = [];
-    const tools: McpTool[] = [];
+    const tools: Tool[] = [];
     const failures: McpServerFailure[] = [];
 
     for (const [server, serverConfig] of Object.entries(config.servers)) {
@@ -72,7 +73,7 @@ export class McpHost {
   }
 
   /** All tools of all reachable servers, in the kernel tool shape. */
-  get tools(): McpTool[] {
+  get tools(): Tool[] {
     return this.#tools;
   }
 
@@ -172,7 +173,7 @@ async function listTools(
   server: string,
   client: Client,
   timeoutMs: number,
-): Promise<McpTool[]> {
+): Promise<Tool[]> {
   const listed = await client.listTools(undefined, { timeout: timeoutMs });
   return listed.tools.map((tool) => {
     const name = `mcp__${server}__${tool.name}`;
@@ -180,9 +181,8 @@ async function listTools(
       name,
       description:
         tool.description ?? `Tool "${tool.name}" from MCP server "${server}".`,
-      inputSchema: tool.inputSchema,
-      execute: (args: Record<string, unknown>) =>
-        callTool(client, name, tool.name, args),
+      parameters: toolParameters(tool.inputSchema),
+      execute: (args) => callTool(client, name, tool.name, args),
     };
   });
 }
@@ -191,14 +191,20 @@ async function callTool(
   client: Client,
   name: string,
   tool: string,
-  args: Record<string, unknown>,
-): Promise<McpToolResult> {
+  args: JsonValue,
+): Promise<ToolResult> {
+  if (typeof args !== "object" || args === null || Array.isArray(args))
+    return {
+      content: `MCP tool "${name}" expects an object of arguments.`,
+      isError: true,
+    };
   try {
     const result = await client.callTool({ name: tool, arguments: args });
-    return { text: toolResultText(result), isError: toolResultIsError(result) };
+    const content = toolResultText(result);
+    return toolResultIsError(result) ? { content, isError: true } : { content };
   } catch (error) {
     return {
-      text: `MCP tool "${name}" failed: ${describeError(error)}`,
+      content: `MCP tool "${name}" failed: ${describeError(error)}`,
       isError: true,
     };
   }

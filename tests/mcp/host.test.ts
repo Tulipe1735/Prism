@@ -1,8 +1,17 @@
+import type { Tool, ToolContext } from "../../src/kernel/tool.ts";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { McpHost } from "../../src/mcp/host.ts";
 
 const fixture = fileURLToPath(new URL("./fixtures/stdio-server.mjs", import.meta.url));
+
+const context: ToolContext = {
+  sessionId: "test-session",
+  workspace: "/tmp",
+  scope: "read-only",
+  target: "wsl",
+  signal: new AbortController().signal,
+};
 
 describe("McpHost over stdio", () => {
   let host: McpHost | undefined;
@@ -13,37 +22,38 @@ describe("McpHost over stdio", () => {
   });
 
   it("exposes a configured server's tools as kernel tools and executes them", async () => {
-    host = await McpHost.connect({
-      servers: {
-        demo: { transport: "stdio", command: process.execPath, args: [fixture] },
-      },
-    });
+    host = await connectDemo();
 
-    const echo = host.tools.find((tool) => tool.name === "mcp__demo__echo");
-    expect(echo).toBeDefined();
-    expect(echo?.description).toBe("Echoes the given text back.");
-    expect(echo?.inputSchema).toMatchObject({
+    const echo = findTool(host, "mcp__demo__echo");
+    expect(echo.description).toBe("Echoes the given text back.");
+    expect(echo.parameters).toEqual({
       type: "object",
       properties: { text: { type: "string" } },
       required: ["text"],
     });
 
-    const result = await echo?.execute({ text: "hello" });
-    expect(result).toEqual({ text: "echo: hello", isError: false });
+    await expect(echo.execute({ text: "hello" }, context)).resolves.toEqual({
+      content: "echo: hello",
+    });
   });
 
   it("returns tool failures as results instead of throwing", async () => {
     host = await connectDemo();
 
     const exploding = findTool(host, "mcp__demo__explode");
-    const failed = await exploding.execute({});
+    const failed = await exploding.execute({}, context);
     expect(failed.isError).toBe(true);
-    expect(failed.text).toContain("tool exploded");
+    expect(failed.content).toContain("tool exploded");
 
     const killing = findTool(host, "mcp__demo__kill");
-    const lost = await killing.execute({});
+    const lost = await killing.execute({}, context);
     expect(lost.isError).toBe(true);
-    expect(lost.text).toContain("mcp__demo__kill");
+    expect(lost.content).toContain("mcp__demo__kill");
+
+    const echo = findTool(host, "mcp__demo__echo");
+    const malformed = await echo.execute("not an object", context);
+    expect(malformed.isError).toBe(true);
+    expect(malformed.content).toContain("mcp__demo__echo");
   });
 
   it("keeps working servers when another server fails to start", async () => {
@@ -64,9 +74,8 @@ describe("McpHost over stdio", () => {
     expect(host.failures[0]?.message).toContain("fake server: refused to start");
 
     const echo = findTool(host, "mcp__good__echo");
-    await expect(echo.execute({ text: "still alive" })).resolves.toEqual({
-      text: "echo: still alive",
-      isError: false,
+    await expect(echo.execute({ text: "still alive" }, context)).resolves.toEqual({
+      content: "echo: still alive",
     });
   });
 
@@ -101,7 +110,7 @@ async function connectDemo(): Promise<McpHost> {
   });
 }
 
-function findTool(host: McpHost, name: string) {
+function findTool(host: McpHost, name: string): Tool {
   const tool = host.tools.find((candidate) => candidate.name === name);
   if (!tool) throw new Error(`Tool ${name} is missing from the host.`);
   return tool;

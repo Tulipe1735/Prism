@@ -1,3 +1,4 @@
+import type { ToolContext } from "../../src/kernel/tool.ts";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +10,14 @@ import { ConfigError } from "../../src/shared/errors.ts";
 
 const fixture = fileURLToPath(new URL("./fixtures/stdio-server.mjs", import.meta.url));
 const directories: string[] = [];
+
+const context: ToolContext = {
+  sessionId: "test-session",
+  workspace: "/tmp",
+  scope: "read-only",
+  target: "wsl",
+  signal: new AbortController().signal,
+};
 
 afterEach(async () => {
   await Promise.all(
@@ -91,9 +100,8 @@ it("connects the servers named in the configuration file", async () => {
   const host = await McpHost.connect(await loadMcpConfig(directory));
   try {
     const echo = host.tools.find((tool) => tool.name === "mcp__demo__echo");
-    await expect(echo?.execute({ text: "from file" })).resolves.toEqual({
-      text: "echo: from file",
-      isError: false,
+    await expect(echo?.execute({ text: "from file" }, context)).resolves.toEqual({
+      content: "echo: from file",
     });
   } finally {
     await host.close();

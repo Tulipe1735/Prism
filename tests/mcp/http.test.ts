@@ -1,4 +1,5 @@
 import type { AddressInfo } from "node:net";
+import type { ToolContext } from "../../src/kernel/tool.ts";
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import {
@@ -15,6 +16,14 @@ import { z } from "zod";
 import { McpHost } from "../../src/mcp/host.ts";
 
 const fixture = fileURLToPath(new URL("./fixtures/stdio-server.mjs", import.meta.url));
+
+const context: ToolContext = {
+  sessionId: "test-session",
+  workspace: "/tmp",
+  scope: "read-only",
+  target: "wsl",
+  signal: new AbortController().signal,
+};
 
 it("connects to an HTTP MCP server and calls its tools", async () => {
   const mcpServer = new McpServer({ name: "fake-http", version: "0.0.0" });
@@ -40,14 +49,13 @@ it("connects to an HTTP MCP server and calls its tools", async () => {
   try {
     const add = host.tools.find((tool) => tool.name === "mcp__remote__add");
     expect(add).toBeDefined();
-    expect(add?.inputSchema).toMatchObject({
+    expect(add?.parameters).toMatchObject({
       type: "object",
       properties: { a: { type: "number" }, b: { type: "number" } },
       required: ["a", "b"],
     });
-    await expect(add?.execute({ a: 2, b: 3 })).resolves.toEqual({
-      text: "5",
-      isError: false,
+    await expect(add?.execute({ a: 2, b: 3 }, context)).resolves.toEqual({
+      content: "5",
     });
     expect(host.failures).toEqual([]);
   } finally {

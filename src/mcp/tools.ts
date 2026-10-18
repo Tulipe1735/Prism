@@ -1,25 +1,11 @@
 /**
- * Kernel-facing shape of MCP tools.
+ * Adapters between MCP tool descriptions/results and the kernel tool shape.
  *
- * An MCP tool is presented to the model exactly like a built-in tool: a name, a
- * description, a JSON Schema for its arguments, and an executor. Executors never
- * throw: failures come back as an error result so the model can react to them.
+ * An MCP tool is presented to the model exactly like a built-in tool: a name,
+ * a description, a JSON Schema for its arguments, and an executor. Executors
+ * never throw: failures come back as an error result so the model can react.
  */
-
-export interface McpToolResult {
-  /** Model-visible text. */
-  text: string;
-  /** True when the call failed; `text` explains the failure. */
-  isError: boolean;
-}
-
-export interface McpTool {
-  /** Namespaced as `mcp__<server>__<tool>` so external tools never collide with built-ins. */
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-  execute: (args: Record<string, unknown>) => Promise<McpToolResult>;
-}
+import type { ToolParameters } from "../kernel/tool.ts";
 
 /** Renders MCP `callTool` content as model-visible text. */
 export function toolResultText(result: unknown): string {
@@ -40,8 +26,23 @@ export function toolResultIsError(result: unknown): boolean {
   return asRecord(result)?.isError === true;
 }
 
+/** Kernel parameters for an MCP tool, from the server's JSON Schema. */
+export function toolParameters(schema: unknown): ToolParameters {
+  const record = asRecord(schema);
+  const properties = asRecord(record?.properties) ?? {};
+  const parameters: ToolParameters = { type: "object", properties };
+  if (
+    Array.isArray(record?.required) &&
+    record.required.every((name) => typeof name === "string")
+  )
+    parameters.required = record.required as string[];
+  if (typeof record?.additionalProperties === "boolean")
+    parameters.additionalProperties = record.additionalProperties;
+  return parameters;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null
+  return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined;
 }
