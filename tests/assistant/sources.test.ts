@@ -1,6 +1,9 @@
 import type { Document } from "../../src/assistant/types.ts";
 import { Buffer } from "node:buffer";
 import dns from "node:dns/promises";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   ArxivSource,
@@ -9,6 +12,7 @@ import {
   NotionSource,
   readWebDocument,
 } from "../../src/assistant/connectors.ts";
+import { AssistantStore } from "../../src/assistant/store.ts";
 
 // Public document-store adapter: assertions observe the same methods as a caller.
 class DocumentLibrary {
@@ -54,6 +58,82 @@ const notionPage = (id = PAGE, title = "Research notes") => ({
 });
 
 describe("Gmail research subscriptions", () => {
+  it("uses persisted message IDs after restart to read only newly received subscription mail", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "prism-mail-incremental-"));
+    let store = new AssistantStore(directory);
+    let phase = 1;
+    const fetch = protocol((url) => {
+      if (url.hostname === "oauth2.googleapis.com")
+        return json({
+          access_token: "test-access",
+          token_type: "Bearer",
+          expires_in: 3600,
+        });
+      if (url.pathname.endsWith("/messages"))
+        return json({
+          messages:
+            phase === 1
+              ? [{ id: "old-mail" }]
+              : [{ id: "old-mail" }, { id: "new-mail" }],
+          resultSizeEstimate: phase === 1 ? 1 : 2,
+        });
+      const old = url.pathname.endsWith("/old-mail");
+      if (old && phase === 2)
+        throw new Error("Already processed mail was downloaded again after restart");
+      return json({
+        id: old ? "old-mail" : "new-mail",
+        threadId: "thread",
+        internalDate: "1792216800000",
+        payload: {
+          mimeType: "text/plain",
+          headers: [{ name: "Subject", value: "Research papers" }],
+          body: {
+            data: Buffer.from(
+              "arXiv:2605.09423v2\nTitle: SimWorld Studio\n\nVerified environments and reusable skills.",
+            ).toString("base64url"),
+          },
+        },
+      });
+    });
+    const options = {
+      clientId: "test-client",
+      clientSecret: "test-secret",
+      refreshToken: "test-refresh",
+      fetch,
+    };
+    try {
+      for (const document of await new GmailSource(options).collect())
+        store.upsertDocument(document);
+      store.close();
+      store = new AssistantStore(directory);
+      phase = 2;
+      const processed = new Set(
+        store
+          .listDocuments()
+          .filter(
+            (document) => document.source === "gmail" && document.metadata?.messageId,
+          )
+          .map((document) => String(document.metadata?.messageId)),
+      );
+      const documents = await new GmailSource(options).collect(undefined, processed);
+      expect(
+        documents.find((document) => document.id === "gmail:old-mail"),
+      ).toBeUndefined();
+      expect(
+        documents.find((document) => document.id === "gmail:new-mail"),
+      ).toBeDefined();
+      expect(
+        documents.find((document) => document.metadata?.kind === "paper"),
+      ).toMatchObject({
+        id: "gmail-paper:2605.09423",
+        metadata: { canonicalId: "arxiv:2605.09423", messageIds: ["new-mail"] },
+      });
+    } finally {
+      store.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("refreshes offline authorization, reads paginated MIME mail, and deduplicates arXiv candidates while retaining both mail origins", async () => {
     const announcement =
       "arXiv:2605.09423v2\nTitle: SimWorld Studio\nAuthors: Haoqiang Kang et al.\nCategories: cs.AI\n\nAn evolving coding agent generates embodied environments.\nhttps://arxiv.org/abs/2605.09423v2";
@@ -158,6 +238,117 @@ describe("Gmail research subscriptions", () => {
       documents.map((document) => document.id),
     );
   });
+
+  it("extracts a linked paper from an HTML-only subscription while leaving an attached PDF unread", async () => {
+    const source = new GmailSource({
+      clientId: "test-client",
+      clientSecret: "test-secret",
+      refreshToken: "test-refresh",
+      fetch: protocol((url) => {
+        if (url.hostname === "oauth2.googleapis.com")
+          return json({
+            access_token: "test-access",
+            token_type: "Bearer",
+            expires_in: 3600,
+          });
+        if (url.pathname.endsWith("/messages"))
+          return json({
+            messages: [{ id: "html-mail", threadId: "html-thread" }],
+            resultSizeEstimate: 1,
+          });
+        if (url.pathname.endsWith("/attachments/body-html"))
+          return json({
+            size: 100,
+            data: Buffer.from(
+              '<html><body><p><a href="https://arxiv.org/abs/2605.09423v2">Persistent skill memory</a></p><p>Evaluated across held-out tasks.</p></body></html>',
+            ).toString("base64url"),
+          });
+        if (url.pathname.endsWith("/messages/html-mail"))
+          return json({
+            id: "html-mail",
+            threadId: "html-thread",
+            internalDate: "1792216800000",
+            payload: {
+              mimeType: "multipart/mixed",
+              headers: [{ name: "Subject", value: "Research roundup" }],
+              parts: [
+                {
+                  mimeType: "text/html",
+                  filename: "",
+                  body: { attachmentId: "body-html", size: 100 },
+                },
+                {
+                  mimeType: "application/pdf",
+                  filename: "paper.pdf",
+                  body: { attachmentId: "pdf-unread", size: 4000 },
+                },
+              ],
+            },
+          });
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    });
+    const documents = await source.collect();
+    expect(
+      documents.find((item) => item.metadata?.canonicalId === "arxiv:2605.09423"),
+    ).toMatchObject({
+      title: "Persistent skill memory",
+      url: "https://arxiv.org/abs/2605.09423",
+    });
+    expect(
+      documents.find((item) => item.id === "gmail:html-mail")?.metadata,
+    ).toMatchObject({
+      attachments: [
+        { name: "paper.pdf", attachmentId: "pdf-unread", status: "unread" },
+      ],
+    });
+  });
+
+  it("keeps non-arXiv research subscriptions eligible as candidates and gives identical content a shared identity", async () => {
+    const source = new GmailSource({
+      clientId: "test-client",
+      clientSecret: "test-secret",
+      refreshToken: "test-refresh",
+      query: "label:research",
+      fetch: protocol((url) => {
+        if (url.hostname === "oauth2.googleapis.com")
+          return json({
+            access_token: "test-access",
+            token_type: "Bearer",
+            expires_in: 3600,
+          });
+        if (url.pathname.endsWith("/messages"))
+          return json({
+            messages: [{ id: "newsletter-a" }, { id: "newsletter-b" }],
+            resultSizeEstimate: 2,
+          });
+        return json({
+          id: url.pathname.split("/").pop(),
+          threadId: "thread",
+          internalDate: "1792216800000",
+          payload: {
+            mimeType: "text/plain",
+            headers: [{ name: "Subject", value: "Systems research roundup" }],
+            body: {
+              data: Buffer.from(
+                "A reproducible evaluation of persistent agent memory. https://research.example.com/method",
+              ).toString("base64url"),
+            },
+          },
+        });
+      }),
+    });
+    const documents = await source.collect();
+    expect(documents).toHaveLength(2);
+    expect(documents[0]?.metadata).toMatchObject({
+      kind: "subscription-mail",
+      envelopeOnly: false,
+      canonicalId: expect.stringMatching(/^subscription:/),
+    });
+    expect(documents[1]?.metadata?.canonicalId).toBe(
+      documents[0]?.metadata?.canonicalId,
+    );
+  });
 });
 
 describe("GitHub Trending", () => {
@@ -232,9 +423,77 @@ describe("arXiv metadata search", () => {
     });
     expect(documents[0]?.content).toContain("SimCoder evolves tools & skills");
   });
+
+  it("does not start GitHub or arXiv provider work after the research task was cancelled", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error("User cancelled research"));
+    const fetch = vi.fn(() => Promise.reject(new Error("Unexpected source request")));
+    await expect(
+      new GitHubTrending({ fetch }).collect(controller.signal),
+    ).rejects.toThrow("User cancelled research");
+    await expect(
+      new ArxivSource({ fetch }).search("cat:cs.AI", 2, controller.signal),
+    ).rejects.toThrow("User cancelled research");
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });
 
 describe("safe web document reading", () => {
+  it.each([
+    "http://127.0.0.1/private",
+    "http://2130706433/private",
+    "http://0177.0.0.1/private",
+    "http://10.0.0.1/",
+    "http://172.16.0.1/",
+    "http://192.168.0.1/",
+    "http://169.254.169.254/",
+    "http://100.100.100.200/",
+    "http://0.0.0.0/",
+    "http://[::1]/",
+    "http://[::ffff:127.0.0.1]/",
+    "https://[2002:7f00:1::]/",
+    "https://localhost/",
+    "https://device.internal/",
+    "file:///etc/passwd",
+    "https://user:password@example.com/",
+    "https://example.com:8443/",
+  ])(
+    "refuses non-public or authenticated destinations before any web request: %s",
+    async (url) => {
+      const fetch = vi.fn();
+      await expect(readWebDocument(url, { fetch })).rejects.toThrow(
+        /private|public|HTTP|port/,
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("checks every DNS address and redirect before fetching a private destination", async () => {
+    const resolve = vi.fn();
+    resolve.mockResolvedValue([
+      { address: "93.184.216.34", family: 4 },
+      { address: "10.1.1.1", family: 4 },
+    ]);
+    vi.spyOn(dns, "lookup").mockImplementation(resolve);
+    const fetch = vi.fn();
+    await expect(
+      readWebDocument("https://mixed.example.com/", { fetch }),
+    ).rejects.toThrow(/private/);
+    expect(fetch).not.toHaveBeenCalled();
+    resolve.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+    const redirected = protocol((url) => {
+      if (url.hostname !== "public.example.com")
+        throw new Error("Private destination was contacted");
+      return new Response(null, {
+        status: 302,
+        headers: { Location: "https://127.0.0.1/admin" },
+      });
+    });
+    await expect(
+      readWebDocument("https://public.example.com/", { fetch: redirected }),
+    ).rejects.toThrow(/private/);
+  });
+
   it("reads public HTML through checked redirects, retaining readable source and unread attachment links", async () => {
     const resolve = vi.fn();
     resolve.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
@@ -278,6 +537,91 @@ describe("safe web document reading", () => {
     );
     expect(document.content).not.toContain("hidden script");
   });
+
+  it("extracts text from a real PDF and preserves page locations instead of treating the download link as read content", async () => {
+    const resolve = vi.fn();
+    resolve.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+    vi.spyOn(dns, "lookup").mockImplementation(resolve);
+    // Minimal uncompressed PDF 1.4, with proper object offsets and a text stream.
+    const stream =
+      "BT /F1 12 Tf 20 100 Td (Verifier feedback improves retained skills.) Tj ET";
+    const objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 150] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    ];
+    let pdf = "%PDF-1.4\n";
+    const offsets = [0];
+    objects.forEach((item, index) => {
+      offsets.push(pdf.length);
+      pdf += `${index + 1} 0 obj\n${item}\nendobj\n`;
+    });
+    const start = pdf.length;
+    pdf += `xref\n0 6\n0000000000 65535 f \n${offsets
+      .slice(1)
+      .map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`)
+      .join("")}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF\n`;
+    const document = await readWebDocument("https://example.com/paper.pdf", {
+      fetch: protocol(
+        () => new Response(pdf, { headers: { "Content-Type": "application/pdf" } }),
+      ),
+    });
+    expect(document.content).toContain("## Page 1");
+    expect(document.content).toContain("Verifier feedback improves retained skills.");
+    expect(document.metadata).toMatchObject({
+      status: "complete",
+      contentType: "application/pdf",
+      pageCount: 1,
+      pages: [{ number: 1, locator: "page 1" }],
+    });
+    const directory = mkdtempSync(join(tmpdir(), "prism-web-pdf-"));
+    const store = new AssistantStore(directory);
+    try {
+      store.upsertDocument(document);
+      expect(store.search("Verifier feedback")[0]).toMatchObject({
+        documentId: document.id,
+        locator: expect.stringContaining("page 1"),
+      });
+    } finally {
+      store.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("stops bounded reading on cancellation and refuses oversized or unsupported responses", async () => {
+    const resolve = vi.fn();
+    resolve.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+    vi.spyOn(dns, "lookup").mockImplementation(resolve);
+    const controller = new AbortController();
+    const pending = readWebDocument("https://example.com/slow", {
+      signal: controller.signal,
+      fetch: () => new Promise<Response>(() => {}),
+    });
+    controller.abort(new Error("User cancelled research"));
+    await expect(pending).rejects.toThrow("User cancelled research");
+    await expect(
+      readWebDocument("https://example.com/large", {
+        fetch: protocol(
+          () =>
+            new Response("large body", {
+              headers: { "Content-Type": "text/plain", "Content-Length": "9000000" },
+            }),
+        ),
+      }),
+    ).rejects.toThrow(/byte limit/);
+    await expect(
+      readWebDocument("https://example.com/data.zip", {
+        fetch: protocol(
+          () =>
+            new Response("not readable text", {
+              headers: { "Content-Type": "application/zip" },
+            }),
+        ),
+      }),
+    ).rejects.toThrow(/Unsupported/);
+  });
 });
 const list = (results: unknown[], next_cursor: string | null = null) => ({
   object: "list",
@@ -304,6 +648,100 @@ function protocol(route: Route): typeof fetch {
 }
 
 describe("Notion source synchronization", () => {
+  it("distinguishes Markdown attachment references from attachment contents that have not been read", async () => {
+    const library = new DocumentLibrary();
+    const source = new NotionSource({
+      token: "test-token",
+      fetch: protocol((url) => {
+        if (url.pathname === "/v1/search") return json(list([notionPage()]));
+        if (url.pathname.endsWith("/markdown"))
+          return json(
+            markdown(
+              'Research text.\n[Appendix](https://example.com/appendix.pdf)\n<file src="https://example.com/data.csv">Experiment data</file>',
+            ),
+          );
+        if (url.pathname.endsWith("/children")) return json(list([]));
+        throw new Error(`Attachment contents must not be downloaded: ${url.pathname}`);
+      }),
+    });
+    expect((await source.sync(library)).complete).toBe(true);
+    expect(library.getDocument(`notion:${PAGE}`)?.metadata).toMatchObject({
+      attachments: [
+        { url: "https://example.com/appendix.pdf", status: "unread" },
+        { url: "https://example.com/data.csv", status: "unread" },
+      ],
+    });
+  });
+
+  it("updates the real searchable library across restart and withdraws derived evidence when source access is revoked", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "prism-source-sync-"));
+    let store = new AssistantStore(directory);
+    let phase = 1;
+    const source = new NotionSource({
+      token: "test-token",
+      fetch: protocol((url) => {
+        if (url.pathname === "/v1/search")
+          return json(
+            list(
+              phase === 1
+                ? [notionPage(), notionPage(ROW)]
+                : [{ ...notionPage(), last_edited_time: "2026-10-18T05:31:56.000Z" }],
+            ),
+          );
+        if (url.pathname === `/v1/pages/${ROW}`)
+          return json({ object: "error", status: 404, code: "object_not_found" }, 404);
+        if (url.pathname === `/v1/pages/${ROW}/markdown`)
+          return json(markdown("Curriculum generation method."));
+        if (url.pathname === `/v1/pages/${PAGE}/markdown`)
+          return json(
+            markdown(
+              phase === 1
+                ? "Reproducible planner feedback."
+                : "Updated planner feedback.",
+            ),
+          );
+        if (url.pathname.endsWith("/children")) return json(list([]));
+        throw new Error(`Unexpected request ${url.pathname}`);
+      }),
+    });
+    try {
+      expect(await source.sync(store)).toMatchObject({ imported: 2, complete: true });
+      expect(store.search("curriculum")[0]?.documentId).toBe(`notion:${ROW}`);
+      store.upsertMemory({
+        id: "research-evidence",
+        kind: "progress",
+        text: "Compare curriculum methods",
+        status: "confirmed",
+        sourceDocumentIds: [`notion:${ROW}`],
+        createdAt: EDITED,
+        updatedAt: EDITED,
+      });
+      store.close();
+      store = new AssistantStore(directory);
+      expect((await source.sync(store)).imported).toBe(0);
+      phase = 2;
+      expect(await source.sync(store)).toMatchObject({ imported: 1, removed: 1 });
+      expect(store.search("curriculum")).toEqual([]);
+      expect(store.getDocument(`notion:${ROW}`)).toBeUndefined();
+      expect(store.listMemory()[0]).toMatchObject({
+        status: "tentative",
+        sourceDocumentIds: [`notion:${ROW}`],
+      });
+      expect(readFileSync(store.documentPath(`notion:${PAGE}`), "utf8")).toContain(
+        "Updated planner feedback.",
+      );
+      store.close();
+      store = new AssistantStore(directory);
+      expect(store.search("Updated planner")[0]).toMatchObject({
+        documentId: `notion:${PAGE}`,
+        version: "2026-10-18T05:31:56.000Z",
+      });
+    } finally {
+      store.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("imports readable Markdown with original page and version, without duplicating repeated synchronization", async () => {
     const library = new DocumentLibrary();
     const source = new NotionSource({

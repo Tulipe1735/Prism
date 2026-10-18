@@ -54,6 +54,12 @@ function version(content: string): string {
 function htmlText(html: string): string {
   const $ = load(html);
   $("script, style, noscript, iframe, template, svg").remove();
+  $("a[href]").each((_, element) => {
+    const anchor = $(element);
+    const href = anchor.attr("href") || "";
+    if (/^https?:\/\//i.test(href) && anchor.text().trim() !== href)
+      anchor.append(` (${href})`);
+  });
   $("br").replaceWith("\n");
   $("p, div, h1, h2, h3, h4, li, section, article, tr, pre").each((_, element) => {
     $(element).append("\n");
@@ -312,7 +318,7 @@ export class NotionSource {
       }
       if (entry.object !== "page") return;
       const page = entry.properties ? entry : await request(`/pages/${id}`);
-      if (page.in_trash || page.is_archived || page.archived) {
+      if (page.in_trash || page.is_archived) {
         revoke(id);
         return;
       }
@@ -387,6 +393,10 @@ export class NotionSource {
         warn(
           `Markdown warning: ${text(object(warning).code)} ${text(object(warning).message)}`,
         );
+      if (content.length > 1_000_000) {
+        content = content.slice(0, 1_000_000);
+        warn("Markdown text limit reached; remaining content not covered");
+      }
       try {
         await scanBlocks(id);
       } catch (error) {
@@ -409,6 +419,44 @@ export class NotionSource {
               };
             })
           : [];
+      });
+      const attachmentUrls = new Set(attachments.map((file) => file.url));
+      const addAttachment = (name: string, href: string, embedded: boolean): void => {
+        try {
+          const url = new URL(href, text(page.url) || notionUrl(id));
+          if (
+            !["http:", "https:"].includes(url.protocol) ||
+            (!embedded &&
+              !/\.(?:pdf|docx?|pptx?|xlsx?|csv|zip|png|jpe?g|gif|webp|svg|mp[34]|wav|ogg|mov)$/i.test(
+                url.pathname,
+              )) ||
+            attachmentUrls.has(url.toString())
+          )
+            return;
+          attachmentUrls.add(url.toString());
+          attachments.push({ name, url: url.toString(), status: "unread" });
+        } catch {
+          /* Invalid references are not downloaded or represented as read content. */
+        }
+      };
+      for (const match of content.matchAll(
+        /(!?)\[([^\]\n]*)\]\(\s*(?:<([^>\n]+)>|([^\s)]+))(?:\s+"[^"]*")?\s*\)/g,
+      ))
+        addAttachment(
+          match[2] || "Attachment",
+          match[3] || match[4] || "",
+          match[1] === "!",
+        );
+      const markup = load(content);
+      markup(
+        "file[src], file[href], pdf[src], image[src], img[src], audio[src], video[src]",
+      ).each((_, element) => {
+        const file = markup(element);
+        addAttachment(
+          file.text().trim() || file.attr("alt") || "Attachment",
+          file.attr("src") || file.attr("href") || "",
+          true,
+        );
       });
       const document: Document = {
         id: `notion:${id}`,
@@ -479,7 +527,10 @@ export class GmailSource {
     this.fetch = options.fetch ?? globalThis.fetch;
   }
 
-  async collect(signal?: AbortSignal): Promise<Document[]> {
+  async collect(
+    signal?: AbortSignal,
+    processedMessageIds?: ReadonlySet<string>,
+  ): Promise<Document[]> {
     const operation = withTimeout(signal, 90_000);
     const token = await requestJson(
       this.fetch,
@@ -509,6 +560,7 @@ export class GmailSource {
     const documents = new Map<string, Document>();
     const papers = new Map<string, Document>();
     const messageIds = new Set<string>();
+    let totalTextBytes = 0;
     let cursor = "";
     const cursors = new Set<string>();
     do {
@@ -520,7 +572,7 @@ export class GmailSource {
       const listing = await request(`messages?${params}`);
       for (const entry of array(listing.messages)) {
         const id = text(object(entry).id);
-        if (!id || messageIds.has(id)) continue;
+        if (!id || messageIds.has(id) || processedMessageIds?.has(id)) continue;
         messageIds.add(id);
         if (messageIds.size > 1_000)
           throw new SourceError(
@@ -575,6 +627,11 @@ export class GmailSource {
           : html.map(htmlText).join("\n\n");
         if (content.length > 1_000_000)
           throw new SourceError(`Gmail message ${id}: body text exceeds the limit`);
+        totalTextBytes += Buffer.byteLength(content, "utf8");
+        if (totalTextBytes > 8 * 1024 * 1024)
+          throw new SourceError(
+            "Gmail collection exceeds the total text limit; narrow the subscription query",
+          );
         const time = Number(message.internalDate);
         const updatedAt =
           Number.isFinite(time) && time > 0
@@ -615,13 +672,26 @@ export class GmailSource {
             /^Title:\s*(.+(?:\n[ \t].+)*)/im
               .exec(excerpt)?.[1]
               ?.replace(/\s+/g, " ")
-              .trim() || `${title} — arXiv:${arxivId}`;
+              .trim() ||
+            (!matches.length
+              ? content
+                  .slice(0, match.index)
+                  .split("\n")
+                  .pop()
+                  ?.replace(/\s*\($/, "")
+                  .trim()
+              : "") ||
+            `${title} — arXiv:${arxivId}`;
           const existing = papers.get(canonicalId);
           if (existing) {
             const metadata = existing.metadata ?? {};
             metadata.messageIds = [...array(metadata.messageIds), id];
             metadata.provenance = [...array(metadata.provenance), origins];
           } else {
+            if (papers.size >= 2_000)
+              throw new SourceError(
+                "Gmail collection exceeds 2000 research candidates; narrow the subscription query",
+              );
             papers.set(canonicalId, {
               id: `gmail-paper:${arxivId}`,
               source: "gmail",
@@ -655,6 +725,11 @@ export class GmailSource {
             status: content ? "complete" : "partial",
             kind: "subscription-mail",
             envelopeOnly: candidates.length > 0,
+            ...(candidates.length
+              ? {}
+              : {
+                  canonicalId: `subscription:${version(content || text(message.snippet))}`,
+                }),
             messageId: id,
             threadId: text(message.threadId),
             from,
@@ -686,12 +761,16 @@ export class GitHubTrending {
 
   async collect(signal?: AbortSignal): Promise<Document[]> {
     const operation = withTimeout(signal);
+    operation.throwIfAborted();
     const listUrl = "https://github.com/trending?since=daily";
-    const response = await this.fetch(listUrl, {
-      signal: operation,
-      redirect: "error",
-      headers: { Accept: "text/html", "User-Agent": "Prism-Personal-Assistant/0.1" },
-    });
+    const response = await abortable(
+      this.fetch(listUrl, {
+        signal: operation,
+        redirect: "error",
+        headers: { Accept: "text/html", "User-Agent": "Prism-Personal-Assistant/0.1" },
+      }),
+      operation,
+    );
     if (!response.ok) {
       await response.body?.cancel();
       throw new SourceError(
@@ -763,6 +842,7 @@ export class ArxivSource {
     if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > 50)
       throw new SourceError("arXiv search allows 1–50 results per request");
     const operation = withTimeout(signal);
+    operation.throwIfAborted();
     const params = new URLSearchParams({
       search_query: query,
       start: "0",
@@ -770,14 +850,17 @@ export class ArxivSource {
       sortBy: "submittedDate",
       sortOrder: "descending",
     });
-    const response = await this.fetch(`https://export.arxiv.org/api/query?${params}`, {
-      signal: operation,
-      redirect: "error",
-      headers: {
-        Accept: "application/atom+xml",
-        "User-Agent": "Prism-Personal-Assistant/0.1",
-      },
-    });
+    const response = await abortable(
+      this.fetch(`https://export.arxiv.org/api/query?${params}`, {
+        signal: operation,
+        redirect: "error",
+        headers: {
+          Accept: "application/atom+xml",
+          "User-Agent": "Prism-Personal-Assistant/0.1",
+        },
+      }),
+      operation,
+    );
     if (!response.ok) {
       await response.body?.cancel();
       throw new SourceError(`arXiv: HTTP ${response.status}`, response.status);
@@ -927,9 +1010,10 @@ function pinnedRequest(
       url,
       {
         signal,
-        family: address.family,
-        lookup: (_hostname, _options, callback) =>
-          callback(null, address.address, address.family),
+        lookup: (_hostname, lookupOptions, callback) => {
+          if (lookupOptions.all) callback(null, addresses);
+          else callback(null, address.address, address.family);
+        },
         headers: {
           Accept: "text/html,application/pdf,text/plain,text/markdown",
           "Accept-Encoding": "identity",
@@ -938,6 +1022,11 @@ function pinnedRequest(
       },
       (response) => {
         const status = response.statusCode ?? 502;
+        if (status < 200 || status > 599) {
+          response.destroy();
+          reject(new SourceError("Web source returned an invalid HTTP status"));
+          return;
+        }
         const headers = new Headers();
         for (const [name, value] of Object.entries(response.headers))
           if (value !== undefined)
@@ -961,9 +1050,18 @@ function pinnedRequest(
             reject(new SourceError("Web document exceeds the byte limit"));
           } else chunks.push(chunk);
         });
-        response.on("end", () =>
-          resolve(new Response(Buffer.concat(chunks), { status, headers })),
-        );
+        response.on("end", () => {
+          try {
+            resolve(
+              new Response(
+                status === 204 || status === 205 ? null : Buffer.concat(chunks),
+                { status, headers },
+              ),
+            );
+          } catch {
+            reject(new SourceError("Web source returned an invalid response"));
+          }
+        });
         response.on("error", reject);
         response.on("aborted", () =>
           reject(new SourceError("Web response was interrupted")),
@@ -1026,9 +1124,76 @@ export async function readWebDocument(
     );
   }
   const bytes = await readBytes(response, signal);
+  const encoding = response.headers.get("content-encoding");
+  if (encoding && encoding.toLowerCase() !== "identity" && !options.fetch)
+    throw new SourceError(`Unsupported web content encoding: ${encoding}`);
   const contentType =
     (response.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase() ||
     "application/octet-stream";
+  if (
+    contentType === "application/pdf" ||
+    Buffer.from(bytes.subarray(0, 5)).toString("ascii") === "%PDF-"
+  ) {
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({
+      data: bytes,
+      isEvalSupported: false,
+      useSystemFonts: false,
+      verbosity: 0,
+    });
+    const abort = (): void => {
+      void parser.destroy().catch(() => {});
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    try {
+      const parsed = await abortable(
+        parser.getText({ first: 80, pageJoiner: "" }),
+        signal,
+      );
+      const pages = parsed.pages.map((page) => ({
+        number: page.num,
+        locator: `page ${page.num}`,
+      }));
+      const fullText = parsed.pages
+        .map((page) => `## Page ${page.num}\n\n${page.text.trim()}`)
+        .join("\n\n");
+      const readable = parsed.pages.some((page) => page.text.trim().length > 0);
+      const content = readable ? fullText.slice(0, 1_000_000) : "";
+      const truncated =
+        parsed.total > parsed.pages.length || fullText.length > 1_000_000;
+      return {
+        id: `web:${version(url.toString())}`,
+        source: "web",
+        title: url.pathname.split("/").pop() || url.hostname,
+        url: url.toString(),
+        content,
+        version:
+          response.headers.get("etag") ||
+          version(Buffer.from(bytes).toString("base64")),
+        updatedAt: new Date().toISOString(),
+        active: readable,
+        metadata: {
+          status: readable ? (truncated ? "partial" : "complete") : "unreadable",
+          originalUrl,
+          contentType: "application/pdf",
+          format: "pdf",
+          pageCount: parsed.total,
+          pages,
+          truncated,
+          coverage: "extracted-text",
+          attachments: [],
+          warnings: readable
+            ? truncated
+              ? ["PDF reading capped at 80 pages or 1000000 text characters"]
+              : []
+            : ["PDF has no extractable text; scanned content has not been read"],
+        },
+      };
+    } finally {
+      signal.removeEventListener("abort", abort);
+      await parser.destroy();
+    }
+  }
   if (
     !["text/html", "application/xhtml+xml", "text/plain", "text/markdown"].includes(
       contentType,
