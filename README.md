@@ -54,6 +54,8 @@ node --env-file=.env dist/agent.js serve
 
 ## 开发状态
 
+[验收记录](docs/assistant-verification.md)列出离线覆盖范围与待接入项目。
+
 当前为开发预览。受控集成测试覆盖任务、引用、共享状态、同步、预算和交付。真实账号收发、云端常驻、个人 Notion/Gmail 导入与翱翔门户查询仍须配置凭据后实测，尚未上线。
 
 已有浏览器 CLI 通过 `prism` 使用，参见[浏览器指南](docs/browser-cli.md)与

@@ -62,6 +62,9 @@ Code: [agent](src/assistant) · [browser CLI](src/interfaces/cli.ts) ·
 
 ## Developer preview
 
+See the [verification record](docs/assistant-verification.md) for tested and pending
+scope.
+
 Controlled integration tests cover task results, citations, state, sync, budgets and
 delivery. Live messaging, cloud operation, personal Notion/Gmail imports and NWPU
 queries require credentials and live acceptance. This version has not been deployed.
