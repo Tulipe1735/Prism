@@ -1,4 +1,4 @@
-# Prism
+# Prism Browser CLI
 
 [简体中文](browser-cli.md) | English
 

@@ -6,6 +6,7 @@ import { afterEach, expect, it } from "vitest";
 import { z } from "zod";
 import { createAssistantServer } from "../../src/assistant/http.ts";
 import { AssistantRuntime } from "../../src/assistant/runtime.ts";
+import { courseMaterials } from "../../src/assistant/courses.ts";
 import { assistantTools, PersonalAssistant } from "../../src/assistant/service.ts";
 import { AssistantStore } from "../../src/assistant/store.ts";
 
@@ -235,6 +236,92 @@ it("recovers interrupted work conservatively and prevents a cancelled local job 
   store.updateTask(local.id, { status: "waiting-device" });
   runtime.cancel(local.id);
   expect(store.claimLocal("pc")).toBeUndefined();
+  store.close();
+});
+
+it("uses current course evidence and versioned community material to produce a sourced revision plan", async () => {
+  const store = await workspace();
+  store.upsertDocument({
+    id: "course:current",
+    source: "course",
+    title: "本人确认的本学期课程",
+    url: "file:///course-record.md",
+    content: "操作系统：本学期在修；考试日期2026-10-25。尚无逐项掌握证据。",
+    version: "2026-autumn",
+    updatedAt: new Date().toISOString(),
+  });
+  const fetcher: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/repos/LecterChu/nwpu-cram"))
+      return Response.json({ default_branch: "main" });
+    if (url.includes("/git/trees/"))
+      return Response.json({
+        sha: "snapshot-2024",
+        truncated: false,
+        tree: [
+          {
+            path: "操作系统/2024/README.md",
+            type: "blob",
+            sha: "material-2024",
+            size: 100,
+          },
+        ],
+      });
+    if (url.startsWith("https://raw.githubusercontent.com/"))
+      return new Response(
+        "# 2024 操作系统复习资料\n覆盖进程调度与内存管理；不包含本学期考试大纲。",
+        { headers: { "Content-Type": "text/plain" } },
+      );
+    throw new Error(`Unexpected course source ${url}`);
+  };
+  let round = 0;
+  const model: Model = {
+    complete: async () => {
+      round++;
+      const call = (name: string, args: Record<string, unknown>) => ({
+        role: "assistant" as const,
+        content: null,
+        tool_calls: [
+          {
+            id: `course-${round}`,
+            type: "function" as const,
+            function: { name, arguments: JSON.stringify(args) },
+          },
+        ],
+      });
+      return {
+        message:
+          round === 1
+            ? call("document_read", { id: "course:current" })
+            : round === 2
+              ? call("course_materials", {
+                  course: "操作系统",
+                  path: "操作系统/2024/README.md",
+                })
+              : {
+                  role: "assistant",
+                  content:
+                    "依据本人课程记录，操作系统在修，2026-10-25考试。社区材料为2024年，覆盖调度与内存管理，不能代表本学期大纲。先用两道调度题检查理解，再按错题安排复习；目前没有掌握证据。来源：file:///course-record.md 与 https://github.com/LecterChu/nwpu-cram/blob/snapshot-2024/操作系统/2024/README.md",
+                },
+        usage: { inputTokens: 50, outputTokens: 50 },
+      };
+    },
+  };
+  const runtime = new AssistantRuntime({
+    store,
+    model,
+    tools: [courseMaterials(store, fetcher)],
+  });
+  const result = await runtime.ask({
+    message: "根据我的课程记录和相关材料准备操作系统考前复习",
+  });
+  expect(result.status).toBe("completed");
+  expect(result.citations.map((citation) => citation.documentId)).toEqual(
+    expect.arrayContaining(["course:current", "course:material-2024"]),
+  );
+  expect(result.answer).toContain("2024年");
+  expect(result.answer).toContain("没有掌握证据");
+  expect(result.artifacts?.some((path) => path.endsWith("report.md"))).toBe(true);
   store.close();
 });
 
