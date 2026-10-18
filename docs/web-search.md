@@ -27,19 +27,19 @@ DeepSeek 有公开可用的 Search API，2026-10-18 依据官方文档核实：
 
 配置类型为 [`WebSearchConfig`](../src/web/search.ts)：
 
-| 键          | 默认                       | 说明                                                        |
-| ----------- | -------------------------- | ----------------------------------------------------------- |
-| `name`      | `deepseek`                 | 搜索来源                                                    |
-| `apiKey`    | 必填                       | 与模型共用 DeepSeek key；缺失时 `createSearchProvider` 报错 |
-| `baseUrl`   | `https://api.deepseek.com` | 可指向网关、代理或自建兼容端点                              |
-| `count`     | `10`                       | 默认结果数，1–50                                            |
-| `timeoutMs` | `25000`                    | 单次请求超时（HTTP 层对 429/503/529 重试）                  |
-| `fetchImpl` | 全局 `fetch`               | 注入点，测试与离线验证用                                    |
+| 键          | 默认                       | 说明                                                                                                        |
+| ----------- | -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `provider`  | `deepseek`                 | 搜索来源，与内核配置 `search.provider` 一致                                                                 |
+| `apiKey`    | 必填                       | 与模型共用 DeepSeek key（内核配置的 `search.apiKey` 或 `model.apiKey`）；缺失时 `createSearchProvider` 报错 |
+| `baseUrl`   | `https://api.deepseek.com` | 可指向网关、代理或自建兼容端点                                                                              |
+| `count`     | `10`                       | 默认结果数，1–50                                                                                            |
+| `timeoutMs` | `25000`                    | 单次请求超时（HTTP 层对 429/503/529 重试）                                                                  |
+| `fetchImpl` | 全局 `fetch`               | 注入点，测试与离线验证用                                                                                    |
 
 调用方式：
 
 ```ts
-const provider = createSearchProvider({ name: "deepseek", apiKey });
+const provider = createSearchProvider({ provider: "deepseek", apiKey });
 const results = await provider.search({ query: "playwright firefox", count: 5 });
 // results: Array<{ title, url, snippet, summary, siteName, date }>
 ```

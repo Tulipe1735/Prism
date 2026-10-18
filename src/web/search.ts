@@ -26,9 +26,9 @@ export interface SearchProvider {
 }
 
 export interface WebSearchConfig {
-  /** Search source; defaults to `deepseek`. */
-  name?: string;
-  apiKey: string;
+  /** Search source; defaults to `deepseek`. Matches `search.provider` in the kernel config. */
+  provider?: string;
+  apiKey?: string;
   /** Overrides the source endpoint; defaults to `https://api.deepseek.com`. */
   baseUrl?: string;
   count?: number;
@@ -52,22 +52,25 @@ const DEFAULT_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_COUNT = 10;
 
 export function createSearchProvider(config: WebSearchConfig): SearchProvider {
-  const name = config.name ?? DEFAULT_SOURCE;
-  if (name !== DEFAULT_SOURCE)
+  const provider = config.provider ?? DEFAULT_SOURCE;
+  if (provider !== DEFAULT_SOURCE)
     throw new ConfigError(
-      `Unknown search source "${name}". Supported sources: ${DEFAULT_SOURCE}.`,
+      `Unknown search source "${provider}". Supported sources: ${DEFAULT_SOURCE}.`,
     );
   if (!config.apiKey)
     throw new ConfigError(
-      `Search source "${name}" needs an API key; set it in the Prism configuration.`,
+      `Search source "${provider}" needs an API key; set it in the Prism configuration.`,
     );
-  return deepseekProvider(config);
+  return deepseekProvider({ ...config, apiKey: config.apiKey });
 }
 
-function deepseekProvider(config: WebSearchConfig): SearchProvider {
+function deepseekProvider(
+  config: WebSearchConfig & { apiKey: string },
+): SearchProvider {
   const endpoint = `${(config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "")}/v1/tools/search`;
   const configuredCount = config.count ?? DEFAULT_COUNT;
   const fetchImpl = config.fetchImpl ?? fetch;
+  const { apiKey } = config;
 
   return {
     name: DEFAULT_SOURCE,
@@ -77,7 +80,7 @@ function deepseekProvider(config: WebSearchConfig): SearchProvider {
         throw new ConfigError("Search count must be an integer between 1 and 50.");
       const payload = await postJson({
         url: endpoint,
-        apiKey: config.apiKey,
+        apiKey,
         label: "DeepSeek search",
         fetchImpl,
         timeoutMs: config.timeoutMs,

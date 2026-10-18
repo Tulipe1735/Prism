@@ -30,7 +30,7 @@ describe("createSearchProvider", () => {
   it("parses DeepSeek search results into titles, links, and summaries", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(deepseekResults));
     const provider = createSearchProvider({
-      name: "deepseek",
+      provider: "deepseek",
       apiKey: "test-key",
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
@@ -52,7 +52,7 @@ describe("createSearchProvider", () => {
   it("sends the query to the DeepSeek search endpoint with the API key", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ results: [] }));
     const provider = createSearchProvider({
-      name: "deepseek",
+      provider: "deepseek",
       apiKey: "test-key",
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
@@ -74,7 +74,7 @@ describe("createSearchProvider", () => {
   it("honors a configured base URL and default result count", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ results: [] }));
     const provider = createSearchProvider({
-      name: "deepseek",
+      provider: "deepseek",
       apiKey: "test-key",
       baseUrl: "https://gateway.example.com/deepseek/",
       fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -89,14 +89,14 @@ describe("createSearchProvider", () => {
 
   it("rejects an unknown source with the supported names", () => {
     expect(() =>
-      createSearchProvider({ name: "altavista", apiKey: "test-key" }),
+      createSearchProvider({ provider: "altavista", apiKey: "test-key" }),
     ).toThrow(/deepseek/);
   });
 
   it("surfaces provider failures without inventing results", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ error: {} }, 401));
     const provider = createSearchProvider({
-      name: "deepseek",
+      provider: "deepseek",
       apiKey: "bad-key",
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });

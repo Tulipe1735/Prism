@@ -51,7 +51,9 @@ pnpm test
 pnpm build
 ```
 
-已有浏览器 CLI 的 agent skill 见 [skills/prism](skills/prism/SKILL.md)。
+已有浏览器 CLI 的 agent skill 见
+[skills/prism](skills/prism/SKILL.md)；内核的 skills 目录约定与优先级见
+[docs/skills.md](docs/skills.md)。
 
 MIT License。README 的组织方式参考
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。
