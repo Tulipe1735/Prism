@@ -18,7 +18,7 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "tsup --config tsup.config.ts --format esm --clean --sourcemap --no-splitting && node -e \"require('node:fs').copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
+    "build": "tsup --config tsup.config.ts --format esm --clean --sourcemap --no-splitting && node -e \"const fs=require('node:fs');for(const file of ['index.html','app.css'])fs.copyFileSync('src/workbench/ui/'+file,'dist/workbench-ui/'+file);fs.copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
     "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/interfaces/cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -26,7 +26,9 @@
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
     "start": "node dist/cli.js",
     "test": "vitest run --exclude '.scratch/**'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p src/workbench/ui/tsconfig.json --noEmit",
+    "workbench": "node dist/workbench-ui/server.js",
+    "workbench:electron": "electron dist/workbench/electron/main.js"
   },
   "engines": {
     "node": ">=22.19.0"
@@ -44,6 +46,7 @@
     "@types/chrome-remote-interface": "0.34.0",
     "@types/html-to-text": "^9.0.4",
     "@types/node": "22.20.1",
+    "electron": "^44.9.0",
     "eslint": "9.39.5",
     "prettier": "3.9.6",
     "tsup": "8.5.1",

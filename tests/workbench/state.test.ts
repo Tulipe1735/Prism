@@ -223,6 +223,11 @@ it("filters the sidebar list by the search query", () => {
   expect(selectVisibleSessions(state).map((group) => group.sessions[0]?.id)).toEqual(["a"]);
 });
 
+it("switches the inspector between artifacts and settings", () => {
+  expect(emptyState().view).toBe("artifacts");
+  expect(reduce(emptyState(), { type: "view", view: "settings" }).view).toBe("settings");
+});
+
 it("remembers recently used workspaces without duplicates", () => {
   let state = reduce(emptyState(), { type: "workspace", workspace: "/home/demo/app" });
   state = reduce(state, { type: "workspace", workspace: "/home/demo/other" });

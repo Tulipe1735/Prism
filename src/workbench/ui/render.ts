@@ -149,6 +149,8 @@ function renderStep(step: ReturnType<typeof toTimeline>[number]): string {
   return renderTool(step);
 }
 
+export { renderStep as renderTimelineStep };
+
 function renderTool(step: ToolStep): string {
   const diff = step.result === undefined ? null : parseUnifiedDiff(step.result);
   const output =
@@ -235,7 +237,7 @@ export function renderSettings(state: UiState): string {
 }
 
 export function renderNotice(state: UiState): string {
-  return state.notice === null ? "" : `<div id="notice">${escapeHtml(state.notice)}</div>`;
+  return state.notice === null ? "" : `<span class="notice">${escapeHtml(state.notice)}</span>`;
 }
 
 /** Short handle for session and request ids in compact places. */

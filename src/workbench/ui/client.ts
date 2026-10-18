@@ -45,7 +45,8 @@ export class KernelClient {
 
   constructor(options: KernelClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? "kernel").replace(/\/$/, "");
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // Wrapped: browsers refuse `fetch` when it is called on another receiver.
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
   }
 
   status(): Promise<KernelStatusReport> {
@@ -137,8 +138,9 @@ export class KernelClient {
             throw new Error(`Event stream refused with HTTP ${response.status}`);
           handlers.onState?.("open");
           for await (const event of parseSse(response.body)) handlers.onEvent(event);
-        } catch {
-          // Dropped or refused: fall through and try again below.
+        } catch (error) {
+          // Dropped or refused: report why and try again below.
+          console.warn("Kernel event stream interrupted:", error);
         }
         if (stopped) break;
         handlers.onState?.("closed");
@@ -178,15 +180,20 @@ export class KernelClient {
 /**
  * Turns the kernel's SSE body into events. Frames are separated by a blank
  * line, `:` lines are comments (the keep-alive) and `data:` lines of one frame
- * are joined before parsing.
+ * are joined before parsing. The body is read chunk by chunk: browsers do not
+ * make streams async-iterable.
  */
 export async function* parseSse(
   body: ReadableStream<Uint8Array>,
 ): AsyncGenerator<KernelEvent> {
+  const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  for await (const chunk of body as unknown as AsyncIterable<Uint8Array>) {
-    buffer += decoder.decode(chunk, { stream: true });
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (value === undefined) continue;
+    buffer += decoder.decode(value, { stream: true });
     let boundary = buffer.indexOf("\n\n");
     while (boundary !== -1) {
       const frame = buffer.slice(0, boundary);

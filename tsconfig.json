@@ -17,5 +17,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src", "tests", "vitest.config.ts"]
+  "include": ["src", "tests", "vitest.config.ts", "tsup.config.ts"],
+  "exclude": ["src/workbench/ui"]
 }

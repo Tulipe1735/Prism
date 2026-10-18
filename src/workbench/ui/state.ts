@@ -3,7 +3,7 @@ import type { KernelSettings } from "../../kernel/kernel.ts";
 import type { SessionEntry, SessionSummary } from "../../kernel/session.ts";
 import { groupSessions, isTaskRunning, searchSessions, type SessionGroup } from "./derive.ts";
 
-export type UiView = "chat" | "artifacts" | "settings";
+export type UiView = "artifacts" | "settings";
 
 /** An approval the user still has to answer. */
 export interface PendingApproval {
@@ -72,7 +72,7 @@ export function emptyState(workspace = ""): UiState {
     approvals: [],
     taskRunning: false,
     search: "",
-    view: "chat",
+    view: "artifacts",
     settings: null,
     notice: null,
     edit: null,
