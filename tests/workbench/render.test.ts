@@ -157,6 +157,23 @@ it("renders the chat timeline with tool cards, diffs and streaming text", () => 
   expect(renderChatHeader(state)).toContain("/home/demo/app");
 });
 
+it("offers manual compaction on the open session, disabled while a task runs", () => {
+  const idle = openSession();
+  expect(renderChatHeader(idle)).toContain('data-action="compact"');
+  expect(renderChatHeader(idle)).not.toContain("disabled");
+
+  const running = reduce(idle, {
+    type: "event",
+    event: {
+      type: "message.delta",
+      sessionId: "6f1c9a3e-0000",
+      entryId: "entry-5",
+      delta: "working",
+    },
+  });
+  expect(renderChatHeader(running)).toContain('data-action="compact" disabled');
+});
+
 it("renders an approval card with the four facts and two buttons", () => {
   const state = reduce(emptyState(), {
     type: "event",

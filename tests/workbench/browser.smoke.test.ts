@@ -165,12 +165,16 @@ describe.runIf(enabled)("workbench in a real browser", () => {
       await page.click('[data-view="settings"]');
       const settings = await page.locator("#settings").textContent();
       expect(settings).toContain(harness.dataDir);
-      expect(await page.locator('#settings input[name="model"]').inputValue()).toBe(
-        "scripted-model",
-      );
-      expect(await page.locator('#settings input[name="baseUrl"]').inputValue()).toBe(
-        harness.model.baseUrl,
-      );
+      expect(
+        await page
+          .locator('#settings form[data-section="model"] input[name="model"]')
+          .inputValue(),
+      ).toBe("scripted-model");
+      expect(
+        await page
+          .locator('#settings form[data-section="model"] input[name="baseUrl"]')
+          .inputValue(),
+      ).toBe(harness.model.baseUrl);
       await page.click('button[data-action="set-scope"][data-scope="read-only"]');
       await page.waitForSelector(
         'button[data-action="set-scope"][data-scope="read-only"][aria-pressed="true"]',

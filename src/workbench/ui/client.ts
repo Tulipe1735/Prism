@@ -125,6 +125,17 @@ export class KernelClient {
     return cancelled;
   }
 
+  /**
+   * Compacts the session's context into a summary entry. `compacted: false`
+   * means the context was still inside the keep window and nothing changed.
+   */
+  compactSession(sessionId: string): Promise<{ compacted: boolean }> {
+    return this.request<{ compacted: boolean }>(
+      `/sessions/${encodeURIComponent(sessionId)}/compact`,
+      { method: "POST" },
+    );
+  }
+
   async answerApproval(
     sessionId: string,
     requestId: string,

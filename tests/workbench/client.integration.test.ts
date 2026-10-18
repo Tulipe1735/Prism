@@ -310,6 +310,30 @@ it("answers an approval request and reports the outcome", async () => {
   }
 });
 
+it("compacts the open session on request and reports what happened", async () => {
+  const harness = await startTestKernel({
+    answers: [{ text: ["Done."] }],
+  });
+  try {
+    const client = new KernelClient({ baseUrl: harness.kernel.url });
+    const session = await client.createSession({ workspace: harness.workspace });
+    await client.sendMessage(session.id, "a short task");
+    await waitFor(
+      async () => !isTaskRunning((await client.readSession(session.id)).entries),
+      "the finished turn",
+    );
+
+    // Two entries are well inside the keep window: nothing to compact.
+    expect(await client.compactSession(session.id)).toMatchObject({
+      compacted: false,
+    });
+    const entries = (await client.readSession(session.id)).entries;
+    expect(entries.some((entry) => entry.type === "compaction")).toBe(false);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
 it("refuses an approval so the tool reports the refusal", async () => {
   const harness = await startTestKernel({
     answers: [

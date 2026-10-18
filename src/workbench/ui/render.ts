@@ -113,7 +113,10 @@ export function renderChatHeader(state: UiState): string {
     return `<span class="muted">选择一个会话，或在工作区里新建会话。</span>`;
   return `<strong>${escapeHtml(session.title ?? "（未命名会话）")}</strong> · ${escapeHtml(
     session.workspace,
-  )} · ${session.entryCount} 条`;
+  )} · ${session.entryCount} 条
+  <button type="button" data-action="compact"${
+    state.taskRunning ? " disabled" : ""
+  } title="把较早的上下文换成一条摘要；原始条目保留">压缩上下文</button>`;
 }
 
 export function renderTaskState(state: UiState): string {

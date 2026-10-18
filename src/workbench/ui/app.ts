@@ -177,6 +177,9 @@ async function onClick(event: MouseEvent): Promise<void> {
     case "cancel":
       await cancel();
       return;
+    case "compact":
+      await compact();
+      return;
     case "set-scope":
       if (target.dataset.scope !== undefined)
         await updateSettings({
@@ -341,6 +344,24 @@ async function cancel(): Promise<void> {
   try {
     if (!(await client.cancelSession(sessionId)))
       dispatch({ type: "notice", notice: "该会话没有运行中的任务。" });
+  } catch (error: unknown) {
+    dispatch({ type: "notice", notice: describe(error) });
+  }
+}
+
+/** Compacts the open session now (US-41); the log keeps every original entry. */
+async function compact(): Promise<void> {
+  const sessionId = state.activeId;
+  if (sessionId === null) return;
+  try {
+    const { compacted } = await client.compactSession(sessionId);
+    dispatch({
+      type: "notice",
+      notice: compacted
+        ? "已压缩上下文；原始条目仍在会话日志里。"
+        : "上下文还在保留窗口内，没有可压缩的内容。",
+    });
+    if (compacted) queueReload();
   } catch (error: unknown) {
     dispatch({ type: "notice", notice: describe(error) });
   }

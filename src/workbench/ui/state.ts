@@ -221,8 +221,15 @@ function reduceEvent(state: UiState, event: KernelEvent): UiState {
         ),
       };
     case "session.compacted":
-      // The compaction entry itself arrives with the next log reload.
-      return state;
+      // The compaction entry itself arrives with the next log reload; the
+      // notice says why the context shrank.
+      return {
+        ...state,
+        notice:
+          event.reason === "manual"
+            ? "上下文已压缩（手动）。"
+            : "上下文接近上限，已自动压缩。",
+      };
   }
 }
 

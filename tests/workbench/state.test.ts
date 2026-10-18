@@ -206,6 +206,30 @@ it("shows a pending approval once and drops it when it is answered", () => {
   expect(state.approvals).toEqual([]);
 });
 
+it("shows a notice when the context was compacted", () => {
+  const manual = reduce(emptyState(), {
+    type: "event",
+    event: {
+      type: "session.compacted",
+      sessionId: "session-1",
+      entryId: "entry-9",
+      reason: "manual",
+    },
+  });
+  expect(manual.notice).toContain("手动");
+
+  const auto = reduce(manual, {
+    type: "event",
+    event: {
+      type: "session.compacted",
+      sessionId: "session-1",
+      entryId: "entry-10",
+      reason: "auto",
+    },
+  });
+  expect(auto.notice).toContain("自动压缩");
+});
+
 it("drops the open session when the workspace changes", () => {
   let state = reduce(emptyState(), {
     type: "open",
