@@ -252,39 +252,39 @@ export class AssistantRuntime {
       () => controller.abort(new TaskStop("deadline", "达到任务时间上限")),
       Math.max(0, deadline - this.now().getTime()),
     );
-    const messages = this.refreshMessages(
-      task,
-      task.messages?.length ? task.messages : this.initialMessages(task),
-    );
-    let phase: "solve" | "check" | "revise" = "solve";
-    let candidate: ResearchCandidate | undefined;
-    let best: ReviewedCandidate | undefined;
-    if (task.effort === "deep") {
-      const bestPath = join(this.artifactDirectory(id), "best.json");
-      if (existsSync(bestPath)) {
-        const saved = z
-          .object({
-            candidate: candidateSchema,
-            review: reviewSchema,
-            score: z.number(),
-          })
-          .safeParse(JSON.parse(readFileSync(bestPath, "utf8")));
-        if (saved.success) best = saved.data;
-      }
-      messages.push({ role: "user", content: RESEARCH_CANDIDATE_PROMPT });
-      this.event(id, "research-solve", "正在查找来源和可比较的方法路线");
-    }
-    this.store.updateTask(id, {
-      startedAt: task.startedAt ?? this.now().toISOString(),
-      deadlineAt: new Date(deadline).toISOString(),
-      messages,
-    });
-    this.event(
-      id,
-      "started",
-      `开始${task.effort === "deep" ? "深入研究" : "问答"}；费用按配置单价估算`,
-    );
     try {
+      const messages = this.refreshMessages(
+        task,
+        task.messages?.length ? task.messages : this.initialMessages(task),
+      );
+      let phase: "solve" | "check" | "revise" = "solve";
+      let candidate: ResearchCandidate | undefined;
+      let best: ReviewedCandidate | undefined;
+      if (task.effort === "deep") {
+        const bestPath = join(this.artifactDirectory(id), "best.json");
+        if (existsSync(bestPath)) {
+          const saved = z
+            .object({
+              candidate: candidateSchema,
+              review: reviewSchema,
+              score: z.number(),
+            })
+            .safeParse(JSON.parse(readFileSync(bestPath, "utf8")));
+          if (saved.success) best = saved.data;
+        }
+        messages.push({ role: "user", content: RESEARCH_CANDIDATE_PROMPT });
+        this.event(id, "research-solve", "正在查找来源和可比较的方法路线");
+      }
+      this.store.updateTask(id, {
+        startedAt: task.startedAt ?? this.now().toISOString(),
+        deadlineAt: new Date(deadline).toISOString(),
+        messages,
+      });
+      this.event(
+        id,
+        "started",
+        `开始${task.effort === "deep" ? "深入研究" : "问答"}；费用按配置单价估算`,
+      );
       for (let round = 0; round < (this.options.maxRounds ?? 16); round++) {
         this.check(controller.signal, deadline);
         this.event(id, "model", `正在推进任务，第 ${round + 1} 轮`);
@@ -293,7 +293,7 @@ export class AssistantRuntime {
         messages.push(reply.message);
         this.store.updateTask(id, { messages });
         if (reply.message.tool_calls?.length) {
-          for (const call of reply.message.tool_calls) {
+          for (const [callIndex, call] of reply.message.tool_calls.entries()) {
             this.check(controller.signal, deadline);
             const result = await this.callTool(id, call, controller.signal);
             messages.push({
@@ -309,6 +309,17 @@ export class AssistantRuntime {
               (result.status === "waiting-device" ||
                 result.status === "awaiting-confirmation")
             ) {
+              for (const deferred of reply.message.tool_calls.slice(callIndex + 1))
+                messages.push({
+                  role: "tool",
+                  tool_call_id: deferred.id,
+                  content: JSON.stringify({
+                    status: "not_executed",
+                    reason:
+                      "Task paused before execution. Request this tool again only after reviewing the local outcome.",
+                  }),
+                });
+              this.store.updateTask(id, { messages });
               return this.finish(
                 id,
                 result.status,
@@ -320,8 +331,10 @@ export class AssistantRuntime {
         }
         const answer = reply.message.content?.trim();
         if (!answer) throw new Error("模型未交付成果");
-        if (reply.finishReason && reply.finishReason !== "stop")
+        if (reply.finishReason && reply.finishReason !== "stop") {
+          if (task.effort !== "deep") this.store.updateTask(id, { answer });
           return this.finish(id, "partial", `模型停止：${reply.finishReason}`);
+        }
         if (task.effort === "deep") {
           try {
             if (phase !== "check") {
@@ -450,6 +463,7 @@ export class AssistantRuntime {
           previous.role === task.role &&
           previous.conversationId === task.conversationId &&
           previous.answer &&
+          previous.citations.every((citation) => this.currentCitation(citation)) &&
           ["completed", "partial"].includes(previous.status),
       )
       .slice(-4);
@@ -466,10 +480,15 @@ export class AssistantRuntime {
   private selectedMemory(task: TaskRecord): MemoryEntry[] {
     const entries = this.store
       .listMemory()
+      .filter((entry) =>
+        (entry.sourceDocumentIds ?? []).every((id) => {
+          const document = this.store.getDocument(id);
+          return document != null && document.active !== false;
+        }),
+      )
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     const terms =
-      task.message.toLowerCase().match(/[a-z][a-z0-9_-]{2,}|\p{Script=Han}{2}/gu) ??
-      [];
+      task.message.toLowerCase().match(/[a-z][a-z0-9_-]{2,}|\p{Script=Han}{2}/gu) ?? [];
     const current = ["progress", "preference", "correction", "question"].flatMap(
       (kind) =>
         entries
@@ -488,6 +507,17 @@ export class AssistantRuntime {
         text: entry.text.slice(0, 1800),
         sourceDocumentIds: entry.sourceDocumentIds?.slice(0, 8),
       }));
+  }
+
+  private currentCitation(citation: Citation): boolean {
+    const document = this.store.getDocument(citation.documentId);
+    return (
+      document != null &&
+      document.active !== false &&
+      document.version === citation.version &&
+      document.url === citation.url &&
+      document.content.includes(citation.excerpt)
+    );
   }
 
   private systemContext(task: TaskRecord): string {
@@ -546,11 +576,9 @@ export class AssistantRuntime {
     const hits = Math.min(usage.cacheHitTokens ?? 0, usage.inputTokens);
     return (
       Math.ceil(
-        (((usage.inputTokens - hits) * p.input +
+        (usage.inputTokens - hits) * p.input +
           hits * (p.cacheHit ?? p.input) +
-          usage.outputTokens * p.output) *
-          1_000_000) /
-          1_000_000,
+          usage.outputTokens * p.output,
       ) / 1_000_000
     );
   }
@@ -658,7 +686,7 @@ export class AssistantRuntime {
   private finish(id: string, status: TaskStatus, reason?: string): TaskRecord {
     const task = this.get(id)!;
     const finalStatus = task.status === "cancelled" ? "cancelled" : status;
-    const answer = task.answer;
+    const answer = task.answer.split("\n\n---\n任务状态：")[0]!;
     const report = `${answer || "尚未形成有依据的成果。"}${reason ? `\n\n---\n任务状态：${finalStatus}。${reason}。` : ""}`;
     const path = this.saveArtifact(id, "report.md", report);
     this.event(id, finalStatus, reason ?? "任务成果已保存");
@@ -868,7 +896,18 @@ export class AssistantRuntime {
             "Read shared research progress, corrections, reading records and learning evidence; tentative is not user confirmed.",
           parameters: objectParameters({}),
         },
-        execute: async () => this.store.listMemory(),
+        execute: async () =>
+          this.store.listMemory().map((entry) => {
+            const unavailableSourceIds = (entry.sourceDocumentIds ?? []).filter(
+              (id) => !this.store.getDocument(id),
+            );
+            return {
+              ...entry,
+              needsReview:
+                entry.status === "tentative" || unavailableSourceIds.length > 0,
+              unavailableSourceIds,
+            };
+          }),
       },
       {
         definition: {
