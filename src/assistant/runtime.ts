@@ -468,7 +468,7 @@ export class AssistantRuntime {
       .listMemory()
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     const terms =
-      task.message.toLowerCase().match(/[a-z][a-z0-9_-]{2,}|[\p{Script=Han}]{2}/gu) ??
+      task.message.toLowerCase().match(/[a-z][a-z0-9_-]{2,}|\p{Script=Han}{2}/gu) ??
       [];
     const current = ["progress", "preference", "correction", "question"].flatMap(
       (kind) =>
