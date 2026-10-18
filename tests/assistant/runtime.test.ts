@@ -483,3 +483,84 @@ it("cancels a running tool and stops subsequent model work while preserving comp
   expect(fixture.requests).toHaveLength(1);
   expect(store.budget()).toMatchObject({ spentCny: result.costCny, reservedCny: 0 });
 });
+
+it("shares confirmed research progress across roles and refreshes withdrawn rules when a paused task resumes", async () => {
+  const store = openStore();
+  const at = new Date().toISOString();
+  store.upsertMemory({
+    id: "research-focus",
+    kind: "progress",
+    status: "confirmed",
+    text: "Current focus: compare reusable scene generators with the RSI survey.",
+    createdAt: at,
+    updatedAt: at,
+  });
+  store.upsertMemory({
+    id: "old-correction",
+    kind: "correction",
+    status: "confirmed",
+    text: "Retired rule: always discuss obsolete baselines.",
+    createdAt: at,
+    updatedAt: at,
+  });
+  const fixture = apiFixture([
+    {
+      message: {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "device",
+            type: "function",
+            function: { name: "local_prism", arguments: "{}" },
+          },
+        ],
+      },
+    },
+    {
+      message: {
+        role: "assistant",
+        content: "The confirmed research focus guides this recommendation.",
+      },
+    },
+  ]);
+  const runtime = new AssistantRuntime({
+    store,
+    model: fixture.model,
+    pricing: { input: 2, output: 3 },
+    tools: [
+      {
+        definition: {
+          name: "local_prism",
+          description: "Read local material",
+          parameters: { type: "object", properties: {} },
+        },
+        execute: async () => ({ status: "waiting-device", jobId: "job-1" }),
+      },
+    ],
+  });
+  const paused = await runtime.ask({
+    message: "Prepare relevant research recommendations",
+    role: "intelligence",
+    conversationId: "brief",
+  });
+  expect(paused.status).toBe("waiting-device");
+  expect(JSON.stringify(fixture.requests[0]?.messages)).toContain(
+    "Current focus: compare reusable scene generators",
+  );
+  store.deleteMemory("old-correction");
+  const messages = paused.messages!.map((message) =>
+    message.tool_call_id === "device"
+      ? { ...message, content: '{"status":"completed","evidence":"local source read"}' }
+      : message,
+  );
+  store.updateTask(paused.id, { status: "queued", messages });
+  const result = await runtime.run(paused.id);
+  expect(result.status).toBe("completed");
+  expect(JSON.stringify(fixture.requests[1]?.messages)).toContain(
+    "Current focus: compare reusable scene generators",
+  );
+  expect(JSON.stringify(fixture.requests[1]?.messages)).not.toContain(
+    "Retired rule: always discuss obsolete baselines.",
+  );
+});

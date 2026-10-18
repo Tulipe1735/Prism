@@ -195,6 +195,7 @@ export class AssistantRuntime {
     const task = this.get(id);
     if (!task) return Promise.reject(new Error(`Unknown task ${id}`));
     if (!this.store.claimTask(id)) return Promise.resolve(this.get(id)!);
+    if (task.startedAt) this.store.updateTask(id, { startedAt: task.startedAt });
     const controller = new AbortController();
     const entry = { controller, promise: Promise.resolve(task) };
     this.running.set(id, entry);
@@ -251,9 +252,10 @@ export class AssistantRuntime {
       () => controller.abort(new TaskStop("deadline", "达到任务时间上限")),
       Math.max(0, deadline - this.now().getTime()),
     );
-    const messages = task.messages?.length
-      ? [...task.messages]
-      : this.initialMessages(task);
+    const messages = this.refreshMessages(
+      task,
+      task.messages?.length ? task.messages : this.initialMessages(task),
+    );
     let phase: "solve" | "check" | "revise" = "solve";
     let candidate: ResearchCandidate | undefined;
     let best: ReviewedCandidate | undefined;
@@ -452,13 +454,91 @@ export class AssistantRuntime {
       )
       .slice(-4);
     return [
-      { role: "system", content: rolePrompt(task.role) },
+      { role: "system", content: this.systemContext(task) },
       ...history.flatMap((previous) => [
         { role: "user" as const, content: previous.message.slice(0, 4000) },
         { role: "assistant" as const, content: previous.answer.slice(0, 8000) },
       ]),
       { role: "user", content: task.message },
     ];
+  }
+
+  private selectedMemory(task: TaskRecord): MemoryEntry[] {
+    const entries = this.store
+      .listMemory()
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    const terms =
+      task.message.toLowerCase().match(/[a-z][a-z0-9_-]{2,}|[\p{Script=Han}]{2}/gu) ??
+      [];
+    const current = ["progress", "preference", "correction", "question"].flatMap(
+      (kind) =>
+        entries
+          .filter((entry) => entry.kind === kind && entry.status === "confirmed")
+          .slice(0, 2),
+    );
+    const relevant = entries
+      .filter((entry) => terms.some((term) => entry.text.toLowerCase().includes(term)))
+      .slice(0, 6);
+    return [
+      ...new Map([...current, ...relevant].map((entry) => [entry.id, entry])).values(),
+    ]
+      .slice(0, 12)
+      .map((entry) => ({
+        ...entry,
+        text: entry.text.slice(0, 1800),
+        sourceDocumentIds: entry.sourceDocumentIds?.slice(0, 8),
+      }));
+  }
+
+  private systemContext(task: TaskRecord): string {
+    return `${rolePrompt(task.role)}\nCurrent shared research state, refreshed from durable storage (bounded current confirmed progress/preferences/corrections plus task-relevant evidence):\n${JSON.stringify(this.selectedMemory(task))}\nRespect status and provenance. Tentative entries are not user confirmations. This current snapshot supersedes historical memory references; withdrawn or superseded rules in earlier messages are not active instructions. Retrieve additional relevant state with memory_list when needed.`;
+  }
+
+  private refreshMessages(task: TaskRecord, previous: ModelMessage[]): ModelMessage[] {
+    const memory = new Map(this.store.listMemory().map((entry) => [entry.id, entry]));
+    const toolNames = new Map(
+      previous.flatMap((message) =>
+        (message.tool_calls ?? []).map(
+          (call) => [call.id, call.function.name] as const,
+        ),
+      ),
+    );
+    const messages = previous
+      .filter((message) => message.role !== "system")
+      .map((message) => {
+        if (message.role !== "tool" || !message.tool_call_id) return { ...message };
+        const name = toolNames.get(message.tool_call_id);
+        if (name === "memory_list")
+          return {
+            ...message,
+            content: JSON.stringify({
+              refreshed: true,
+              entries: this.selectedMemory(task),
+            }),
+          };
+        if (name === "memory_update" && message.content) {
+          try {
+            const result = z
+              .object({ id: z.string() })
+              .safeParse(JSON.parse(message.content));
+            if (result.success)
+              return {
+                ...message,
+                content: JSON.stringify(
+                  memory.get(result.data.id) ?? {
+                    id: result.data.id,
+                    withdrawn: true,
+                    note: "This memory is no longer active.",
+                  },
+                ),
+              };
+          } catch {
+            /* Failed historical tool results stay visible as errors. */
+          }
+        }
+        return { ...message };
+      });
+    return [{ role: "system", content: this.systemContext(task) }, ...messages];
   }
 
   private price(usage: Usage): number {
