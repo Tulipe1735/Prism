@@ -62,3 +62,78 @@ it("reads a workspace file the model asks for", async () => {
   });
   events.close();
 });
+
+it("writes a file the model asks for, creating parent directories", async () => {
+  const { kernel, workspace } = await start({
+    answers: [
+      {
+        toolCalls: [
+          {
+            id: "call_1",
+            name: "write_file",
+            arguments: '{"path":"notes/idea.txt","content":"written by the model"}',
+          },
+        ],
+      },
+      { text: ["Done."] },
+    ],
+  });
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "save an idea" },
+  });
+  const completed = await events.waitFor(
+    (event) => event.type === "tool.completed" && event.callId === "call_1",
+  );
+  if (completed.type !== "tool.completed") throw new Error("Expected a completed tool");
+  expect(completed.result).toContain("notes/idea.txt");
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 4,
+  );
+  expect(await readFile(join(workspace, "notes", "idea.txt"), "utf8")).toBe(
+    "written by the model",
+  );
+  events.close();
+});
+
+it("lists a directory, marking subdirectories and flagging empty ones", async () => {
+  const { kernel, workspace } = await start({
+    answers: [
+      {
+        toolCalls: [
+          { id: "call_1", name: "list_directory", arguments: "{}" },
+          {
+            id: "call_2",
+            name: "list_directory",
+            arguments: '{"path":"empty"}',
+          },
+        ],
+      },
+      { text: ["Done."] },
+    ],
+  });
+  await mkdir(join(workspace, "src"), { recursive: true });
+  await mkdir(join(workspace, "empty"), { recursive: true });
+  await writeFile(join(workspace, "README.md"), "# readme\n");
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "list the workspace" },
+  });
+  const first = await events.waitFor(
+    (event) => event.type === "tool.completed" && event.callId === "call_1",
+  );
+  if (first.type !== "tool.completed") throw new Error("Expected a completed tool");
+  expect(first.result).toBe("README.md\nempty/\nsrc/");
+  const second = await events.waitFor(
+    (event) => event.type === "tool.completed" && event.callId === "call_2",
+  );
+  if (second.type !== "tool.completed") throw new Error("Expected a completed tool");
+  expect(second.result).toBe("(empty directory)");
+  events.close();
+});
