@@ -51,29 +51,35 @@ const DEFAULT_SOURCE = "deepseek";
 const DEFAULT_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_COUNT = 10;
 
+/**
+ * Builds the search source named in the configuration. `deepseek` is the only
+ * source with a built-in endpoint; any other name needs an explicit `baseUrl`
+ * and is then called the same way, so a gateway or proxy works without code.
+ */
 export function createSearchProvider(config: WebSearchConfig): SearchProvider {
   const provider = config.provider ?? DEFAULT_SOURCE;
-  if (provider !== DEFAULT_SOURCE)
+  if (provider !== DEFAULT_SOURCE && config.baseUrl === undefined)
     throw new ConfigError(
-      `Unknown search source "${provider}". Supported sources: ${DEFAULT_SOURCE}.`,
+      `Unknown search source "${provider}". Set "search.baseUrl" to use it as a DeepSeek-compatible endpoint, or use "${DEFAULT_SOURCE}".`,
     );
   if (!config.apiKey)
     throw new ConfigError(
       `Search source "${provider}" needs an API key; set it in the Prism configuration.`,
     );
-  return deepseekProvider({ ...config, apiKey: config.apiKey });
+  return compatibleProvider({ ...config, provider, apiKey: config.apiKey });
 }
 
-function deepseekProvider(
-  config: WebSearchConfig & { apiKey: string },
+/** The DeepSeek search endpoint shape, which compatible sources reuse. */
+function compatibleProvider(
+  config: WebSearchConfig & { provider: string; apiKey: string },
 ): SearchProvider {
   const endpoint = `${(config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "")}/v1/tools/search`;
   const configuredCount = config.count ?? DEFAULT_COUNT;
   const fetchImpl = config.fetchImpl ?? fetch;
-  const { apiKey } = config;
+  const { apiKey, provider } = config;
 
   return {
-    name: DEFAULT_SOURCE,
+    name: provider,
     async search(request) {
       const count = request.count ?? configuredCount;
       if (!Number.isInteger(count) || count < 1 || count > 50)
@@ -81,7 +87,7 @@ function deepseekProvider(
       const payload = await postJson({
         url: endpoint,
         apiKey,
-        label: "DeepSeek search",
+        label: `${provider} search`,
         fetchImpl,
         timeoutMs: config.timeoutMs,
         signal: request.signal,
@@ -97,7 +103,7 @@ function deepseekProvider(
       const parsed = searchResponseSchema.safeParse(payload);
       if (!parsed.success)
         throw new Error(
-          "DeepSeek search returned an unexpected response shape; no results were used.",
+          `${provider} search returned an unexpected response shape; no results were used.`,
         );
       return parsed.data.results.map((result) => ({
         title: result.title,

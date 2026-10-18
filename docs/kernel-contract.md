@@ -101,8 +101,11 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 
 - `permissions.scope` 取 `read-only` | `workspace-write` | `full-access`，默认
   `workspace-write`（ADR-0005）；可用 `PUT /settings` 切换。
+- `browser.engine` 取 `chromium` | `firefox` | `webkit`；可用 `PUT /settings`
+  切换，下一次 `browser_open` 使用新引擎。
 - `browser.actionsNeedApproval` 取布尔值，默认 `false`（US-30）：为 `true`
   时每个浏览器动作都要一次审批。工作台入口由 08 消费本契约出卡片。
+- `search` 报告当前来源；配置了 `search.baseUrl` 时一并报告（缺省时省略该键）。
 
 ### PUT /settings
 
@@ -114,13 +117,37 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 ```
 
 ```json
-{ "browser": { "actionsNeedApproval": true } }
+{ "browser": { "engine": "firefox", "actionsNeedApproval": true } }
+```
+
+```json
+{ "model": { "baseUrl": "https://api.deepseek.com/v1", "model": "deepseek-chat" } }
+```
+
+```json
+{ "model": { "apiKey": "<新密钥>" } }
+```
+
+```json
+{ "search": { "provider": "gateway", "baseUrl": "https://gateway.example.com" } }
 ```
 
 → 200，应答体与 `GET /settings` 相同，即修改后生效的全部设置。内核同时把修改合并进
 `<dataDir>/config.json`，下次启动沿用（未写过的字段保持原值）。
 
+| 段            | 可改的键                        | 生效时机                         |
+| ------------- | ------------------------------- | -------------------------------- |
+| `permissions` | `scope`                         | 下一次工具调用                   |
+| `browser`     | `engine`、`actionsNeedApproval` | 下一次 `browser_open` / 动作判定 |
+| `model`       | `baseUrl`、`model`、`apiKey`    | 下一次模型请求                   |
+| `search`      | `provider`、`baseUrl`           | 下一次 `web_search`              |
+
+- `model.apiKey` 只写不回传：应答只带 `model.hasApiKey: true`。
+- 以上字段都必须是非空字符串（或枚举值）；`browser.endpoint` 与 `compaction`
+  等启动期设置不在本端点内，`PUT` 它们返回 400。
 - 范围切换立即生效：正在运行的任务，其下一次工具调用就按新档位判定。
+- 未知来源名加显式 `search.baseUrl` 时按 DeepSeek 兼容端点处理；没有 `baseUrl`
+  的未知来源会在调用 `web_search` 时报错，不影响内核启动。
 - 本轮不新增事件：修改方以本应答更新界面；其他客户端在需要时读 `GET /settings`。
 
 ### 会话
@@ -169,6 +196,8 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 
 - 模型的工具调用参数按原样（JSON 文本）存入 `tool_call.arguments`；
   `tool.started.arguments` 是解析后的 JSON 值，解析失败时是原始字符串。
+- `tool_call.effects`
+  记录这次调用声明的动作（`Tool.effects`，见「工具」），供工作台区分文件改动与读取；工具不声明 effects 时该键省略（含义是「未知」，不是「无动作」）。
 - 工具结果超过 8 000 字符时截断，并在末尾附
   `\n[result truncated after 8000 characters]`；模型看到的是截断后的文本。
 - 模型或传输失败：不伪造助手回复，改为追加一条 `role: "system"`
@@ -261,7 +290,7 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 
 ```
 event: tool.started
-data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arguments":{"text":"hi"}}
+data: {"type":"tool.started","sessionId":"...","callId":"...","name":"read_file","arguments":{"path":"README.md"}}
 
 ```
 
@@ -307,12 +336,11 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
 | 工具                                                                                               | 用途                                                | `effects`                                             |
 | -------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------- |
 | `read_file` `write_file` `list_directory` `glob` `grep`                                            | 工作区内读写与查找（03）                            | 仅 `write_file` 声明 `file-write`                     |
-| `command`                                                                                          | 执行 shell 命令（03）                               | `command`                                             |
+| `run_command`                                                                                      | 执行 shell 命令（03）                               | `command`                                             |
 | `skill`                                                                                            | 列出或读取技能（见下）                              | 无                                                    |
 | `browser_open` `browser_observe` `browser_context` `browser_act` `browser_receipt` `browser_close` | Playwright 浏览器（06）：观察、引用、单步动作与回执 | `browser_open` 与 `browser_act` 声明 `browser-action` |
 | `web_search` `web_fetch`                                                                           | 联网检索（07）：检索与抓取，不改工作区              | 无                                                    |
 | `mcp__<服务器>__<工具>`                                                                            | 配置的 MCP 服务器提供的工具（09），出厂 0 个        | 无                                                    |
-| `echo`                                                                                             | 占位工具，返回入参文本；保留用于自测                | 无                                                    |
 
 02 接入：
 
@@ -320,7 +348,9 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
   时列出可用技能（名称、描述、来源）。技能发现与读取用
   `src/skills/loader.ts`，根目录优先级见
   `docs/skills.md`。技能的名称与描述同时写入系统提示，供模型选择。
-- `echo`：占位工具，返回入参文本；03 接入真实文件与命令工具后保留用于自测。
+
+测试不经过生产注册表：`tests/kernel/harness.ts` 自己注册占位工具 `echo`
+驱动任务循环，内核出厂不包含它。
 
 工具收到的 `ToolContext` 里，`noteExplored(path)`
 由文件与命令工具在解析每个要读、写、列出或作为工作目录的路径时调用（集中在
@@ -334,7 +364,7 @@ Implementation Decisions）。
 
 - 会写文件、跑命令、驱动浏览器的工具必须声明这些动作（`{ kind: "file-write", path }`
   等）；路径按上下文里的工作区解析后交给内核。
-- 不声明 `effects` 的工具不进三档范围判定：`echo`、`skill` 与 MCP 工具（09）属此类。
+- 不声明 `effects` 的工具不进三档范围判定：`skill` 与 MCP 工具（09）属此类。
 - 判定顺序：`tool.started` 事件先出，判定不通过时该次调用以 `tool.failed`
   结束，模型读到一条 `isError: true` 的拒绝说明（含拒绝原因与「不要重试」的指引）。
 
