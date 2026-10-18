@@ -24,6 +24,21 @@ export interface MessageEntry extends SessionEntryBase {
   content: string;
 }
 
+/** One tool call the model asked for; `arguments` is the JSON text as received. */
+export interface ToolCallEntry extends SessionEntryBase {
+  type: "tool_call";
+  callId: string;
+  name: string;
+  arguments: string;
+}
+
+export interface ToolResultEntry extends SessionEntryBase {
+  type: "tool_result";
+  callId: string;
+  content: string;
+  isError: boolean;
+}
+
 /** Replaces the entries between the branch start and `firstKeptEntryId` with `summary`. */
 export interface CompactionEntry extends SessionEntryBase {
   type: "compaction";
@@ -31,7 +46,8 @@ export interface CompactionEntry extends SessionEntryBase {
   firstKeptEntryId: string | null;
 }
 
-export type SessionEntry = MessageEntry | CompactionEntry;
+export type SessionEntry =
+  MessageEntry | ToolCallEntry | ToolResultEntry | CompactionEntry;
 
 export type SessionEntryInput =
   | {
@@ -39,12 +55,31 @@ export type SessionEntryInput =
       role: MessageRole;
       content: string;
       parentId?: string | null;
+      /** Set by the task loop so streamed deltas carry the id of the persisted entry. */
+      id?: string;
+    }
+  | {
+      type: "tool_call";
+      callId: string;
+      name: string;
+      arguments: string;
+      parentId?: string | null;
+      id?: string;
+    }
+  | {
+      type: "tool_result";
+      callId: string;
+      content: string;
+      isError: boolean;
+      parentId?: string | null;
+      id?: string;
     }
   | {
       type: "compaction";
       summary: string;
       firstKeptEntryId: string | null;
       parentId?: string | null;
+      id?: string;
     };
 
 export interface SessionLog {
@@ -68,6 +103,16 @@ export interface ContextMessage {
   content: string;
   entryId: string;
   summary?: true;
+  /** Tool calls of an assistant message; `arguments` is the JSON text as received. */
+  toolCalls?: ToolCallRecord[];
+  /** Set on a tool message: the call this result answers. */
+  toolCallId?: string;
+}
+
+export interface ToolCallRecord {
+  id: string;
+  name: string;
+  arguments: string;
 }
 
 /** Thrown when a log entry references an entry that is not in the log. */
@@ -117,12 +162,49 @@ export function rebuildContext(
 
   const messages: ContextMessage[] = [];
   if (newestCompaction !== undefined) messages.push(summaryMessage(newestCompaction));
+  /** Assistant message that consecutive tool calls are merged into. */
+  let openAssistant: ContextMessage | null = null;
   for (const [index, entry] of chain.entries()) {
     if (index < firstKeptIndex || entry.id === newestCompaction?.id) continue;
-    if (entry.type === "compaction") {
-      messages.push(summaryMessage(entry));
-    } else {
-      messages.push({ role: entry.role, content: entry.content, entryId: entry.id });
+    switch (entry.type) {
+      case "message": {
+        const message: ContextMessage = {
+          role: entry.role,
+          content: entry.content,
+          entryId: entry.id,
+        };
+        messages.push(message);
+        openAssistant = entry.role === "assistant" ? message : null;
+        break;
+      }
+      case "tool_call": {
+        if (openAssistant === null) {
+          openAssistant = { role: "assistant", content: "", entryId: entry.id };
+          messages.push(openAssistant);
+        }
+        openAssistant.toolCalls ??= [];
+        openAssistant.toolCalls.push({
+          id: entry.callId,
+          name: entry.name,
+          arguments: entry.arguments,
+        });
+        break;
+      }
+      case "tool_result": {
+        messages.push({
+          role: "tool",
+          content: entry.content,
+          entryId: entry.id,
+          toolCallId: entry.callId,
+        });
+        openAssistant = null;
+        break;
+      }
+      case "compaction": {
+        messages.push(summaryMessage(entry));
+        openAssistant = null;
+        break;
+      }
     }
   }
   return messages;

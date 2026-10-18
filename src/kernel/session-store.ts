@@ -55,6 +55,24 @@ const entrySchema = z.discriminatedUnion("type", [
     content: z.string(),
   }),
   z.object({
+    type: z.literal("tool_call"),
+    id: z.string().min(1),
+    parentId: z.string().nullable(),
+    timestamp: z.string().min(1),
+    callId: z.string().min(1),
+    name: z.string().min(1),
+    arguments: z.string(),
+  }),
+  z.object({
+    type: z.literal("tool_result"),
+    id: z.string().min(1),
+    parentId: z.string().nullable(),
+    timestamp: z.string().min(1),
+    callId: z.string().min(1),
+    content: z.string(),
+    isError: z.boolean(),
+  }),
+  z.object({
     type: z.literal("compaction"),
     id: z.string().min(1),
     parentId: z.string().nullable(),
@@ -113,22 +131,50 @@ export class SessionStore {
     const { entries } = await this.readLog(path, sessionId);
     const parentId =
       input.parentId === undefined ? (entries.at(-1)?.id ?? null) : input.parentId;
-    const base = { id: randomUUID(), parentId, timestamp: new Date().toISOString() };
-    const entry: SessionEntry =
-      input.type === "message"
-        ? { type: "message", ...base, role: input.role, content: input.content }
-        : {
+    const base = {
+      id: input.id ?? randomUUID(),
+      parentId,
+      timestamp: new Date().toISOString(),
+    };
+    const entry: SessionEntry = (() => {
+      switch (input.type) {
+        case "message":
+          return { type: "message", ...base, role: input.role, content: input.content };
+        case "tool_call":
+          return {
+            type: "tool_call",
+            ...base,
+            callId: input.callId,
+            name: input.name,
+            arguments: input.arguments,
+          };
+        case "tool_result":
+          return {
+            type: "tool_result",
+            ...base,
+            callId: input.callId,
+            content: input.content,
+            isError: input.isError,
+          };
+        case "compaction":
+          return {
             type: "compaction",
             ...base,
             summary: input.summary,
             firstKeptEntryId: input.firstKeptEntryId,
           };
+      }
+    })();
     await appendFile(path, `${JSON.stringify(entry)}\n`);
     return entry;
   }
 
   async read(sessionId: string): Promise<SessionLog> {
     return this.readLog(await this.locate(sessionId), sessionId);
+  }
+
+  async summary(sessionId: string): Promise<SessionSummary> {
+    return summarize(await this.read(sessionId));
   }
 
   async filePath(sessionId: string): Promise<string> {
@@ -140,18 +186,9 @@ export class SessionStore {
     const workspace = options.workspace && resolve(options.workspace);
     const summaries: SessionSummary[] = [];
     for (const path of await this.logFiles()) {
-      const { header, entries } = await this.readLog(path, basename(path, ".jsonl"));
-      if (workspace && header.workspace !== workspace) continue;
-      const last = entries.at(-1);
-      summaries.push({
-        id: header.id,
-        workspace: header.workspace,
-        ...(header.title === undefined ? {} : { title: header.title }),
-        createdAt: header.timestamp,
-        updatedAt: last?.timestamp ?? header.timestamp,
-        entryCount: entries.length,
-        leafId: last?.id ?? null,
-      });
+      const log = await this.readLog(path, basename(path, ".jsonl"));
+      if (workspace && log.header.workspace !== workspace) continue;
+      summaries.push(summarize(log));
     }
     return summaries.sort(
       (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
@@ -234,6 +271,20 @@ async function exists(path: string): Promise<boolean> {
     () => true,
     () => false,
   );
+}
+
+function summarize(log: SessionLog): SessionSummary {
+  const { header, entries } = log;
+  const last = entries.at(-1);
+  return {
+    id: header.id,
+    workspace: header.workspace,
+    ...(header.title === undefined ? {} : { title: header.title }),
+    createdAt: header.timestamp,
+    updatedAt: last?.timestamp ?? header.timestamp,
+    entryCount: entries.length,
+    leafId: last?.id ?? null,
+  };
 }
 
 function parseLine<T>(schema: z.ZodType<T>, line: string, sessionId: string): T {

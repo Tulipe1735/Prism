@@ -18,6 +18,18 @@ export interface ToolContext {
   target: ExecutionTarget;
   /** Aborts when the user cancels the running task. */
   signal: AbortSignal;
+  /**
+   * Asks the user to approve one action that leaves the permission scope. The
+   * answer holds for this call only (ADR-0005); the kernel never caches it.
+   */
+  requestApproval: (request: ApprovalRequest) => Promise<boolean>;
+}
+
+/** Why an action leaves the scope, what it touches and what that implies. */
+export interface ApprovalRequest {
+  reason: string;
+  target: string;
+  impact: string;
 }
 
 export interface ToolResult {
