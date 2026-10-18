@@ -12,6 +12,14 @@ export function readString(args: JsonValue, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+/** Reads a number field from the arguments the model produced. */
+export function readNumber(args: JsonValue, key: string): number | undefined {
+  if (typeof args !== "object" || args === null || Array.isArray(args))
+    return undefined;
+  const value = (args as Record<string, JsonValue>)[key];
+  return typeof value === "number" ? value : undefined;
+}
+
 /** Error result for a missing or mistyped argument the tool requires. */
 export function missingArgument(key: string): ToolResult {
   return {
@@ -78,7 +86,7 @@ export async function gatePath(
       };
   }
   const rel = relative(resolve(context.workspace), path);
-  const display = inside ? rel === "" ? "." : rel : path;
+  const display = inside ? (rel === "" ? "." : rel) : path;
   return { path, display };
 }
 
@@ -92,7 +100,8 @@ export function isRefusal(
 /** Wraps a filesystem failure in a tool result the model can act on. */
 export function fileError(display: string, error: unknown): ToolResult {
   const code = (error as NodeJS.ErrnoException).code;
-  if (code === "ENOENT") return { content: `File not found: ${display}.`, isError: true };
+  if (code === "ENOENT")
+    return { content: `File not found: ${display}.`, isError: true };
   if (code === "EISDIR")
     return { content: `${display} is a directory; use list_directory.`, isError: true };
   return {

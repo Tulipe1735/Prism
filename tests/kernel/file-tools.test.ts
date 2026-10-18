@@ -187,10 +187,7 @@ it("searches file contents and reports path and line", async () => {
     ],
   });
   await mkdir(join(workspace, "src"), { recursive: true });
-  await writeFile(
-    join(workspace, "src", "a.ts"),
-    "const a = 1;\n// TODO: fix this\n",
-  );
+  await writeFile(join(workspace, "src", "a.ts"), "const a = 1;\n// TODO: fix this\n");
   await writeFile(join(workspace, "src", "b.md"), "# b\n");
   const events = await connectEvents(`${kernel.url}/events`);
   const session = await createSession(kernel.url, workspace);

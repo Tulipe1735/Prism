@@ -7,6 +7,7 @@ import type { SkillToolRoots } from "./tools.ts";
 import type { ExecutionTarget, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { VERSION } from "../shared/version.ts";
+import { createCommandTool } from "./command-tool.ts";
 import { createFileTools } from "./file-tools.ts";
 import { runTask } from "./loop.ts";
 import { SessionStore } from "./session-store.ts";
@@ -81,6 +82,7 @@ export class Kernel {
       echoTool,
       createSkillTool(this.skillRoots),
       ...createFileTools(),
+      createCommandTool({ timeoutMs: this.config.command.timeoutMs }),
       ...(options.tools ?? []),
     ]);
     this.scope = options.scope ?? "workspace-write";

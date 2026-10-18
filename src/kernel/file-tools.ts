@@ -1,5 +1,14 @@
 import type { Tool, ToolResult } from "./tool.ts";
-import { glob, mkdir, open, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { Buffer } from "node:buffer";
+import {
+  glob,
+  mkdir,
+  open,
+  readdir,
+  readFile,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { TOOL_RESULT_LIMIT } from "./loop.ts";
 import {
@@ -17,15 +26,6 @@ const READ_BYTES = TOOL_RESULT_LIMIT * 4;
 /** Glob matches collected per call; more than this is reported as truncated. */
 const MAX_GLOB_MATCHES = 1_000;
 
-/**
- * The file tools: read, write, list and find inside the workspace. Paths that
- * leave the workspace trigger a one-time approval (04 turns the answer into
- * the scope policy).
- */
-export function createFileTools(): Tool[] {
-  return [readFileTool, writeFileTool, listDirectoryTool, globTool, grepTool];
-}
-
 const readFileTool: Tool = {
   name: "read_file",
   description:
@@ -40,8 +40,7 @@ const readFileTool: Tool = {
   },
   execute: async (args, context) => {
     const requested = readString(args, "path");
-    if (requested === undefined || requested === "")
-      return missingArgument("path");
+    if (requested === undefined || requested === "") return missingArgument("path");
     const gate = await gatePath(context, requested, {
       reason: "Reads a file outside the workspace",
       impact: "The file is outside the session workspace.",
@@ -81,8 +80,7 @@ const writeFileTool: Tool = {
   },
   execute: async (args, context) => {
     const requested = readString(args, "path");
-    if (requested === undefined || requested === "")
-      return missingArgument("path");
+    if (requested === undefined || requested === "") return missingArgument("path");
     const content = readString(args, "content");
     if (content === undefined) return missingArgument("content");
     const gate = await gatePath(context, requested, {
@@ -154,8 +152,7 @@ const globTool: Tool = {
   },
   execute: async (args, context) => {
     const pattern = readString(args, "pattern");
-    if (pattern === undefined || pattern === "")
-      return missingArgument("pattern");
+    if (pattern === undefined || pattern === "") return missingArgument("pattern");
     const requested = readString(args, "path") ?? ".";
     const gate = await gatePath(context, requested, {
       reason: "Finds files outside the workspace",
@@ -206,8 +203,7 @@ const grepTool: Tool = {
   },
   execute: async (args, context) => {
     const pattern = readString(args, "pattern");
-    if (pattern === undefined || pattern === "")
-      return missingArgument("pattern");
+    if (pattern === undefined || pattern === "") return missingArgument("pattern");
     let regex: RegExp;
     try {
       regex = new RegExp(pattern);
@@ -260,4 +256,13 @@ async function* walkFiles(target: string): AsyncGenerator<string> {
     if (entry.isDirectory()) yield* walkFiles(child);
     else if (entry.isFile()) yield child;
   }
+}
+
+/**
+ * The file tools: read, write, list and find inside the workspace. Paths that
+ * leave the workspace trigger a one-time approval (04 turns the answer into
+ * the scope policy).
+ */
+export function createFileTools(): Tool[] {
+  return [readFileTool, writeFileTool, listDirectoryTool, globTool, grepTool];
 }
