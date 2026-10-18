@@ -461,6 +461,8 @@ it("switches the scope over HTTP, keeps it in the config file and applies it nex
       },
       { text: ["Done."] },
     ],
+    // The patch must merge into this file, not replace it.
+    configFile: { model: { apiKey: "sk-keep-me" } },
     tools: [writeFileTool],
   });
 
@@ -478,7 +480,10 @@ it("switches the scope over HTTP, keeps it in the config file and applies it nex
   });
   expect(
     JSON.parse(await readFile(join(dataDir, "config.json"), "utf8")),
-  ).toMatchObject({ permissions: { scope: "full-access" } });
+  ).toMatchObject({
+    model: { apiKey: "sk-keep-me" },
+    permissions: { scope: "full-access" },
+  });
 
   // The next action already runs under the new scope, without approval.
   const outside = resolve(workspace, "..", "outside", "note.txt");
@@ -514,6 +519,50 @@ it("switches the scope over HTTP, keeps it in the config file and applies it nex
     body: { model: { model: "other" } },
   });
   expect(unknown.status).toBe(400);
+  events.close();
+});
+
+it("refuses the whole call when one action is denied, without asking about the rest", async () => {
+  let ran = false;
+  const bothTool: Tool = {
+    name: "write_and_click",
+    description: "Test stand-in declaring a denied write and a browsable action.",
+    parameters: { type: "object", properties: {} },
+    effects: () => [
+      { kind: "file-write", path: "/etc/hosts" },
+      { kind: "browser-action", action: "click", target: "https://example.com/" },
+    ],
+    execute: async () => {
+      ran = true;
+      return { content: "did both" };
+    },
+  };
+  const { kernel, workspace } = await start({
+    answers: [
+      { toolCalls: [{ id: "call_1", name: "write_and_click", arguments: "{}" }] },
+      { text: ["Understood."] },
+    ],
+    scope: "read-only",
+    browserActionsNeedApproval: true,
+    tools: [bothTool],
+  });
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "do both" },
+  });
+  const failed = await events.waitFor(
+    (event) => event.type === "tool.failed" && event.callId === "call_1",
+  );
+  if (failed.type !== "tool.failed") throw new Error("Expected a failed tool");
+  expect(failed.error).toContain("read-only");
+
+  expect(ran).toBe(false);
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(
+    false,
+  );
   events.close();
 });
 

@@ -68,14 +68,13 @@ export class PermissionPolicy {
               },
             }
           : { outcome: "allow" };
-      default:
-        return { outcome: "allow" };
     }
   }
 
   /**
    * Checks every action a call declares and asks the user once for each action
    * that leaves the scope. Nothing is remembered: the next call decides again.
+   * A call that holds any denied action is refused before the user is asked.
    */
   async authorizeAll(
     actions: PermissionAction[],
@@ -89,21 +88,22 @@ export class PermissionPolicy {
       const key = JSON.stringify(action);
       if (!decisions.has(key)) decisions.set(key, this.decide(action, input.workspace));
     }
-    for (const decision of decisions.values()) {
-      if (decision.outcome === "deny")
+    const planned = [...decisions.values()];
+    const denied = planned.find((decision) => decision.outcome === "deny");
+    if (denied?.outcome === "deny")
+      return {
+        allowed: false,
+        refusal: `Permission denied: ${denied.reason} The action was not executed; change your approach or report the limitation instead of retrying it.`,
+      };
+
+    for (const decision of planned) {
+      if (decision.outcome !== "approval") continue;
+      const approved = await input.requestApproval(decision.request);
+      if (!approved)
         return {
           allowed: false,
-          refusal: `Permission denied: ${decision.reason} The action was not executed; change your approach or report the limitation instead of retrying it.`,
+          refusal: `The user refused approval, so the action was not executed: ${buildApprovalReason(decision.request)} Do not ask again; change your approach or report the limitation instead.`,
         };
-      if (decision.outcome === "approval") {
-        const reason = buildApprovalReason(decision.request);
-        const approved = await input.requestApproval(decision.request);
-        if (!approved)
-          return {
-            allowed: false,
-            refusal: `The user refused approval, so the action was not executed: ${reason} Do not ask again; change your approach or report the limitation instead.`,
-          };
-      }
     }
     return { allowed: true };
   }
