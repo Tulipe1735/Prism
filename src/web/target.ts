@@ -41,15 +41,15 @@ function isPublicIpv6(address: string): boolean {
   if (!groups) return false;
   const [first = 0, second = 0] = groups;
   const firstFiveZero = groups.slice(0, 5).every((group) => group === 0);
-  if (firstFiveZero && groups[5] === 0xFFFF)
+  if (firstFiveZero && groups[5] === 0xffff)
     return isPublicIpv4(joinIpv4(((groups[6] ?? 0) << 16) | (groups[7] ?? 0)));
   if (groups.slice(0, 6).every((group) => group === 0)) return false; // unspecified, loopback, and IPv4-compatible ranges
-  if ((first & 0xFE00) === 0xFC00) return false; // unique local
-  if ((first & 0xFFC0) === 0xFE80) return false; // link-local
-  if ((first & 0xFF00) === 0xFF00) return false; // multicast
-  if (first === 0x2001 && (second === 0x0DB8 || second === 0)) return false; // documentation, Teredo
+  if ((first & 0xfe00) === 0xfc00) return false; // unique local
+  if ((first & 0xffc0) === 0xfe80) return false; // link-local
+  if ((first & 0xff00) === 0xff00) return false; // multicast
+  if (first === 0x2001 && (second === 0x0db8 || second === 0)) return false; // documentation, Teredo
   if (first === 0x2002) return false; // deprecated 6to4
-  if (first === 0x0064 && second === 0xFF9B) return false; // NAT64
+  if (first === 0x0064 && second === 0xff9b) return false; // NAT64
   if (first === 0x0100 && groups.slice(1, 4).every((group) => group === 0))
     return false; // discard-only
   return true;
@@ -95,7 +95,7 @@ function groupsOf(part: string): number[] | null {
 }
 
 function joinIpv4(value: number): string {
-  return [value >>> 24, (value >>> 16) & 0xFF, (value >>> 8) & 0xFF, value & 0xFF].join(
+  return [value >>> 24, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff].join(
     ".",
   );
 }

@@ -51,7 +51,7 @@ function decodeEntities(text: string): string {
     if (entity.startsWith("#")) {
       const hex = entity[1]?.toLowerCase() === "x";
       const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10);
-      if (Number.isInteger(code) && code > 0 && code <= 0x10_FFFF)
+      if (Number.isInteger(code) && code > 0 && code <= 0x10_ffff)
         return String.fromCodePoint(code);
       return match;
     }

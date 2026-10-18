@@ -302,7 +302,7 @@ describe("webFetch limits", () => {
   it("decodes a declared legacy charset", async () => {
     routes.set("/latin", (_request, response) => {
       response.writeHead(200, { "content-type": "text/plain; charset=iso-8859-1" });
-      response.end(Buffer.from([0x63, 0x61, 0x66, 0xE9]));
+      response.end(Buffer.from([0x63, 0x61, 0x66, 0xe9]));
     });
 
     const page = await webFetch({
