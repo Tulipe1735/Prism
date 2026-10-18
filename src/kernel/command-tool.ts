@@ -1,27 +1,27 @@
-import type { Buffer } from "node:buffer";
+import type { ShellOutcome } from "./shell.ts";
 import type { Tool, ToolResult } from "./tool.ts";
 import { spawn } from "node:child_process";
-import process from "node:process";
 import { StringDecoder } from "node:string_decoder";
+import { killProcessGroup, runProcess } from "./shell.ts";
 import {
   missingArgument,
-  OutputBuffer,
   readNumber,
   readString,
   resolveToolPath,
 } from "./tool-support.ts";
+import { runWindowsCommand } from "./windows-command.ts";
 
 /** How long one command may run before the kernel kills it. */
 export interface CommandToolOptions {
   timeoutMs: number;
 }
 
-/** Runs shell commands in the WSL environment (05 adds the Windows target). */
+/** Runs shell commands in the WSL environment or on the Windows side (ADR-0002). */
 export function createCommandTool(options: CommandToolOptions): Tool {
   return {
     name: "run_command",
     description:
-      "Runs a shell command and returns merged output, the exit code and the duration. The command runs in the workspace unless cwd says otherwise.",
+      'Runs a shell command and returns merged output, the exit code and the duration. The command runs in the workspace unless cwd says otherwise. The "wsl" environment runs it in the kernel\'s own shell; the "windows" environment runs it in cmd.exe on Windows through WSL interop.',
     parameters: {
       type: "object",
       properties: {
@@ -29,7 +29,8 @@ export function createCommandTool(options: CommandToolOptions): Tool {
         environment: {
           type: "string",
           enum: ["wsl", "windows"],
-          description: 'Execution target; defaults to "wsl".',
+          description:
+            'Execution target; defaults to "wsl". "windows" needs WSL interop.',
         },
         cwd: {
           type: "string",
@@ -54,12 +55,7 @@ export function createCommandTool(options: CommandToolOptions): Tool {
         return missingArgument("command");
 
       const environment = readString(args, "environment") ?? context.target;
-      if (environment === "windows")
-        return {
-          content: 'The "windows" environment is not available yet; use "wsl".',
-          isError: true,
-        };
-      if (environment !== "wsl")
+      if (environment !== "wsl" && environment !== "windows")
         return {
           content: `Unknown environment "${environment}"; valid values are "wsl" and "windows".`,
           isError: true,
@@ -79,24 +75,45 @@ export function createCommandTool(options: CommandToolOptions): Tool {
         };
       const timeoutMs = requestedTimeout ?? options.timeoutMs;
 
-      const outcome = await runShell(command, {
+      const run = {
         cwd: target.path,
         timeoutMs,
         signal: context.signal,
-      });
+      };
+      const outcome =
+        environment === "windows"
+          ? await runWindowsCommand({ command, ...run })
+          : await runWslCommand(command, run);
       return commandResult(outcome, timeoutMs);
     },
   };
 }
 
-interface ShellOutcome {
-  exitCode: number | null;
-  signal: NodeJS.Signals | null;
-  durationMs: number;
-  timedOut: boolean;
-  cancelled: boolean;
-  spawnError?: string;
-  output: OutputBuffer;
+/** Runs a command in the shell of the kernel's own side (WSL). */
+function runWslCommand(
+  command: string,
+  options: { cwd: string; timeoutMs: number; signal: AbortSignal },
+): Promise<ShellOutcome> {
+  return runProcess((output) => {
+    const stdout = new StringDecoder("utf8");
+    const stderr = new StringDecoder("utf8");
+    const decoders = { stdout, stderr };
+    return {
+      start: () =>
+        spawn(command, {
+          cwd: options.cwd,
+          shell: true,
+          detached: true,
+          stdio: ["ignore", "pipe", "pipe"],
+        }),
+      onData: (stream, chunk) => output.append(decoders[stream].write(chunk)),
+      onEnd: () => {
+        output.append(stdout.end());
+        output.append(stderr.end());
+      },
+      stop: killProcessGroup,
+    };
+  }, options);
 }
 
 /** Formats the outcome for the model: facts first, then the merged output. */
@@ -117,81 +134,4 @@ function commandResult(outcome: ShellOutcome, timeoutMs: number): ToolResult {
       outcome.cancelled ||
       outcome.exitCode !== 0,
   };
-}
-
-/**
- * Runs one command through a shell and settles when the process group is gone.
- * Timeout and task cancellation kill the whole group, not just the shell.
- */
-function runShell(
-  command: string,
-  options: { cwd: string; timeoutMs: number; signal: AbortSignal },
-): Promise<ShellOutcome> {
-  const output = new OutputBuffer();
-  const startedAt = Date.now();
-  if (options.signal.aborted)
-    return Promise.resolve({
-      exitCode: null,
-      signal: null,
-      durationMs: 0,
-      timedOut: false,
-      cancelled: true,
-      output,
-    });
-
-  return new Promise((resolve) => {
-    const child = spawn(command, {
-      cwd: options.cwd,
-      shell: true,
-      detached: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    const stdout = new StringDecoder("utf8");
-    const stderr = new StringDecoder("utf8");
-    let timedOut = false;
-    let cancelled = false;
-    let spawnError: string | undefined;
-    let settled = false;
-
-    const killGroup = (): void => {
-      if (child.pid === undefined) return;
-      try {
-        process.kill(-child.pid, "SIGKILL");
-      } catch {
-        // The process group already exited.
-      }
-    };
-    const timer = setTimeout(() => {
-      timedOut = true;
-      killGroup();
-    }, options.timeoutMs);
-    const onAbort = (): void => {
-      cancelled = true;
-      killGroup();
-    };
-    options.signal.addEventListener("abort", onAbort, { once: true });
-
-    child.stdout?.on("data", (chunk: Buffer) => output.append(stdout.write(chunk)));
-    child.stderr?.on("data", (chunk: Buffer) => output.append(stderr.write(chunk)));
-    child.on("error", (error) => {
-      spawnError = `Could not start the command: ${error.message}`;
-    });
-    child.on("close", (code, signal) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      options.signal.removeEventListener("abort", onAbort);
-      output.append(stdout.end());
-      output.append(stderr.end());
-      resolve({
-        exitCode: code,
-        signal,
-        durationMs: Date.now() - startedAt,
-        timedOut,
-        cancelled,
-        ...(spawnError === undefined ? {} : { spawnError }),
-        output,
-      });
-    });
-  });
 }
