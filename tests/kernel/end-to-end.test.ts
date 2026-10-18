@@ -418,6 +418,10 @@ it("discovers the preset prism skill and loads its instructions on demand", asyn
 
   // The prompt names the skill so the model can choose it.
   expect(model.requests[0]?.messages[0]?.content).toContain("- prism:");
+  // Without an mcp.json, the kernel connects no servers and registers no MCP tools.
+  expect(
+    model.requests[0]?.tools?.some((tool) => tool.function.name.startsWith("mcp__")),
+  ).toBe(false);
   const results = toolResults(await readSessionLog(dataDir, sessionId));
   expect(results[0]!.content).toContain("prism (bundled)");
   // The body the kernel served is the skill file shipped with Prism.
