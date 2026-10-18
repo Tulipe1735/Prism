@@ -1,6 +1,8 @@
 import type { FakeAnswer, ModelRequest } from "./harness.ts";
 import type { SessionEntry } from "../../src/kernel/session.ts";
 import { createServer, type Server } from "node:http";
+import { fileURLToPath } from "node:url";
+import process from "node:process";
 import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { BROWSER_ENGINES } from "../../src/kernel/types.ts";
 import {
@@ -319,6 +321,91 @@ it("searches through the configured source and fetches a page as text", async ()
   // A private target is refused, and nothing connected to it.
   expect(results[2]!.content).toContain("not a public address");
   expect(webRequests.some((request) => request.path === "/admin")).toBe(false);
+});
+
+const MCP_FIXTURE = fileURLToPath(
+  new URL("../mcp/fixtures/stdio-server.mjs", import.meta.url),
+);
+
+it("runs a configured MCP server's tools like built-ins, outside the scope", async () => {
+  const { kernel, model, workspace, dataDir } = await start({
+    // MCP tools declare no effects, so even the read-only scope runs them.
+    scope: "read-only",
+    mcpConfig: {
+      mcpServers: {
+        demo: {
+          transport: "stdio",
+          command: process.execPath,
+          args: [MCP_FIXTURE, "serve"],
+        },
+      },
+    },
+    answers: [
+      call("call_mcp", "mcp__demo__echo", { text: "through the kernel" }),
+      call("call_missing", "mcp__demo__explode", {}),
+      { text: ["Done."] },
+    ],
+  });
+  const events = await connectEvents(`${kernel.url}/events`);
+  const sessionId = await createSession(kernel.url, workspace);
+  await send(kernel.url, sessionId, "use the external tool");
+  await waitForTaskEnd(kernel.url, sessionId);
+
+  expect(model.requests[0]?.tools?.map((tool) => tool.function.name)).toContain(
+    "mcp__demo__echo",
+  );
+  const results = toolResults(await readSessionLog(dataDir, sessionId));
+  expect(results[0]!.content).toBe("echo: through the kernel");
+  expect(results[0]!.isError).toBe(false);
+  // A tool that throws becomes a result for the model, not a broken task.
+  expect(results[1]!.isError).toBe(true);
+  expect(results[1]!.content).toContain("tool exploded");
+  // No MCP call asked for approval: the three scopes do not cover them.
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(
+    false,
+  );
+  events.close();
+});
+
+it("keeps serving when an MCP server or its configuration is broken", async () => {
+  const { kernel, model, workspace, dataDir } = await start({
+    mcpConfig: {
+      mcpServers: {
+        good: {
+          transport: "stdio",
+          command: process.execPath,
+          args: [MCP_FIXTURE, "serve"],
+        },
+        broken: {
+          transport: "stdio",
+          command: process.execPath,
+          args: [MCP_FIXTURE, "crash"],
+        },
+      },
+    },
+    answers: [call("call_good", "mcp__good__echo", { text: "still here" })],
+  });
+  const sessionId = await createSession(kernel.url, workspace);
+  await send(kernel.url, sessionId, "use the working server");
+  await waitForTaskEnd(kernel.url, sessionId);
+
+  const results = toolResults(await readSessionLog(dataDir, sessionId));
+  expect(results[0]!.content).toBe("echo: still here");
+  expect(model.requests[0]?.tools?.map((tool) => tool.function.name)).toEqual(
+    expect.arrayContaining(["mcp__good__echo"]),
+  );
+  expect(model.requests[0]?.tools?.map((tool) => tool.function.name)).not.toEqual(
+    expect.arrayContaining([expect.stringContaining("mcp__broken__")]),
+  );
+
+  // A malformed configuration is reported without taking the kernel down.
+  const malformed = await start({
+    mcpConfig: { mcpServers: { broken: { transport: "carrier-pigeon" } } },
+  });
+  await expect(api(malformed.kernel.url, "/status")).resolves.toMatchObject({
+    status: 200,
+    body: { status: "ready" },
+  });
 });
 
 for (const engine of BROWSER_ENGINES) {

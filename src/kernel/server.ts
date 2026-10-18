@@ -19,6 +19,8 @@ import {
 import { SessionStoreError } from "./session-store.ts";
 import { isPermissionScope, PERMISSION_SCOPES } from "./types.ts";
 import { createWebTools, type WebFetchOverrides } from "./web-tools.ts";
+import { loadMcpConfig } from "../mcp/config.ts";
+import { McpHost } from "../mcp/host.ts";
 
 /** Cap on request bodies; the workbench sends small JSON documents. */
 const MAX_BODY_BYTES = 1_000_000;
@@ -68,9 +70,10 @@ export async function startKernel(
     },
     ...(options.webFetch === undefined ? {} : { fetch: options.webFetch }),
   });
+  const mcp = await connectMcpServers(options.config.dataDir);
   const kernel = new Kernel({
     ...options,
-    tools: [...browser.tools, ...web, ...(options.tools ?? [])],
+    tools: [...browser.tools, ...web, ...mcp.tools, ...(options.tools ?? [])],
   });
   const clients = new Set<ServerResponse>();
   const unsubscribe = kernel.subscribe((event) => {
@@ -105,6 +108,7 @@ export async function startKernel(
     clients.clear();
     await kernel.close();
     await browser.close();
+    await mcp.close();
     const draining = new Promise<void>((resolve) => server.close(() => resolve()));
     server.closeAllConnections();
     await draining;
@@ -265,6 +269,25 @@ export async function startKernel(
 function writeEvent(response: ServerResponse, event: KernelEvent): void {
   if (response.writableEnded) return;
   response.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+}
+
+/**
+ * Connects the servers from `<dataDir>/mcp.json`, which ships absent (zero
+ * servers). A missing file means zero servers; a malformed file or an
+ * unreachable server is reported on stderr and never stops the kernel or the
+ * other servers (US-34).
+ */
+async function connectMcpServers(dataDir: string): Promise<McpHost> {
+  const config = await loadMcpConfig(dataDir).catch((error: unknown) => {
+    console.error(
+      `MCP configuration could not be read: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return { servers: {} };
+  });
+  const host = await McpHost.connect(config);
+  for (const failure of host.failures)
+    console.error(`MCP server "${failure.server}" is unavailable: ${failure.message}`);
+  return host;
 }
 
 function sendJson(response: ServerResponse, status: number, body: unknown): void {
