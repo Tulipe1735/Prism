@@ -1,7 +1,7 @@
 {
   "name": "@tulipe1735/prism",
   "version": "0.1.6",
-  "description": "Personal research agent with a self-written task loop, sourced briefs, shared memory, and local browser execution.",
+  "description": "Personal coding agent: Windows desktop workbench, agent execution in WSL.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -9,8 +9,7 @@
   },
   "type": "module",
   "bin": {
-    "prism": "dist/cli.js",
-    "prism-agent": "dist/agent.js"
+    "prism": "dist/cli.js"
   },
   "files": [
     "dist",
@@ -21,33 +20,24 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts --format esm --clean --sourcemap --no-splitting && node -e \"require('node:fs').copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
     "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/interfaces/cli.ts",
-    "eval": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/cli.ts",
-    "eval:report": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/report-cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
     "start": "node dist/cli.js",
     "test": "vitest run --exclude '.scratch/**'",
-    "typecheck": "tsc --noEmit",
-    "eval:cohort": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/cohort.ts",
-    "agent": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/assistant/cli.ts",
-    "eval:assistant": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/assistant/run.ts"
+    "typecheck": "tsc --noEmit"
   },
   "engines": {
     "node": ">=22.19.0"
   },
   "dependencies": {
-    "@larksuiteoapi/node-sdk": "^1.76.0",
-    "cheerio": "^1.2.0",
     "chrome-remote-interface": "0.34.0",
-    "fast-xml-parser": "^5.11.2",
-    "mammoth": "^1.13.0",
-    "pdf-parse": "^2.4.5",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@antfu/eslint-config": "4.0.1",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@types/chrome-remote-interface": "0.34.0",
     "@types/node": "22.20.1",
     "eslint": "9.39.5",

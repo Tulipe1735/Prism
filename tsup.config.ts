@@ -7,13 +7,5 @@ export default defineConfig({
   entry: {
     cli: "src/interfaces/cli.ts",
     daemon: "src/interfaces/daemon.ts",
-    agent: "src/assistant/cli.ts",
   },
-  external: [
-    "@larksuiteoapi/node-sdk",
-    "pdf-parse",
-    "mammoth",
-    "cheerio",
-    "fast-xml-parser",
-  ],
 });

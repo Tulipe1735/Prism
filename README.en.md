@@ -2,88 +2,68 @@
 
 English | [简体中文](README.md)
 
-A personal research agent built for everyday use. Discover papers and repositories,
-compare approaches, and carry research progress into the next task.
+A personal coding agent built for long-term use. The desktop workbench runs on Windows,
+and the agent works in WSL on your repository: reading code, editing files, running
+commands and tests, and verifying task results.
 
-Prism runs its own task loop with DeepSeek. Two Feishu roles share durable research
-state; a local worker uses the browser CLI for an already signed-in NWPU portal.
+Prism runs its own task loop and ships with a Prism browser tool, MCP, skills, web
+search, and cross-session memory. The default model is DeepSeek.
 
-Code: [loop](src/assistant/runtime.ts) · [prompts](src/assistant/prompts.ts) ·
-[orchestration](src/assistant/service.ts)
+Code: [browser capability](src/browser) · [browser CLI](src/interfaces/cli.ts) ·
+[receipts and sessions](src/cli/sessions.ts)
 
-## Features
+## Status
 
-- **Morning brief:** 10:00 Asia/Shanghai, Gmail subscriptions and actual GitHub
-  Trending. Silence when nothing merits a recommendation.
-- **Deep research:** alternative methods, assumptions, evidence, costs and limits; check
-  and revise within 20 minutes.
-- **Personal knowledge:** Notion-to-Markdown sync; manual Markdown, text PDF and resume
-  imports with source locations.
-- **Shared state:** progress, preferences and editable corrections. Delivery, reading
-  and demonstrated understanding remain distinct.
-- **Learning:** course records and nwpu-cram materials, with local observations and
-  execution receipts.
+Under reconstruction. The previous personal research assistant has been removed; the new
+agent kernel and Electron desktop are not implemented yet.
 
-Code: [sources](src/assistant/connectors.ts) · [library](src/assistant/library.ts) ·
-[store](src/assistant/store.ts) · [courses](src/assistant/courses.ts) ·
-[worker](src/assistant/local.ts)
+Available today: the `prism` browser CLI, documented in the
+[browser guide](docs/browser-cli.md).
 
-## Run
+## First-version goals
+
+- **Desktop workbench**: an Electron interface on Windows with workspaces, sessions,
+  chat, tool activity, code changes, and task artifacts. No built-in editor, file tree,
+  or interactive terminal.
+- **Full development loop**: read and write files, run commands and tests in a WSL
+  workspace, with verifiable results.
+- **Preset capabilities**:
+  - Prism browser: observation, target references, action validation, and input
+    receipts; serves the built-in agent first, and may open up to external agents later.
+  - MCP: connect external tool servers.
+  - Skills: loaded on demand from directory conventions.
+  - Web search: built-in `web_search` and `web_fetch`, DeepSeek by default,
+    configurable.
+  - Cross-session memory: session history is persisted, resumable, and compactable.
+- **Permission boundary**: three scopes (read-only / workspace-write / full access) with
+  out-of-scope approvals granted once; modeled after
+  [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
+- **Model**: DeepSeek API by default; any OpenAI-compatible endpoint can be configured.
+
+## Architecture
+
+![Prism architecture](docs/architecture.svg)
+
+The Electron interface runs on Windows; the kernel runs in WSL. The two communicate over
+local HTTP/SSE, and the desktop starts the kernel through `wsl.exe`. See
+[ADR-0001](docs/adr/0001-windows-ui-wsl-execution.md).
+
+[Editable Excalidraw source](docs/architecture.excalidraw) · [Glossary](GLOSSARY.md) ·
+[Requirements](docs/requirements-2026-10-18-coding-agent.md)
+
+## Development
 
 Requires Node.js ≥22.19 and pnpm.
 
 ```bash
 pnpm install
-pnpm build
-cp .env.example .env
-# Configure DeepSeek, actual monthly infrastructure cost, and integrations
-node --env-file=.env dist/agent.js init
-node --env-file=.env dist/agent.js doctor
-node --env-file=.env dist/agent.js ask "Compare the approaches in my research library" --deep
-node --env-file=.env dist/agent.js serve
-```
-
-See the [setup guide](docs/assistant.md) for integrations and deployment. Infrastructure
-and model usage share a monthly CNY 50 cap. Estimates use configured rates; reconcile
-provider bills.
-
-Code: [CLI](src/assistant/cli.ts) · [config](src/assistant/config.ts) ·
-[Feishu](src/assistant/feishu.ts) · [deployment](compose.assistant.yaml)
-
-## Architecture
-
-![Prism personal research architecture](docs/architecture.svg)
-
-[Editable Excalidraw](docs/architecture.excalidraw) ·
-[module index](docs/architecture.md) · [glossary](GLOSSARY.md)
-
-Code: [agent](src/assistant) · [browser CLI](src/interfaces/cli.ts) ·
-[receipts](src/cli/sessions.ts)
-
-## Developer preview
-
-See the [verification record](docs/assistant-verification.md) for tested and pending
-scope.
-
-Controlled integration tests cover task results, citations, state, sync, budgets and
-delivery. Live messaging, cloud operation, personal Notion/Gmail imports and NWPU
-queries require credentials and live acceptance. This version has not been deployed.
-
-The existing `prism` browser CLI remains available:
-[browser guide](docs/browser-cli.en.md), [agent skill](skills/prism/SKILL.md).
-
-Code: [tests](tests/assistant) · [research evaluation](evals/assistant/README.md) ·
-[browser tests](tests/cli)
-
-## Development
-
-```bash
 pnpm typecheck
 pnpm test
 pnpm build
 ```
 
-MIT License. README structure inspired by
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
+See [skills/prism](skills/prism/SKILL.md) for the agent skill of the existing browser
+CLI.
 
-Code: [test configuration](vitest.config.ts) · [build entries](tsup.config.ts)
+MIT License. The README follows the structure of
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
