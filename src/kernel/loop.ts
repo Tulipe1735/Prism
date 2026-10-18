@@ -229,6 +229,8 @@ interface PreparedCall {
   context?: ToolContext;
   /** What the call declares it will touch; empty when the tool declares nothing. */
   effects: PermissionAction[];
+  /** Set when deciding the effects failed; the call is refused instead of run. */
+  effectError?: string;
 }
 
 /**
@@ -244,7 +246,18 @@ function prepareCall(
   const args = parseArguments(call.arguments);
   if (tool === undefined) return { call, args, effects: [] };
   const context = toolContext(run, tool.name);
-  return { call, tool, args, context, effects: tool.effects?.(args, context) ?? [] };
+  try {
+    return { call, tool, args, context, effects: tool.effects?.(args, context) ?? [] };
+  } catch (error) {
+    return {
+      call,
+      tool,
+      args,
+      context,
+      effects: [],
+      effectError: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 /** The live context of one tool call, shared by its effect check and its run. */
@@ -265,9 +278,11 @@ function toolContext(run: TaskRun, toolName: string): ToolContext {
 
 async function executeTool(run: TaskRun, prepared: PreparedCall): Promise<ToolResult> {
   const { kernel } = run;
-  const { call, tool, args, context, effects } = prepared;
+  const { call, tool, args, context, effects, effectError } = prepared;
   if (tool === undefined || context === undefined)
     return { content: `Unknown tool "${call.name}".`, isError: true };
+  if (effectError !== undefined)
+    return { content: `Tool "${call.name}" failed: ${effectError}`, isError: true };
   try {
     // The permission scope is enforced here, before the tool runs: a call
     // whose action is out of scope needs approval first (ADR-0005).

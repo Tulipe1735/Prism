@@ -299,7 +299,7 @@ function renderSearchSettings(settings: KernelSettings): string {
   )}" autocomplete="off"></label>
   <label>端点 <input name="baseUrl" value="${escapeHtml(
     settings.search.baseUrl ?? "",
-  )}" placeholder="默认用来源自己的端点" autocomplete="off"></label>
+  )}" placeholder="可留空：沿用当前端点（默认用来源自己的）" autocomplete="off"></label>
   <button type="submit">保存搜索</button>
 </form>`;
 }

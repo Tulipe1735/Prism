@@ -615,6 +615,47 @@ it("records the declared effects of each tool call in the session log", async ()
   expect(calls[2]).not.toHaveProperty("effects");
 });
 
+it("reports a tool whose effects cannot be decided without running it", async () => {
+  let ran = false;
+  const broken: Tool = {
+    name: "broken_effects",
+    description: "Test tool whose effect check throws.",
+    parameters: { type: "object", properties: {} },
+    effects: () => {
+      throw new Error("effect check exploded");
+    },
+    execute: async () => {
+      ran = true;
+      return { content: "should not run" };
+    },
+  };
+  const { kernel, workspace } = await start({
+    answers: [
+      { toolCalls: [{ id: "call_1", name: "broken_effects", arguments: "{}" }] },
+      { text: ["Understood."] },
+    ],
+    tools: [broken],
+  });
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "do it" },
+  });
+  const failed = await events.waitFor(
+    (event) => event.type === "tool.failed" && event.callId === "call_1",
+  );
+  if (failed.type !== "tool.failed") throw new Error("Expected a failed tool");
+  expect(failed.error).toContain("effect check exploded");
+  // The failure stays inside the call: the tool never ran and the task went on.
+  expect(ran).toBe(false);
+  await events.waitFor(
+    (event) => event.type === "message.delta" && event.delta === "Understood.",
+  );
+  events.close();
+});
+
 it("starts from the scope and the browser approval setting in the config file", async () => {
   const { kernel } = await start({
     configFile: {
