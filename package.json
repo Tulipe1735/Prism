@@ -32,12 +32,12 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
     "chrome-remote-interface": "0.34.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@antfu/eslint-config": "4.0.1",
-    "@modelcontextprotocol/sdk": "1.30.0",
     "@types/chrome-remote-interface": "0.34.0",
     "@types/node": "22.20.1",
     "eslint": "9.39.5",
