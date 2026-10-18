@@ -62,7 +62,9 @@ const SEARCH_ANSWER = {
 };
 
 /** Long enough that reading it pushes the session over its compaction trigger. */
-const NOTE = `${"The release note: Prism 0.1.6 ships the kernel browser tools.\n".repeat(20)}`;
+const NOTE = "The release note: Prism 0.1.6 ships the kernel browser tools.\n".repeat(
+  20,
+);
 
 const PUBLIC_PAGE = `<!doctype html><title>Prism notes</title>
 <h1>Prism notes</h1><p>Extract this text.</p>
@@ -164,18 +166,14 @@ async function waitForTaskEnd(url: string, sessionId: string): Promise<void> {
 
 /** The result of one earlier tool call, by its call id. */
 function resultOf<T>(request: ModelRequest, callId: string): T {
-  const torn = (): never => {
-    throw new Error(`The model request carries no result for call ${callId}`);
-  };
   for (const [index, message] of request.messages.entries()) {
     if (!message.tool_calls?.some((call) => call.id === callId)) continue;
-    for (let next = index + 1; next < request.messages.length; next += 1) {
-      const candidate = request.messages[next]!;
-      if (candidate.role === "tool") return JSON.parse(candidate.content ?? "") as T;
-    }
-    return torn();
+    const result = request.messages
+      .slice(index + 1)
+      .find((candidate) => candidate.role === "tool");
+    if (result !== undefined) return JSON.parse(result.content ?? "") as T;
   }
-  return torn();
+  throw new Error(`The model request carries no result for call ${callId}`);
 }
 
 /** A scripted round that calls one tool straight away. */
@@ -393,13 +391,17 @@ it("keeps serving when an MCP server or its configuration is broken", async () =
   );
 
   // A malformed configuration is reported without taking the kernel down.
-  const malformed = await start({
+  const malformed = await startTestKernel({
     mcpConfig: { mcpServers: { broken: { transport: "carrier-pigeon" } } },
   });
-  await expect(api(malformed.kernel.url, "/status")).resolves.toMatchObject({
-    status: 200,
-    body: { status: "ready" },
-  });
+  try {
+    await expect(api(malformed.kernel.url, "/status")).resolves.toMatchObject({
+      status: 200,
+      body: { status: "ready" },
+    });
+  } finally {
+    await malformed.cleanup();
+  }
 });
 
 it("discovers the preset prism skill and loads its instructions on demand", async () => {
