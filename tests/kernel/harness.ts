@@ -323,8 +323,10 @@ export async function startTestKernel(
     compaction?: Partial<CompactionConfig>;
     /** Overrides for `command` in the kernel config. */
     command?: Partial<CommandConfig>;
-    /** Overrides the bundled skills root; the real one resolves by default. */
+    /** Overrides the skill roots entirely; otherwise the temporary roots apply. */
     skillRoots?: SkillToolRoots;
+    /** `package`: resolve the skills shipped with Prism, as a user install does. */
+    bundledSkills?: "empty" | "package";
     /** Test seam: transport overrides for a controlled HTTP service. */
     webFetch?: WebFetchOverrides;
   } = {},
@@ -369,7 +371,10 @@ export async function startTestKernel(
       : { browserActionsNeedApproval: options.browserActionsNeedApproval }),
     ...(options.tools === undefined ? {} : { tools: options.tools }),
     ...(options.webFetch === undefined ? {} : { webFetch: options.webFetch }),
-    skillRoots: options.skillRoots ?? { home, bundled },
+    skillRoots: options.skillRoots ?? {
+      home,
+      ...(options.bundledSkills === "package" ? {} : { bundled }),
+    },
     instructionRoots: { home },
   });
   return {

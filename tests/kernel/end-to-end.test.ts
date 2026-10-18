@@ -1,6 +1,8 @@
 import type { FakeAnswer, ModelRequest } from "./harness.ts";
 import type { SessionEntry } from "../../src/kernel/session.ts";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import process from "node:process";
 import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
@@ -40,6 +42,9 @@ const SEARCH_ANSWER = {
     },
   ],
 };
+
+/** Long enough that reading it pushes the session over its compaction trigger. */
+const NOTE = `${"The release note: Prism 0.1.6 ships the kernel browser tools.\n".repeat(20)}`;
 
 const PUBLIC_PAGE = `<!doctype html><title>Prism notes</title>
 <h1>Prism notes</h1><p>Extract this text.</p>
@@ -406,6 +411,136 @@ it("keeps serving when an MCP server or its configuration is broken", async () =
     status: 200,
     body: { status: "ready" },
   });
+});
+
+it("discovers the preset prism skill and loads its instructions on demand", async () => {
+  const { kernel, model, workspace, home, dataDir } = await start({
+    // The skills shipped with Prism resolve like they do in a user install.
+    bundledSkills: "package",
+    answers: [
+      call("call_list", "skill", {}),
+      call("call_read", "skill", { name: "prism" }),
+      { text: ["Read it."] },
+    ],
+  });
+  const sessionId = await createSession(kernel.url, workspace);
+  await send(kernel.url, sessionId, "how do I drive a browser?");
+  await waitForTaskEnd(kernel.url, sessionId);
+
+  // The prompt names the skill so the model can choose it.
+  expect(model.requests[0]?.messages[0]?.content).toContain("- prism:");
+  const results = toolResults(await readSessionLog(dataDir, sessionId));
+  expect(results[0]!.content).toContain("prism (bundled)");
+  // The body the kernel served is the skill file shipped with Prism.
+  const shipped = await readFile(
+    fileURLToPath(new URL("../../skills/prism/SKILL.md", import.meta.url)),
+    "utf8",
+  );
+  const body = shipped.replace(/^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, "").trim();
+  expect(results[1]!.content).toBe(body);
+});
+
+it("compacts a long session, loads nested instructions and keeps memory across sessions", async () => {
+  const { kernel, model, workspace, home, dataDir } = await start({
+    compaction: { triggerTokens: 300, keepTokens: 100 },
+    answers: [
+      call("call_read", "read_file", { path: "src/note.txt" }),
+      { text: ["SUMMARY: the release note in src/note.txt was read."] },
+      { text: ["Read the note."] },
+      { text: ["Fresh session, nothing to add."] },
+    ],
+  });
+  // Instructions at every level the kernel reads: global, ancestor, workspace.
+  await mkdir(join(home, ".agents"), { recursive: true });
+  await writeFile(
+    join(home, ".agents", "AGENTS.md"),
+    "Global rule: answer in the user's language.",
+    "utf8",
+  );
+  await writeFile(
+    join(dirname(workspace), "AGENTS.md"),
+    "Ancestor rule: keep each change small.",
+    "utf8",
+  );
+  await writeFile(
+    join(workspace, "AGENTS.md"),
+    "Workspace rule: run pnpm test before reporting.",
+    "utf8",
+  );
+  await mkdir(join(workspace, "src"), { recursive: true });
+  await writeFile(
+    join(workspace, "src", "AGENTS.md"),
+    "Nested rule: the release note lives in src/note.txt.",
+    "utf8",
+  );
+  await writeFile(join(workspace, "src", "note.txt"), NOTE, "utf8");
+
+  const events = await connectEvents(`${kernel.url}/events`);
+  const sessionId = await createSession(kernel.url, workspace);
+  await send(kernel.url, sessionId, "read the notes and continue");
+  await waitForTaskEnd(kernel.url, sessionId);
+
+  // The long file pushed the context over the trigger; the kernel summarized it.
+  await expect(
+    events.waitFor((event) => event.type === "session.compacted"),
+  ).resolves.toMatchObject({ sessionId, reason: "auto" });
+  events.close();
+
+  // The instructions reached the model outermost first, before anything was read.
+  const first = model.requests[0]!.messages[0]!.content ?? "";
+  expect(first).toContain("Global rule: answer in the user's language.");
+  expect(first).toContain("Ancestor rule: keep each change small.");
+  expect(first).toContain("Workspace rule: run pnpm test before reporting.");
+  expect(first).not.toContain("Nested rule: the release note lives");
+  expect(first.indexOf("Global rule")).toBeLessThan(first.indexOf("Workspace rule"));
+
+  // The summary is written by the session model, in a request of its own.
+  expect(model.requests[1]!.tools).toBeUndefined();
+  expect(model.requests[1]!.messages[0]!.content).toMatch(/summari[sz]e/i);
+
+  // The next round continues from the summary; the replaced turn is gone from
+  // the context but stays in the log, and the nested file joined the prompt.
+  const continued = model.requests[2]!.messages;
+  const context = continued.map((message) => message.content ?? "").join("\n");
+  expect(context).toContain("SUMMARY: the release note in src/note.txt was read.");
+  expect(context).not.toContain("read the notes and continue");
+  expect(context).toContain("Nested rule: the release note lives in src/note.txt.");
+  expect(
+    continued.some(
+      (message) =>
+        message.role === "system" &&
+        (message.content ?? "").includes("Instructions discovered at"),
+    ),
+  ).toBe(true);
+
+  const entries = await readSessionLog(dataDir, sessionId);
+  expect(
+    entries
+      .filter((entry) => entry.type === "compaction")
+      .map((entry) => entry.summary),
+  ).toEqual(["SUMMARY: the release note in src/note.txt was read."]);
+  expect(entries).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        type: "message",
+        role: "user",
+        content: "read the notes and continue",
+      }),
+      expect.objectContaining({
+        type: "tool_result",
+        content: expect.stringContaining("The release note"),
+      }),
+    ]),
+  );
+
+  // A new session in the same workspace starts from the project instructions
+  // without inheriting the old conversation.
+  const second = await createSession(kernel.url, workspace);
+  await send(kernel.url, second, "where are we?");
+  await waitForTaskEnd(kernel.url, second);
+  const secondPrompt = model.requests.at(-1)!.messages[0]!.content ?? "";
+  expect(secondPrompt).toContain("Workspace rule: run pnpm test before reporting.");
+  expect(secondPrompt).not.toContain("SUMMARY: the release note");
 });
 
 for (const engine of BROWSER_ENGINES) {
