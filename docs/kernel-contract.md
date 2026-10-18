@@ -60,12 +60,14 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | ------ | ------------------------------------ | ----------------------- |
 | GET    | `/status`                            | 内核状态                |
 | GET    | `/settings`                          | 读取设置                |
+| PUT    | `/settings`                          | 修改设置（04）          |
 | GET    | `/sessions?workspace=<path>`         | 会话列表                |
 | POST   | `/sessions`                          | 新建会话                |
 | GET    | `/sessions/:id`                      | 继续会话（摘要 + 条目） |
 | DELETE | `/sessions/:id`                      | 删除会话                |
 | POST   | `/sessions/:id/messages`             | 发送用户消息            |
 | POST   | `/sessions/:id/cancel`               | 取消运行中的任务        |
+| POST   | `/sessions/:id/compact`              | 手动压缩上下文          |
 | POST   | `/sessions/:id/approvals/:requestId` | 应答审批                |
 | GET    | `/events`                            | SSE 事件流              |
 | POST   | `/shutdown`                          | 关闭内核                |
@@ -90,15 +92,35 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
     "model": "deepseek-chat",
     "hasApiKey": true
   },
-  "browser": { "engine": "chromium" },
+  "browser": { "engine": "chromium", "actionsNeedApproval": false },
   "search": { "provider": "deepseek" },
   "permissions": { "scope": "workspace-write" }
 }
 ```
 
 - `permissions.scope` 取 `read-only` | `workspace-write` | `full-access`，默认
-  `workspace-write`（ADR-0005）。
-- 设置的**修改**端点由 04（权限范围）与后续 ticket 定义；工作台在本轮只读。
+  `workspace-write`（ADR-0005）；可用 `PUT /settings` 切换。
+- `browser.actionsNeedApproval` 取布尔值，默认 `false`（US-30）：为 `true`
+  时每个浏览器动作都要一次审批。工作台入口由 08 消费本契约出卡片。
+
+### PUT /settings
+
+修改设置。请求体只允许出现要改的字段；未列出的键返回 400 `INVALID_REQUEST`
+（而不是静默忽略）：
+
+```json
+{ "permissions": { "scope": "read-only" } }
+```
+
+```json
+{ "browser": { "actionsNeedApproval": true } }
+```
+
+→ 200，应答体与 `GET /settings` 相同，即修改后生效的全部设置。内核同时把修改合并进
+`<dataDir>/config.json`，下次启动沿用（未写过的字段保持原值）。
+
+- 范围切换立即生效：正在运行的任务，其下一次工具调用就按新档位判定。
+- 本轮不新增事件：修改方以本应答更新界面；其他客户端在需要时读 `GET /settings`。
 
 ### 会话
 
@@ -160,6 +182,36 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 `tool_call` 都有 `tool_result`」；随后写入一条 `system`
 消息说明任务被用户取消。取消后该会话不再产生本次任务的任何事件。
 
+### 压缩
+
+`POST /sessions/:id/compact` → 200。压缩把上下文里较早的部分替换为一条模型写的摘要，写进
+`compaction` 条目；原始条目一条不删。
+
+```json
+{ "compacted": true, "entryId": "<compaction 条目 id>" }
+```
+
+整个上下文仍在保留窗口内时返回 `{ "compacted": false }`
+（没有可压缩的内容，端点不改动会话）。该会话有任务在运行时返回 409 `TASK_RUNNING`。
+
+`compaction` 条目形状见 `src/kernel/session.ts`：`summary` 是摘要正文，
+`firstKeptEntryId` 是其之前全部条目被摘要取代的那条日志条目（`null`
+表示上下文里没有逐字保留的条目）；上下文重建见 `rebuildContext`。
+
+- **自动压缩**：每一轮模型请求前估算当前上下文（约 4 字符 1 token）；超过
+  `compaction.triggerTokens` 时先生成摘要、写入条目，再用压缩后的上下文继续本轮任务。
+- **保留窗口**：最近 `compaction.keepTokens` 估算大小的消息逐字保留；起点不会落在 `tool`
+  结果上，避免留下找不到对应工具调用的消息。
+- **摘要请求**：用会话模型发一次不带工具的内部请求，要求按「目标、决策、进行中、下一步、相关文件」分节；摘要内容就是
+  `summary`。
+- **摘要失败**：不中断任务、不写 `compaction` 条目；追加一条 `system`
+  消息说明失败原因，本次任务沿用完整历史，不再重试压缩。
+- **配置**：`<dataDir>/config.json` 的 `compaction` 段，缺省
+  `{ "triggerTokens": 100000, "keepTokens": 15000 }`；`GET /settings` 不报告这两个值。
+
+写入 `compaction` 条目后内核先发 `session.updated`（`entryCount` 已含该条目），再发
+`session.compacted`。
+
 ### 审批应答
 
 `POST /sessions/:id/approvals/:requestId`，请求体 `{ "approved": true }` → 200
@@ -170,6 +222,29 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 - 内核在应答后发 `approval.resolved`，且不再为该 `requestId` 发 `approval.requested`。
 - 请求的产生方是 04（权限范围与审批）：工具执行前经内核注册待审批请求，再触发
   `approval.requested`。02 提供端点与登记/应答机制。
+
+### 权限执行
+
+范围在**工具执行前**由内核判定，不在工具内部各自实现（`src/kernel/permissions.ts`）。工具用
+`Tool.effects` 声明一次调用会做什么，内核逐项判定后才调用
+`execute`：任何一项被拒绝，工具根本不运行，`tool_result` 是一条 `isError: true` 的说明。
+
+| 动作           | `read-only` | `workspace-write` | `full-access` |
+| -------------- | ----------- | ----------------- | ------------- |
+| 读文件         | 允许        | 允许              | 允许          |
+| 写工作区内文件 | 拒绝        | 允许              | 允许          |
+| 写工作区外文件 | 拒绝        | **审批**          | 允许          |
+| 命令           | 拒绝        | 允许              | 允许          |
+| 浏览器动作     | 允许\*      | 允许\*            | 允许\*        |
+
+- 只读档是硬上限：它直接拒绝，不发审批请求（US-14 由用户切换档位，不由模型请求越权）。
+- 路径按解析后的字符串比较，不跟随符号链接，也没有 OS 级沙箱（ADR-0005）。工作区外写的审批只对本次调用生效，不复用（US-16）。
+- \* 浏览器动作不受三档范围约束（范围只管文件效果）：默认自动执行，仅在
+  `browser.actionsNeedApproval` 为 `true` 时逐个审批。该开关与档位正交。
+- MCP 工具（09）不纳入三档范围：它们的 `Tool.effects` 为空，内核不判定。理由与边界见
+  `docs/permissions.md`。
+
+`Tool.effects` 返回 0..n 个动作；同一次调用中重复的动作只判定一次、只请求一次审批。
 
 ### 关闭
 
@@ -193,18 +268,19 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
 - 不重放历史事件：重连后工作台用 `GET /sessions/:id` 取回状态。事件只用于增量。
 - 事件不带 `id:`，客户端不需要 `Last-Event-ID`。
 
-事件类型（定义见 `src/kernel/events.ts`，共 8 种）：
+事件类型（定义见 `src/kernel/events.ts`，共 9 种）：
 
-| 类型                 | 载荷（除 `type` 外）                                           | 语义                                            |
-| -------------------- | -------------------------------------------------------------- | ----------------------------------------------- |
-| `message.delta`      | `sessionId`, `entryId`, `delta`                                | 助手文本增量；`entryId` 是该消息落盘后的条目 id |
-| `tool.started`       | `sessionId`, `callId`, `name`, `arguments`                     | 工具开始执行                                    |
-| `tool.completed`     | `sessionId`, `callId`, `result`                                | 工具成功结束（`result` 已按上限截断）           |
-| `tool.failed`        | `sessionId`, `callId`, `error`                                 | 工具失败结束                                    |
-| `approval.requested` | `sessionId`, `requestId`, `tool`, `reason`, `target`, `impact` | 需要用户逐次审批                                |
-| `approval.resolved`  | `sessionId`, `requestId`, `approved`                           | 审批已应答                                      |
-| `session.updated`    | `session`（会话摘要）                                          | 会话日志已变化，含最后 `entryCount`/`leafId`    |
-| `kernel.status`      | `status`, `version`, `dataDir`                                 | 连接建立时与状态切换时                          |
+| 类型                 | 载荷（除 `type` 外）                                           | 语义                                                     |
+| -------------------- | -------------------------------------------------------------- | -------------------------------------------------------- |
+| `message.delta`      | `sessionId`, `entryId`, `delta`                                | 助手文本增量；`entryId` 是该消息落盘后的条目 id          |
+| `tool.started`       | `sessionId`, `callId`, `name`, `arguments`                     | 工具开始执行                                             |
+| `tool.completed`     | `sessionId`, `callId`, `result`                                | 工具成功结束（`result` 已按上限截断）                    |
+| `tool.failed`        | `sessionId`, `callId`, `error`                                 | 工具失败结束                                             |
+| `approval.requested` | `sessionId`, `requestId`, `tool`, `reason`, `target`, `impact` | 需要用户逐次审批                                         |
+| `approval.resolved`  | `sessionId`, `requestId`, `approved`                           | 审批已应答                                               |
+| `session.updated`    | `session`（会话摘要）                                          | 会话日志已变化，含最后 `entryCount`/`leafId`             |
+| `session.compacted`  | `sessionId`, `entryId`, `reason`                               | 已写入 `compaction` 条目；`reason` 为 `auto` 或 `manual` |
+| `kernel.status`      | `status`, `version`, `dataDir`                                 | 连接建立时与状态切换时                                   |
 
 顺序保证（可断言）：
 
@@ -217,6 +293,7 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
 4. `approval.requested` 先于同一 `requestId` 的 `approval.resolved`；同一 `requestId` 的
    `approval.requested` 只出现一次。
 5. 取消之后不再出现本次任务的事件。
+6. `session.compacted` 一定在该 `entryId` 对应的 `session.updated` 之后出现。
 
 ## 工具
 
@@ -229,8 +306,33 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
   `docs/skills.md`。技能的名称与描述同时写入系统提示，供模型选择。
 - `echo`：占位工具，返回入参文本；03 接入真实文件与命令工具后保留用于自测。
 
+工具收到的 `ToolContext` 里，`noteExplored(path)`
+由文件与命令工具在解析每个要读、写、列出或作为工作目录的路径时调用（集中在
+`src/kernel/tool-support.ts` 的 `resolveToolPath`）；内核据此把该路径目录链上的嵌套
+`AGENTS.md` 加入上下文，工作区外的路径被忽略。未调用不影响其他行为。
+
 03（文件与命令）、04（权限）、06（浏览器）、07（联网检索）、09（MCP）向同一注册表追加工具；外部工具与内置工具形状相同（PRD
 Implementation Decisions）。
+
+工具执行前，内核用 `Tool.effects`（可选）判定权限：
+
+- 会写文件、跑命令、驱动浏览器的工具必须声明这些动作（`{ kind: "file-write", path }`
+  等）；路径按上下文里的工作区解析后交给内核。
+- 不声明 `effects` 的工具不进三档范围判定：`echo`、`skill` 与 MCP 工具（09）属此类。
+- 判定顺序：`tool.started` 事件先出，判定不通过时该次调用以 `tool.failed`
+  结束，模型读到一条 `isError: true` 的拒绝说明（含拒绝原因与「不要重试」的指引）。
+
+## 指令文件
+
+`AGENTS.md` 按「外层在前、内层在后」写入系统提示，每条都带文件路径：
+
+1. 全局文件 `<home>/.agents/AGENTS.md`（`home` 为运行内核的用户目录）。
+2. 工作目录的祖先目录链，从文件系统根到工作区根（含）。
+3. 工作区内嵌套的 `AGENTS.md`：文件工具经 `ToolContext.noteExplored`
+   上报探索到的路径后，其目录链上的嵌套文件从下一次模型请求起进入上下文，以紧随对话的
+   `system` 消息给出，每个文件只出现一次，跨任务保留。
+
+文件在每次请求前重新读取，因此修改在下一次请求生效；缺失或空文件不产生提示内容。
 
 ## 测试接缝
 

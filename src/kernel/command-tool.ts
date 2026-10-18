@@ -4,11 +4,10 @@ import { spawn } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
 import { killProcessGroup, runProcess } from "./shell.ts";
 import {
-  gatePath,
-  isRefusal,
   missingArgument,
   readNumber,
   readString,
+  resolveToolPath,
 } from "./tool-support.ts";
 import { runWindowsCommand } from "./windows-command.ts";
 
@@ -47,6 +46,9 @@ export function createCommandTool(options: CommandToolOptions): Tool {
       required: ["command"],
       additionalProperties: false,
     },
+    effects: (args) => [
+      { kind: "command", command: readString(args, "command") ?? "" },
+    ],
     execute: async (args, context) => {
       const command = readString(args, "command");
       if (command === undefined || command.trim() === "")
@@ -60,12 +62,7 @@ export function createCommandTool(options: CommandToolOptions): Tool {
         };
 
       const cwd = readString(args, "cwd") ?? ".";
-      const gate = await gatePath(context, cwd, {
-        reason: "Runs a command outside the workspace",
-        impact:
-          "The command runs with a working directory the workspace does not cover.",
-      });
-      if (isRefusal(gate)) return gate;
+      const target = resolveToolPath(context, cwd);
 
       const requestedTimeout = readNumber(args, "timeoutMs");
       if (
@@ -79,7 +76,7 @@ export function createCommandTool(options: CommandToolOptions): Tool {
       const timeoutMs = requestedTimeout ?? options.timeoutMs;
 
       const run = {
-        cwd: gate.path,
+        cwd: target.path,
         timeoutMs,
         signal: context.signal,
       };

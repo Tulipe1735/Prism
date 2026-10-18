@@ -1,10 +1,11 @@
 import type { Buffer } from "node:buffer";
 import type { Server } from "node:http";
-import type { CommandConfig } from "../../src/kernel/config.ts";
+import type { CommandConfig, CompactionConfig } from "../../src/kernel/config.ts";
 import type { KernelEvent } from "../../src/kernel/events.ts";
+import type { SessionEntry } from "../../src/kernel/session.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
 import type { PermissionScope } from "../../src/kernel/types.ts";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -259,12 +260,39 @@ export interface KernelHarness {
   cleanup: () => Promise<void>;
 }
 
+/** The session log as it sits on disk, the way the workbench would replay it. */
+export async function readSessionLog(
+  dataDir: string,
+  sessionId: string,
+): Promise<SessionEntry[]> {
+  const root = join(dataDir, "sessions");
+  for (const directory of await readdir(root)) {
+    try {
+      const lines = (
+        await readFile(join(root, directory, `${sessionId}.jsonl`), "utf8")
+      )
+        .split("\n")
+        .filter((line) => line !== "");
+      return lines.slice(1).map((line) => JSON.parse(line) as SessionEntry);
+    } catch {
+      // Not this workspace directory.
+    }
+  }
+  throw new Error(`Session ${sessionId} was not written under ${root}`);
+}
+
 export async function startTestKernel(
   options: {
     answers?: FakeAnswer[];
     tools?: Tool[];
     scope?: PermissionScope;
+    browserActionsNeedApproval?: boolean;
+    /** Written to `<dataDir>/config.json` before the kernel loads it. */
+    configFile?: Record<string, unknown>;
     workspace?: string;
+    /** Overrides for `compaction` in the kernel config. */
+    compaction?: Partial<CompactionConfig>;
+    /** Overrides for `command` in the kernel config. */
     command?: Partial<CommandConfig>;
   } = {},
 ): Promise<KernelHarness> {
@@ -277,20 +305,32 @@ export async function startTestKernel(
     mkdir(workspace, { recursive: true }),
     mkdir(home, { recursive: true }),
     mkdir(bundled, { recursive: true }),
+    mkdir(dataDir, { recursive: true }),
   ]);
+  if (options.configFile !== undefined)
+    await writeFile(
+      join(dataDir, "config.json"),
+      JSON.stringify(options.configFile),
+      "utf8",
+    );
   const model = await startFakeModel(options.answers ?? []);
   const config = await loadConfig({
     dataDir,
     overrides: {
       model: { baseUrl: model.baseUrl, model: "scripted-model", apiKey: "test-key" },
+      ...(options.compaction === undefined ? {} : { compaction: options.compaction }),
       ...(options.command === undefined ? {} : { command: options.command }),
     },
   });
   const kernel = await startKernel({
     config,
     ...(options.scope === undefined ? {} : { scope: options.scope }),
+    ...(options.browserActionsNeedApproval === undefined
+      ? {}
+      : { browserActionsNeedApproval: options.browserActionsNeedApproval }),
     ...(options.tools === undefined ? {} : { tools: options.tools }),
     skillRoots: { home, bundled },
+    instructionRoots: { home },
   });
   return {
     kernel,

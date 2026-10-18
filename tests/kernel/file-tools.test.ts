@@ -248,7 +248,7 @@ it("cuts a long read at the result limit with a visible notice", async () => {
   events.close();
 });
 
-it("reads outside the workspace only after the user approves once", async () => {
+it("reads a file above the workspace without asking", async () => {
   const { kernel, model, workspace } = await start({
     answers: [
       {
@@ -272,30 +272,17 @@ it("reads outside the workspace only after the user approves once", async () => 
     method: "POST",
     body: { text: "read the file above the workspace" },
   });
-  const requested = await events.waitFor(
-    (event) => event.type === "approval.requested",
-  );
-  if (requested.type !== "approval.requested")
-    throw new Error("Expected an approval request");
-  expect(requested).toMatchObject({
-    sessionId: session.id,
-    tool: "read_file",
-    target: outside,
-  });
-  expect(requested.reason).toMatch(/outside the workspace/);
-
-  const answered = await api<{ approved: boolean }>(
-    kernel.url,
-    `/sessions/${session.id}/approvals/${requested.requestId}`,
-    { method: "POST", body: { approved: true } },
-  );
-  expect(answered.status).toBe(200);
   const completed = await events.waitFor(
     (event) => event.type === "tool.completed" && event.callId === "call_1",
   );
   if (completed.type !== "tool.completed") throw new Error("Expected a completed tool");
   expect(completed.result).toBe("outside content\n");
 
+  // Reads stay outside the three permission scopes (04): no approval, and the
+  // model gets the content directly.
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(
+    false,
+  );
   await events.waitFor(
     (event) => event.type === "session.updated" && event.session.entryCount === 4,
   );

@@ -1,5 +1,5 @@
 import type { ModelConfig } from "./config.ts";
-import type { MessageRole } from "./session.ts";
+import type { ContextMessage, MessageRole } from "./session.ts";
 import type { ToolParameters } from "./tool.ts";
 
 /** One model-ready message, in the shape the loop builds from the session log. */
@@ -10,6 +10,16 @@ export interface ChatMessage {
   toolCalls?: { id: string; name: string; arguments: string }[];
   /** Set on tool messages: the call this result answers. */
   toolCallId?: string;
+}
+
+/** Session context messages in the shape the model transport sends. */
+export function toModelMessages(messages: ContextMessage[]): ChatMessage[] {
+  return messages.map((message) => ({
+    role: message.role,
+    content: message.content,
+    ...(message.toolCalls === undefined ? {} : { toolCalls: message.toolCalls }),
+    ...(message.toolCallId === undefined ? {} : { toolCallId: message.toolCallId }),
+  }));
 }
 
 export interface ModelToolDefinition {
@@ -27,7 +37,8 @@ export type ChatEvent =
 export interface StreamChatOptions {
   model: ModelConfig;
   messages: ChatMessage[];
-  tools: ModelToolDefinition[];
+  /** Omitted or empty for internal calls, such as compaction summaries. */
+  tools?: ModelToolDefinition[];
   signal: AbortSignal;
   /** Overridden in tests; defaults to the global fetch. */
   fetchImpl?: typeof fetch;
@@ -59,7 +70,9 @@ export async function* streamChat(
       body: JSON.stringify({
         model: options.model.model,
         messages: options.messages.map(wireMessage),
-        tools: options.tools.map(wireTool),
+        ...(options.tools === undefined || options.tools.length === 0
+          ? {}
+          : { tools: options.tools.map(wireTool) }),
         stream: true,
       }),
       signal: options.signal,
