@@ -88,6 +88,12 @@ export class Kernel {
     string,
     { controller: AbortController; settled: Promise<void> }
   >();
+  /**
+   * Every task that has not finished writing yet, cancelled ones included: a
+   * cancelled task still appends its last entries, so `close` must wait for it
+   * before the caller removes the data directory.
+   */
+  private readonly settlements = new Set<Promise<void>>();
   private readonly approvals = new Map<
     string,
     { sessionId: string; resolve: (approved: boolean) => void }
@@ -189,18 +195,26 @@ export class Kernel {
   }
 
   async deleteSession(sessionId: string): Promise<void> {
+    const active = this.runs.get(sessionId);
     this.cancelSession(sessionId);
+    // The cancelled task appends its last entries; the log goes away after that.
+    await active?.settled;
     if (!(await this.store.delete(sessionId)))
       throw new KernelError("SESSION_NOT_FOUND", `Session ${sessionId} does not exist`);
   }
 
   /** Rewrites the session title; a session with a running task is refused. */
   async renameSession(sessionId: string, title: string): Promise<SessionSummary> {
-    if (this.runs.has(sessionId))
-      throw new KernelError(
-        "TASK_RUNNING",
-        `Session ${sessionId} has a running task; cancel it before renaming`,
-      );
+    const active = this.runs.get(sessionId);
+    if (active !== undefined) {
+      if (!active.controller.signal.aborted)
+        throw new KernelError(
+          "TASK_RUNNING",
+          `Session ${sessionId} has a running task; cancel it before renaming`,
+        );
+      // A cancelled task may still be appending; rewriting the header could lose it.
+      await active.settled;
+    }
     await this.store.rename(sessionId, title);
     const session = await this.store.summary(sessionId);
     this.emit({ type: "session.updated", session });
@@ -229,7 +243,7 @@ export class Kernel {
 
     const controller = new AbortController();
     const run = { controller, settled: Promise.resolve() };
-    run.settled = runTask({
+    const settled = runTask({
       kernel: this,
       sessionId,
       workspace: session.workspace,
@@ -245,7 +259,10 @@ export class Kernel {
       })
       .finally(() => {
         if (this.runs.get(sessionId) === run) this.runs.delete(sessionId);
+        this.settlements.delete(settled);
       });
+    run.settled = settled;
+    this.settlements.add(settled);
     this.runs.set(sessionId, run);
     return entry.id;
   }
@@ -331,9 +348,8 @@ export class Kernel {
   }
 
   async close(): Promise<void> {
-    const settled = [...this.runs.values()].map((run) => run.settled);
     for (const sessionId of [...this.runs.keys()]) this.cancelSession(sessionId);
-    await Promise.allSettled(settled);
+    await Promise.allSettled([...this.settlements]);
     this.listeners.clear();
   }
 

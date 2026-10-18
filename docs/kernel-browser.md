@@ -32,8 +32,11 @@
   按需。WebKit 在部分 Linux 环境需要系统库：`npx playwright install --with-deps webkit`（需要 root）。
 - 接管已登录浏览器（仅 Chromium 系）：用户先启动 Chrome/Edge，例如
   `google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.prism-chrome"`，内核以
-  `connectOverCDP` 连接。Chrome
+  `connectOverCDP` 连接；内核侧在 `config.json` 的 `browser.endpoint` 填该地址。Chrome
   136+ 不允许在默认 profile 上开启远程调试。关闭会话只关闭内核自有的标签页并断开连接，不关闭用户的浏览器。
+- 引擎与接管地址都写在 `<数据目录>/config.json` 的 `browser` 段（`engine`、
+  `actionsNeedApproval`、`endpoint`）；`actionsNeedApproval` 也可以在运行中经
+  `PUT /settings` 切换，其余字段只读。
 
 ## 保留的语义
 
@@ -55,9 +58,24 @@
 - 不写事件 JSONL：内核的事件流由内核循环（`02`）统一推送，浏览器模块只返回结果。
 - 不设 context 视图预算：一次观察可追加的目标上下文数量由内核循环自行控制，模块只保证「证据属于哪次观察、哪个目标」。
 
+## 内核工具形态（联调）
+
+内核注册的工具：`read_file`、`write_file`、`list_directory`、`glob`、`grep`、`command`、
+`skill`、`echo`，加上浏览器（`browser_open`、`browser_observe`、`browser_context`、
+`browser_act`、`browser_receipt`、`browser_close`）、联网检索（`web_search`、
+`web_fetch`）与 MCP 服务器提供的工具。模型看到的只是注册表，新增工具无需改循环。
+
+- `browser_open` 与 `browser_act` 声明 `browser-action`
+  效果：审批开关打开时逐个走 04 的审批通道；`browser_observe`、`browser_context`、`browser_receipt`
+  是只读观察，不受档位与开关约束。
+- 审批卡片的「目标」用该会话最后一次观察到的页面 URL 加目标引用，例如
+  `http://example.com/ (o_…:e2)`。
+- 键入类动作（fill/select）在参数校验失败时不会触发输入；引擎没装时报错里直接给出
+  `npx playwright install <engine>`。
+
 ## 已知限制
 
 - 接管模式下，新建标签页由 Playwright 发起，Chromium 可能短暂把它切到前台；ADR-0006 拒绝裸 CDP，因此当前不提供「后台标签」开关。
 - `page.goto` 失败（DNS、超时）不阻止会话打开：浏览器错误页也是需要被观察的内容。
-- 打包时（`02`/`12` 接入内核入口）需保证 `snapshot.js` 相对模块路径在 `dist`
-  中可用，做法与现有 CLI 构建把 `snapshot.js` 复制到 `dist/` 相同。
+- 打包：`snapshot.js`
+  由构建复制到每个 bundle 旁边（`dist/snapshot.js`），模块先找 bundle 旁的副本、再找源码位置（`src/browser/snapshot.js`），两处都没有时以「找不到页面脚本，请先构建」报错而不是静默降级。

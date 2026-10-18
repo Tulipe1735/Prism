@@ -8,15 +8,10 @@ import type { ControlState, ObservedAction, PublicState } from "../../browser/st
 import type { SnapshotAction } from "../../shared/types.ts";
 import type { BrowserPage, Observation } from "./session.ts";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { extractInPage, extractRelationsInPage } from "../../browser/representation.ts";
 import { createStateReaderInPage } from "../../browser/state.ts";
 import { StalePageError } from "./session.ts";
-
-const snapshotSource = readFileSync(
-  new URL("../../browser/snapshot.js", import.meta.url),
-  "utf8",
-);
+import { SNAPSHOT_SOURCE } from "./snapshot-source.ts";
 
 export interface EvidenceCapture {
   snapshot: Omit<Observation, "actions"> & { actions: ObservedAction[] };
@@ -52,7 +47,7 @@ export async function captureEvidence(
   return session.readObservation(async () => {
     const value = (await session.evaluate(
       `(() => {
-      const snapshot = ${snapshotSource};
+      const snapshot = ${SNAPSHOT_SOURCE};
       if (!snapshot) return null;
       const reader = (${createStateReaderInPage.toString()})();
       snapshot.actions = snapshot.actions.map(reader.readAction);

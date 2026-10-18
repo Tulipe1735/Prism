@@ -28,11 +28,15 @@ export interface BrowserConfig {
   engine: BrowserEngine;
   /** When true, every browser action goes through one-time approval (US-30). */
   actionsNeedApproval: boolean;
+  /** Chromium only: take over a browser started with `--remote-debugging-port`. */
+  endpoint?: string;
 }
 
 export interface SearchConfig {
   provider: string;
   apiKey?: string;
+  /** Overrides the source endpoint; defaults to the provider's own. */
+  baseUrl?: string;
 }
 
 export interface CompactionConfig {
@@ -96,12 +100,17 @@ const configFileSchema = z
       .object({
         engine: z.enum(BROWSER_ENGINES),
         actionsNeedApproval: z.boolean(),
+        endpoint: z.string().min(1),
       })
       .partial()
       .strict()
       .optional(),
     search: z
-      .object({ provider: z.string().min(1), apiKey: z.string().min(1) })
+      .object({
+        provider: z.string().min(1),
+        apiKey: z.string().min(1),
+        baseUrl: z.string().min(1),
+      })
       .partial()
       .strict()
       .optional(),
