@@ -1,6 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
-import { appendFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
+import {
+  appendFile,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  rmdir,
+  stat,
+  writeFile,
+} from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { z } from "zod";
 
 import {
@@ -9,9 +18,13 @@ import {
   type SessionEntryInput,
   type SessionHeader,
   type SessionLog,
+  type SessionSummary,
 } from "./session.ts";
 
-export type SessionStoreErrorCode = "SESSION_NOT_FOUND" | "INVALID_SESSION_LOG";
+export type SessionStoreErrorCode =
+  | "SESSION_NOT_FOUND"
+  | "INVALID_SESSION_LOG"
+  | "INVALID_INPUT";
 
 export class SessionStoreError extends Error {
   readonly code: SessionStoreErrorCode;
@@ -118,6 +131,65 @@ export class SessionStore {
 
   async filePath(sessionId: string): Promise<string> {
     return this.locate(sessionId);
+  }
+
+  /** Sessions of every workspace, or of one workspace, most recent activity first. */
+  async list(options: { workspace?: string } = {}): Promise<SessionSummary[]> {
+    const workspace = options.workspace && resolve(options.workspace);
+    const summaries: SessionSummary[] = [];
+    for (const path of await this.logFiles()) {
+      const { header, entries } = await this.readLog(path, basename(path, ".jsonl"));
+      if (workspace && header.workspace !== workspace) continue;
+      const last = entries.at(-1);
+      summaries.push({
+        id: header.id,
+        workspace: header.workspace,
+        ...(header.title === undefined ? {} : { title: header.title }),
+        createdAt: header.timestamp,
+        updatedAt: last?.timestamp ?? header.timestamp,
+        entryCount: entries.length,
+        leafId: last?.id ?? null,
+      });
+    }
+    return summaries.sort(
+      (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
+    );
+  }
+
+  async delete(sessionId: string): Promise<boolean> {
+    const path = await this.locate(sessionId).catch(() => null);
+    if (path === null) return false;
+    await rm(path);
+    await rmdir(dirname(path)).catch(() => undefined);
+    return true;
+  }
+
+  /** Removes sessions whose last activity is older than `olderThan`, and returns their ids. */
+  async prune(options: { olderThan: string; workspace?: string }): Promise<string[]> {
+    const cutoff = Date.parse(options.olderThan);
+    if (Number.isNaN(cutoff))
+      throw new SessionStoreError(
+        "INVALID_INPUT",
+        `prune needs an ISO timestamp, received ${JSON.stringify(options.olderThan)}`,
+      );
+    const stale = (await this.list(options)).filter(
+      (session) => Date.parse(session.updatedAt) < cutoff,
+    );
+    for (const session of stale) await this.delete(session.id);
+    return stale.map((session) => session.id);
+  }
+
+  private async logFiles(): Promise<string[]> {
+    const root = join(this.dataDir, "sessions");
+    const directories = await readdir(root).catch(() => [] as string[]);
+    const files: string[] = [];
+    for (const directory of directories) {
+      const entries = await readdir(join(root, directory)).catch(() => [] as string[]);
+      for (const entry of entries) {
+        if (entry.endsWith(".jsonl")) files.push(join(root, directory, entry));
+      }
+    }
+    return files;
   }
 
   private async readLog(path: string, sessionId: string): Promise<SessionLog> {
