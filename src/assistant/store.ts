@@ -93,10 +93,12 @@ export class AssistantStore {
         .run(JSON.stringify(policy));
     });
     // SQLite is authoritative. Rebuild readable mirrors after an interrupted write.
-    for (const document of this.listDocuments()) {
-      if (document.active !== false) this.writeDocument(document);
-      else rmSync(this.documentPath(document.id), { force: true });
-    }
+    this.transaction(() => {
+      for (const document of this.listDocuments()) {
+        if (document.active !== false) this.writeDocument(document);
+        else rmSync(this.documentPath(document.id), { force: true });
+      }
+    });
   }
 
   close(): void {
@@ -115,7 +117,11 @@ export class AssistantStore {
   }
 
   upsertDocument(document: Document): void {
-    const current = { ...document, active: document.active !== false };
+    const current = {
+      ...document,
+      content: document.active === false ? "" : document.content,
+      active: document.active !== false,
+    };
     this.transaction(() => {
       const previous = this.getDocument(current.id);
       this.db
@@ -324,7 +330,12 @@ export class AssistantStore {
         .get(taskId);
       if (previous && previous.month !== month) return false;
       const budget = this.currentBudget(month);
-      const available = money(budget.availableCny) + Number(previous?.units ?? 0);
+      const available =
+        money(budget.limitCny) -
+        money(budget.infrastructureCny) -
+        money(budget.spentCny) -
+        money(budget.reservedCny) +
+        Number(previous?.units ?? 0);
       if (units > available) return false;
       this.db
         .prepare(
@@ -353,6 +364,23 @@ export class AssistantStore {
 
   releaseReservation(taskId: string): void {
     this.db.prepare("DELETE FROM reservations WHERE task_id=?").run(taskId);
+  }
+
+  settleInterruptedBudget(taskId: string): number {
+    return this.transaction(() => {
+      const reservation = this.db
+        .prepare("SELECT month,units FROM reservations WHERE task_id=?")
+        .get(taskId);
+      if (!reservation) return 0;
+      const units = Number(reservation.units);
+      this.db
+        .prepare(
+          "INSERT INTO spending(month,units) VALUES (?,?) ON CONFLICT(month) DO UPDATE SET units=spending.units+excluded.units",
+        )
+        .run(String(reservation.month), units);
+      this.db.prepare("DELETE FROM reservations WHERE task_id=?").run(taskId);
+      return units / 1_000_000;
+    });
   }
 
   budget(): Budget {
@@ -457,6 +485,12 @@ export class AssistantStore {
       const job = this.getLocalJob(id);
       if (!job || job.status !== "pending")
         throw new Error("Only a pending local job can be approved.");
+      if (
+        ["cancelled", "completed", "partial", "failed"].includes(
+          this.requireTask(job.taskId).status,
+        )
+      )
+        throw new Error("A terminal task cannot approve local operations.");
       const approved = {
         ...job,
         command: { ...job.command, approved: true },
@@ -477,6 +511,7 @@ export class AssistantStore {
       for (const row of pending) {
         const job = JSON.parse(String(row.data)) as LocalJob;
         if (job.command.approved === false) continue;
+        if (this.getTask(job.taskId)?.status !== "waiting-device") continue;
         const claimed: LocalJob = {
           ...job,
           status: "claimed",
@@ -691,7 +726,7 @@ function indexText(text: string): string {
     .normalize("NFKC")
     .toLowerCase()
     .match(/[\p{L}\p{N}_]+/gu) ?? []) {
-    for (const part of word.match(/\p{Script=Han}+|[^\p{Script=Han}]+/gu) ?? []) {
+    for (const part of word.match(/\p{Script=Han}+|\P{Script=Han}+/gu) ?? []) {
       if (/\p{Script=Han}/u.test(part)) {
         const characters = [...part];
         if (characters.length === 1) tokens.push(part);
@@ -726,6 +761,18 @@ function chunks(document: Document): Array<{ locator: string; excerpt: string }>
       flush();
       page = Number(pdfPage[1]);
       start = index + 1;
+    }
+    if (line.length > 1600) {
+      flush();
+      for (let offset = 0; offset < line.length; offset += 1520) {
+        const excerpt = line.slice(offset, offset + 1600).trim();
+        if (excerpt)
+          result.push({
+            locator: `${page ? `page ${page}, ` : ""}lines ${index + 1}-${index + 1}`,
+            excerpt,
+          });
+      }
+      continue;
     }
     if (text.length + line.length > 1600 && text) {
       flush();

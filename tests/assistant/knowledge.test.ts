@@ -1,8 +1,11 @@
 import type { Document } from "../../src/assistant/types.ts";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { Buffer } from "node:buffer";
+import { spawn } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, it } from "vitest";
+import { KnowledgeLibrary } from "../../src/assistant/library.ts";
 import { AssistantStore } from "../../src/assistant/store.ts";
 
 const directories: string[] = [];
@@ -35,7 +38,7 @@ const note: Document = {
   updatedAt: "2026-10-18T02:00:00.000Z",
 };
 
-test("资料副本在重启后保持来源、版本及可阅读的 Markdown 产物", () => {
+it("资料副本在重启后保持来源、版本及可阅读的 Markdown 产物", () => {
   const path = directory();
   const store = open(path);
   store.upsertDocument(note);
@@ -46,7 +49,7 @@ test("资料副本在重启后保持来源、版本及可阅读的 Markdown 产�
   expect(readFileSync(restarted.documentPath(note.id), "utf8")).toContain(note.url);
 });
 
-test("中文问题能检索资料原文位置，资料修改后不会继续引用旧版本", () => {
+it("中文问题能检索资料原文位置，资料修改后不会继续引用旧版本", () => {
   const store = open();
   store.upsertDocument(note);
   store.upsertDocument({
@@ -77,7 +80,7 @@ test("中文问题能检索资料原文位置，资料修改后不会继续引�
   });
 });
 
-test("共享研究状态持久化且拒绝覆盖过期版本，撤回资料后派生进展待复核", () => {
+it("共享研究状态持久化且拒绝覆盖过期版本，撤回资料后派生进展待复核", () => {
   const path = directory();
   const store = open(path, { now: () => new Date("2026-10-18T03:00:00Z") });
   store.upsertDocument(note);
@@ -118,7 +121,7 @@ test("共享研究状态持久化且拒绝覆盖过期版本，撤回资料后�
   expect(restarted.listMemory()).toEqual([]);
 });
 
-test("同一消息只生成一个任务且只有一个执行者领取，进度和结果跨重启保留", () => {
+it("同一消息只生成一个任务且只有一个执行者领取，进度和结果跨重启保留", () => {
   const path = directory();
   const first = open(path);
   const second = open(path);
@@ -157,7 +160,7 @@ test("同一消息只生成一个任务且只有一个执行者领取，进度�
   });
 });
 
-test("多个执行者共享月度费用上限，预占跨重启保留且按原月份结算", () => {
+it("多个执行者共享月度费用上限，预占跨重启保留且按原月份结算", () => {
   const path = directory();
   let now = new Date("2026-10-31T15:00:00.000Z");
   const first = open(path, { now: () => now, budgetCny: 50, infrastructureCny: 20 });
@@ -194,7 +197,7 @@ test("多个执行者共享月度费用上限，预占跨重启保留且按原�
   expect(first.budget().availableCny).toBe(7);
 });
 
-test("晨报只允许一次发送领取，结果未知时重启也不会重复发送", () => {
+it("晨报只允许一次发送领取，结果未知时重启也不会重复发送", () => {
   const path = directory();
   const first = open(path);
   const second = open(path);
@@ -224,11 +227,12 @@ test("晨报只允许一次发送领取，结果未知时重启也不会重复�
   ]);
 });
 
-test("本地关键提交在准确内容获批前不交给设备，任务和回执不会重复领取", () => {
+it("本地关键提交在准确内容获批前不交给设备，任务和回执不会重复领取", () => {
   const path = directory();
   const first = open(path);
   const second = open(path);
   const task = first.createTask({ id: "portal-query", message: "准备课程查询" });
+  first.updateTask(task.id, { status: "waiting-device" });
   const command = {
     prism: { command: "act", target: "observed-ref" },
     approved: false,
@@ -254,3 +258,255 @@ test("本地关键提交在准确内容获批前不交给设备，任务和回�
   });
   expect(restarted.claimLocal("laptop")).toBeUndefined();
 });
+
+it("手动导入 Markdown 保留原文件引用，重复导入只更新同一份资料副本", async () => {
+  const store = open();
+  const library = new KnowledgeLibrary(store);
+  const file = join(directory(), "研究笔记.md");
+  writeFileSync(file, "# 反馈研究\n\n先检查工具回执。\n\n[原始附件](./实验报告.pdf)");
+  const imported = await library.importFile(file);
+  expect(imported).toMatchObject({
+    source: "file",
+    title: "反馈研究",
+    metadata: {
+      format: "markdown",
+      parseStatus: "parsed",
+      references: [{ url: "./实验报告.pdf", status: "not-read" }],
+    },
+  });
+  expect(store.search("工具回执")[0]).toMatchObject({
+    documentId: imported.id,
+    url: imported.url,
+    locator: "lines 1-5",
+  });
+  writeFileSync(file, "# 新的重点\n\n现在比较奖励设计。");
+  const updated = await library.importFile(file);
+  expect(updated.id).toBe(imported.id);
+  expect(updated.version).not.toBe(imported.version);
+  expect(store.listDocuments()).toHaveLength(1);
+  expect(store.search("工具回执")).toEqual([]);
+  expect(readFileSync(store.documentPath(updated.id), "utf8")).toContain(
+    "现在比较奖励设计",
+  );
+});
+
+it("可提取文本的 PDF 进入资料库并定位到原始页码", async () => {
+  const store = open();
+  const file = join(directory(), "methods.pdf");
+  writeFileSync(
+    file,
+    pdf([
+      "Agent feedback uses verified execution evidence.",
+      "Course registration does not prove mastery.",
+    ]),
+  );
+  const document = await new KnowledgeLibrary(store).importFile(file);
+  expect(document.metadata).toMatchObject({
+    format: "pdf",
+    parseStatus: "parsed",
+    pageCount: 2,
+  });
+  expect(store.search("feedback")[0]).toMatchObject({
+    documentId: document.id,
+    locator: expect.stringContaining("page 1"),
+    excerpt: expect.stringContaining("verified execution evidence"),
+  });
+  expect(store.search("mastery")[0]?.locator).toContain("page 2");
+});
+
+it("没有文本的 PDF 明确标记未读取，不能生成伪造正文引用", async () => {
+  const store = open();
+  const file = join(directory(), "feedback.pdf");
+  writeFileSync(file, pdf([""]));
+  const document = await new KnowledgeLibrary(store).importFile(file);
+  expect(document).toMatchObject({
+    content: "",
+    metadata: {
+      format: "pdf",
+      parseStatus: "unreadable",
+      unreadPages: [1],
+      warnings: [expect.stringContaining("OCR was not performed")],
+    },
+  });
+  expect(store.search("feedback")).toEqual([]);
+});
+
+it("DOCX 简历可以导入并引用个人原文而不自动生成学习证据", async () => {
+  const store = open();
+  const file = join(directory(), "resume.docx");
+  // A minimal OOXML document containing two Chinese paragraphs, not a parser mock.
+  writeFileSync(
+    file,
+    Buffer.from(
+      "UEsDBBQAAAAIAEVQUl3MVIwQ4AAAAJwBAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbH2Qy07DMBBFf8XyFsUTukAIJekCyhJYlA+w7Eli4Zc8bil/z6QtXaDC0r6PM7rd+hC82GMhl2Ivb1UrBUaTrItTL9+3z829XA/d9isjCbZG6uVca34AIDNj0KRSxsjKmErQlZ9lgqzNh54QVm17BybFirE2demQQ/eEo975KjYH/j5hC3qS4vFkXFi91Dl7Z3RlHfbR/qI0Z4Li5NFDs8t0wwYJVwmL8jfgnHvlHYqzKN50qS86sAs+U7Fgk9kFTqr/a67cmcbRGbzkl7ZckkEiHjh4dVGCdvHnfjjOPXwDUEsDBBQAAAAIAEVQUl02V97cogAAABgBAAALAAAAX3JlbHMvLnJlbHONzzsOwjAMBuCrRN6pCwNCqGkXhNQVlQNEiZtGNA8l4XV7MjBQxMBo+/dnuekedmY3isl4x2Fd1cDISa+M0xzOw3G1g65tTjSLXBJpMiGxsuIShynnsEdMciIrUuUDuTIZfbQilzJqDEJehCbc1PUW46cBS5P1ikPs1RrY8Az0j+3H0Ug6eHm15PKPE1+JIouoKXO4+6hQvdtVYQHbBhcvti9QSwMEFAAAAAgARVBSXfcb1DALAQAARQEAABEAAAB3b3JkL2RvY3VtZW50LnhtbLOxr8jNUShLLSrOzM+zVTLUM1BSSM1Lzk/JzEu3VQoNcdO1ULK3sym3SslPLs1NzStRAKrPK7Yqt1XKKCkpsNLXL07OSM1NLNbLL0jNA8ql5RflJpYAuUXp+uX5RSkFRfnJqcXFQONyc/SNDAzM9HMTM/OUQEYm5adUgugCEFEEIkrsnuxY9WTXrufrGp72tb3fM+vpunnP+zY829r/YnnH05krnnUuf7Gw5+n2pU9btz/Z0fe0f/2L5U3PtnY/a1j+uKHJRh9kAogsApMF6Ia/XLjz+ex1z3f3Aw1/sqP3Rfuqp10rXqxvfDaj71lfz7P+hU9bV7xsXvGsq+HZnPXYDdSHOVsfESR2AFBLAQIUAxQAAAAIAEVQUl3MVIwQ4AAAAJwBAAATAAAAAAAAAAAAAACAAQAAAABbQ29udGVudF9UeXBlc10ueG1sUEsBAhQDFAAAAAgARVBSXTZX3tyiAAAAGAEAAAsAAAAAAAAAAAAAAIABEQEAAF9yZWxzLy5yZWxzUEsBAhQDFAAAAAgARVBSXfcb1DALAQAARQEAABEAAAAAAAAAAAAAAIAB3AEAAHdvcmQvZG9jdW1lbnQueG1sUEsFBgAAAAADAAMAuQAAABYDAAAAAA==",
+      "base64",
+    ),
+  );
+  const document = await new KnowledgeLibrary(store).importFile(file);
+  expect(document).toMatchObject({
+    metadata: { format: "docx", parseStatus: "parsed" },
+    content: expect.stringContaining("个人简历：实现浏览器执行工具与可观测性。"),
+  });
+  expect(store.search("浏览器执行")[0]).toMatchObject({
+    documentId: document.id,
+    locator: expect.stringMatching(/^lines /),
+  });
+  expect(store.listMemory()).toEqual([]);
+});
+
+it("独立进程同时申请模型费用也不能突破同一份月度余额", async () => {
+  const path = directory();
+  const store = open(path, { budgetCny: 50, infrastructureCny: 20 });
+  const workers = [budgetWorker(path, "parallel-a"), budgetWorker(path, "parallel-b")];
+  try {
+    await Promise.all(workers.map((worker) => worker.ready));
+    for (const worker of workers) worker.start();
+    expect((await Promise.all(workers.map((worker) => worker.done))).sort()).toEqual([
+      false,
+      true,
+    ]);
+    expect(store.budget()).toMatchObject({ reservedCny: 20, availableCny: 10 });
+  } finally {
+    for (const worker of workers) worker.kill();
+  }
+});
+
+it("长段落检索只交付相关的有界引用，不把整份资料灌入任务", () => {
+  const store = open();
+  store.upsertDocument({
+    ...note,
+    title: "方法笔记",
+    content: `${"背景材料。".repeat(1000)}独立回执可以验证浏览器输入。`,
+  });
+  const citation = store.search("独立回执")[0]!;
+  expect(citation).toMatchObject({
+    locator: "lines 1-1",
+    excerpt: expect.stringContaining("独立回执"),
+  });
+  expect(citation.excerpt.length).toBeLessThanOrEqual(1600);
+});
+
+it("已报告费用高于预占时仍记账，后续预占必须按真实余额收紧", () => {
+  const store = open(undefined, { budgetCny: 50, infrastructureCny: 20 });
+  expect(store.reserveBudget("first", 10)).toBe(true);
+  expect(store.reserveBudget("second", 20)).toBe(true);
+  store.settleBudget("first", 25);
+  expect(store.budget()).toMatchObject({
+    spentCny: 25,
+    reservedCny: 20,
+    availableCny: 0,
+  });
+  expect(store.reserveBudget("second", 10)).toBe(false);
+  expect(store.reserveBudget("second", 5)).toBe(true);
+  expect(store.budget()).toMatchObject({
+    spentCny: 25,
+    reservedCny: 5,
+    availableCny: 0,
+  });
+});
+
+it("取消任务后，已排队的本地操作不能获批或被设备领取", () => {
+  const store = open();
+  const task = store.createTask({ message: "查询课程" });
+  store.updateTask(task.id, { status: "waiting-device" });
+  const job = store.enqueueLocal(task.id, {
+    prism: { command: "observe" },
+    approved: false,
+  });
+  store.approveLocal(job.id);
+  store.updateTask(task.id, { status: "cancelled" });
+  expect(store.claimLocal("laptop")).toBeUndefined();
+  expect(() => store.approveLocal(job.id)).toThrow(/task/i);
+  expect(store.getLocalJob(job.id)?.status).toBe("pending");
+});
+
+it("重启恢复中断模型请求时将未知用量按预占上界结算，重复恢复不重复扣费", () => {
+  const path = directory();
+  const store = open(path, { budgetCny: 50, infrastructureCny: 20 });
+  store.reserveBudget("interrupted", 3);
+  store.close();
+  const restarted = open(path);
+  expect(restarted.settleInterruptedBudget("interrupted")).toBe(3);
+  expect(restarted.settleInterruptedBudget("interrupted")).toBe(0);
+  expect(restarted.budget()).toMatchObject({
+    spentCny: 3,
+    reservedCny: 0,
+    availableCny: 27,
+  });
+});
+
+function budgetWorker(path: string, taskId: string) {
+  const module = new URL("../../src/assistant/store.ts", import.meta.url).href;
+  const script = `
+    import {AssistantStore} from ${JSON.stringify(module)};
+    const store = new AssistantStore(process.argv[1]);
+    console.log('ready');
+    process.stdin.once('data', () => {
+      console.log(JSON.stringify(store.reserveBudget(process.argv[2], 20)));
+      store.close();
+      process.stdin.destroy();
+    });
+  `;
+  const child = spawn(
+    process.execPath,
+    ["--experimental-strip-types", "--input-type=module", "-e", script, path, taskId],
+    { stdio: ["pipe", "pipe", "pipe"] },
+  );
+  let output = "";
+  let error = "";
+  let ready!: () => void;
+  const readiness = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  child.stdout.on("data", (chunk) => {
+    output += chunk.toString();
+    if (output.includes("ready\n")) ready();
+  });
+  child.stderr.on("data", (chunk) => {
+    error += chunk.toString();
+  });
+  const done = new Promise<boolean>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code) => {
+      ready();
+      if (code !== 0) reject(new Error(error || `Budget worker exited ${code}`));
+      else resolve(JSON.parse(output.trim().split("\n").at(-1)!));
+    });
+  });
+  return {
+    ready: readiness,
+    done,
+    start: () => child.stdin.write("go\n"),
+    kill: () => child.kill(),
+  };
+}
+
+function pdf(pages: string[]): Buffer {
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    `<< /Type /Pages /Kids [${pages.map((_, i) => `${4 + i * 2} 0 R`).join(" ")}] /Count ${pages.length} >>`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  for (const [index, text] of pages.entries()) {
+    const stream = `BT /F1 12 Tf 72 720 Td (${text}) Tj ET`;
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + index * 2} 0 R >>`,
+    );
+    objects.push(
+      `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
+    );
+  }
+  let result = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(result));
+    result += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = Buffer.byteLength(result);
+  result += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets.slice(1))
+    result += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  return Buffer.from(
+    `${result}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`,
+  );
+}
