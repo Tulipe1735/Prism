@@ -32,6 +32,7 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
     "chrome-remote-interface": "0.34.0",
     "html-to-text": "^10.0.1",
     "yaml": "^2.9.1",
@@ -39,7 +40,6 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "4.0.1",
-    "@modelcontextprotocol/sdk": "1.30.0",
     "@types/chrome-remote-interface": "0.34.0",
     "@types/html-to-text": "^9.0.4",
     "@types/node": "22.20.1",

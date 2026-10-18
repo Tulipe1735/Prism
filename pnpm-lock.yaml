@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.30.0
+        version: 1.30.0(zod@4.6.5)
       chrome-remote-interface:
         specifier: 0.34.0
         version: 0.34.0
@@ -24,9 +27,6 @@ importers:
       '@antfu/eslint-config':
         specifier: 4.0.1
         version: 4.0.1(@typescript-eslint/typescript-estree@8.70.1(typescript@5.9.3))(@typescript-eslint/utils@8.70.1(eslint@9.39.5)(typescript@5.9.3))(@vue/compiler-sfc@3.5.43)(eslint@9.39.5)(typescript@5.9.3)(vitest@3.2.7(@types/debug@4.1.13)(@types/node@22.20.1)(yaml@2.9.1))
-      '@modelcontextprotocol/sdk':
-        specifier: 1.30.0
-        version: 1.30.0(zod@4.6.5)
       '@types/chrome-remote-interface':
         specifier: 0.34.0
         version: 0.34.0
