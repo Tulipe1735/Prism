@@ -14,11 +14,10 @@ import { TOOL_RESULT_LIMIT } from "./loop.ts";
 import {
   capText,
   fileError,
-  gatePath,
-  isRefusal,
   missingArgument,
   OutputBuffer,
   readString,
+  resolveToolPath,
 } from "./tool-support.ts";
 
 /** Bytes read at most per file; UTF-8 uses at most four bytes per character. */
@@ -41,13 +40,9 @@ const readFileTool: Tool = {
   execute: async (args, context) => {
     const requested = readString(args, "path");
     if (requested === undefined || requested === "") return missingArgument("path");
-    const gate = await gatePath(context, requested, {
-      reason: "Reads a file outside the workspace",
-      impact: "The file is outside the session workspace.",
-    });
-    if (isRefusal(gate)) return gate;
+    const target = resolveToolPath(context, requested);
     try {
-      const handle = await open(gate.path, "r");
+      const handle = await open(target.path, "r");
       try {
         const { size } = await handle.stat();
         const buffer = Buffer.alloc(Math.min(READ_BYTES, size));
@@ -60,7 +55,7 @@ const readFileTool: Tool = {
         await handle.close();
       }
     } catch (error) {
-      return fileError(gate.display, error) satisfies ToolResult;
+      return fileError(target.display, error) satisfies ToolResult;
     }
   },
 };
@@ -78,22 +73,23 @@ const writeFileTool: Tool = {
     required: ["path", "content"],
     additionalProperties: false,
   },
+  effects: (args, context) => {
+    const requested = readString(args, "path");
+    if (requested === undefined || requested === "") return [];
+    return [{ kind: "file-write", path: resolveToolPath(context, requested).path }];
+  },
   execute: async (args, context) => {
     const requested = readString(args, "path");
     if (requested === undefined || requested === "") return missingArgument("path");
     const content = readString(args, "content");
     if (content === undefined) return missingArgument("content");
-    const gate = await gatePath(context, requested, {
-      reason: "Writes a file outside the workspace",
-      impact: "The change is not contained by the workspace.",
-    });
-    if (isRefusal(gate)) return gate;
+    const target = resolveToolPath(context, requested);
     try {
-      await mkdir(dirname(gate.path), { recursive: true });
-      await writeFile(gate.path, content);
-      return { content: `Wrote ${content.length} characters to ${gate.display}.` };
+      await mkdir(dirname(target.path), { recursive: true });
+      await writeFile(target.path, content);
+      return { content: `Wrote ${content.length} characters to ${target.display}.` };
     } catch (error) {
-      return fileError(gate.display, error) satisfies ToolResult;
+      return fileError(target.display, error) satisfies ToolResult;
     }
   },
 };
@@ -111,13 +107,9 @@ const listDirectoryTool: Tool = {
   },
   execute: async (args, context) => {
     const requested = readString(args, "path") ?? ".";
-    const gate = await gatePath(context, requested, {
-      reason: "Lists a directory outside the workspace",
-      impact: "The listing shows paths outside the session workspace.",
-    });
-    if (isRefusal(gate)) return gate;
+    const target = resolveToolPath(context, requested);
     try {
-      const entries = await readdir(gate.path, { withFileTypes: true });
+      const entries = await readdir(target.path, { withFileTypes: true });
       if (entries.length === 0) return { content: "(empty directory)" };
       const buffer = new OutputBuffer();
       const lines = entries
@@ -129,7 +121,7 @@ const listDirectoryTool: Tool = {
       }
       return { content: buffer.render().replace(/\n$/, "") };
     } catch (error) {
-      return fileError(gate.display, error) satisfies ToolResult;
+      return fileError(target.display, error) satisfies ToolResult;
     }
   },
 };
@@ -154,17 +146,13 @@ const globTool: Tool = {
     const pattern = readString(args, "pattern");
     if (pattern === undefined || pattern === "") return missingArgument("pattern");
     const requested = readString(args, "path") ?? ".";
-    const gate = await gatePath(context, requested, {
-      reason: "Finds files outside the workspace",
-      impact: "The matches can name paths outside the session workspace.",
-    });
-    if (isRefusal(gate)) return gate;
+    const target = resolveToolPath(context, requested);
     try {
       const root = resolve(context.workspace);
       const matches: string[] = [];
       let more = false;
       for await (const entry of glob(pattern, {
-        cwd: gate.path,
+        cwd: target.path,
         withFileTypes: true,
       })) {
         if (entry.isDirectory()) continue;
@@ -180,7 +168,7 @@ const globTool: Tool = {
       const text = matches.join("\n");
       return { content: capText(text, more || text.length > TOOL_RESULT_LIMIT) };
     } catch (error) {
-      return fileError(gate.display, error) satisfies ToolResult;
+      return fileError(target.display, error) satisfies ToolResult;
     }
   },
 };
@@ -214,16 +202,12 @@ const grepTool: Tool = {
       };
     }
     const requested = readString(args, "path") ?? ".";
-    const gate = await gatePath(context, requested, {
-      reason: "Searches files outside the workspace",
-      impact: "The matches can quote content from outside the session workspace.",
-    });
-    if (isRefusal(gate)) return gate;
+    const target = resolveToolPath(context, requested);
     try {
       const root = resolve(context.workspace);
       const buffer = new OutputBuffer();
       let matches = 0;
-      for await (const file of walkFiles(gate.path)) {
+      for await (const file of walkFiles(target.path)) {
         if (buffer.truncated) break;
         const text = await readFile(file, "utf8").catch(() => null);
         if (text === null) continue;
@@ -238,7 +222,7 @@ const grepTool: Tool = {
       if (matches === 0) return { content: `No matches for "${pattern}".` };
       return { content: buffer.render().replace(/\n$/, "") };
     } catch (error) {
-      return fileError(gate.display, error) satisfies ToolResult;
+      return fileError(target.display, error) satisfies ToolResult;
     }
   },
 };
@@ -259,9 +243,9 @@ async function* walkFiles(target: string): AsyncGenerator<string> {
 }
 
 /**
- * The file tools: read, write, list and find inside the workspace. Paths that
- * leave the workspace trigger a one-time approval (04 turns the answer into
- * the scope policy).
+ * The file tools: read, write, list and find inside the workspace. Reads run in
+ * every permission scope; `write_file` declares its write, and the kernel turns
+ * a write outside the workspace into a one-time approval (04).
  */
 export function createFileTools(): Tool[] {
   return [readFileTool, writeFileTool, listDirectoryTool, globTool, grepTool];

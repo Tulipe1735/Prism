@@ -1,6 +1,9 @@
 import type { PermissionScope } from "./types.ts";
 
-import { isAbsolute, relative, resolve } from "node:path";
+import type { WorkspacePath } from "./workspace-path.ts";
+import { resolve } from "node:path";
+
+import { resolveWorkspacePath } from "./workspace-path.ts";
 
 /** Why an action leaves the scope, what it touches and what that implies. */
 export interface ApprovalRequest {
@@ -52,7 +55,10 @@ export class PermissionPolicy {
   decide(action: PermissionAction, workspace: string): PermissionDecision {
     switch (action.kind) {
       case "file-write":
-        return this.decideFileWrite(resolve(workspace, action.path), workspace);
+        return this.decideFileWrite(
+          resolveWorkspacePath(workspace, action.path),
+          workspace,
+        );
       case "command":
         return this.scope === "read-only"
           ? { outcome: "deny", reason: "the read-only scope never runs commands" }
@@ -108,19 +114,22 @@ export class PermissionPolicy {
     return { allowed: true };
   }
 
-  private decideFileWrite(path: string, workspace: string): PermissionDecision {
+  private decideFileWrite(
+    target: WorkspacePath,
+    workspace: string,
+  ): PermissionDecision {
     if (this.scope === "read-only")
       return {
         outcome: "deny",
-        reason: `the read-only scope never writes files (${path})`,
+        reason: `the read-only scope never writes files (${target.path})`,
       };
-    if (this.scope === "workspace-write" && !isInsideWorkspace(workspace, path)) {
+    if (this.scope === "workspace-write" && !target.inside) {
       return {
         outcome: "approval",
         request: {
           reason: "Writes a file outside the workspace",
-          target: path,
-          impact: `Creates or overwrites ${path}, outside the workspace ${resolve(workspace)}.`,
+          target: target.path,
+          impact: `Creates or overwrites ${target.path}, outside the workspace ${resolve(workspace)}.`,
         },
       };
     }
@@ -142,10 +151,4 @@ export function describeScope(scope: PermissionScope): string {
     case "full-access":
       return "full-access: writes anywhere and commands run without approval";
   }
-}
-
-/** True when `path` is the workspace itself or sits below it. */
-function isInsideWorkspace(workspace: string, path: string): boolean {
-  const inner = relative(resolve(workspace), path);
-  return inner === "" || (!inner.startsWith("..") && !isAbsolute(inner));
 }

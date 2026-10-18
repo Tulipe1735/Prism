@@ -57,44 +57,23 @@ export class OutputBuffer {
   }
 }
 
-/** Why a tool asks the user before touching a path. */
-export interface PathRequest {
-  reason: string;
-  impact: string;
+/** A resolved tool path: what to touch, and how to name it to the model. */
+export interface ToolPath {
+  /** Absolute path the tool touches. */
+  path: string;
+  /** Workspace-relative name inside the workspace, absolute outside it. */
+  display: string;
 }
 
 /**
- * Resolves a path and, when it leaves the workspace, asks the user once.
- * Returns the resolved path, or the refusal result for the model.
+ * Resolves a path a tool was asked for. The kernel decides whether touching it
+ * is allowed (04, `Tool.effects`) before the tool runs, so this only resolves
+ * the path and picks the name to report.
  */
-export async function gatePath(
-  context: ToolContext,
-  requested: string,
-  request: PathRequest,
-): Promise<{ path: string; display: string } | ToolResult> {
+export function resolveToolPath(context: ToolContext, requested: string): ToolPath {
   const { path, inside } = resolveWorkspacePath(context.workspace, requested);
-  if (!inside) {
-    const approved = await context.requestApproval({
-      reason: request.reason,
-      target: path,
-      impact: request.impact,
-    });
-    if (!approved)
-      return {
-        content: `The user refused this action: ${request.reason.toLowerCase()} — ${path}.`,
-        isError: true,
-      };
-  }
   const rel = relative(resolve(context.workspace), path);
-  const display = inside ? (rel === "" ? "." : rel) : path;
-  return { path, display };
-}
-
-/** True when a gatePath result carries a refusal instead of a path. */
-export function isRefusal(
-  result: { path: string; display: string } | ToolResult,
-): result is ToolResult {
-  return "content" in result;
+  return { path, display: inside ? (rel === "" ? "." : rel) : path };
 }
 
 /** Wraps a filesystem failure in a tool result the model can act on. */

@@ -95,7 +95,11 @@ const configFileSchema = z
       .partial()
       .strict()
       .optional(),
-    command: z.object({ timeoutMs: z.number().int().positive() }),
+    command: z
+      .object({ timeoutMs: z.number().int().positive() })
+      .partial()
+      .strict()
+      .optional(),
     permissions: z
       .object({ scope: z.enum(PERMISSION_SCOPES) })
       .partial()

@@ -1,9 +1,9 @@
 import type { KernelSettings } from "../../src/kernel/kernel.ts";
 import type { SessionEntry, SessionSummary } from "../../src/kernel/session.ts";
-import type { Tool, ToolContext } from "../../src/kernel/tool.ts";
+import type { Tool } from "../../src/kernel/tool.ts";
 import type { JsonValue } from "../../src/kernel/types.ts";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { api, connectEvents, type KernelHarness, startTestKernel } from "./harness.ts";
 
@@ -45,50 +45,10 @@ function stringField(args: JsonValue, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function writeTarget(args: JsonValue, context: ToolContext): string {
-  return resolve(context.workspace, stringField(args, "path"));
+/** The real `write_file` arguments. */
+function write(path: string, content: string): string {
+  return JSON.stringify({ path, content });
 }
-
-/**
- * Stands in for the file tool 03 adds: it declares the write it performs, and
- * the kernel checks that declaration before `execute` runs.
- */
-const writeFileTool: Tool = {
-  name: "write_file",
-  description: "Test stand-in for the workspace file tool.",
-  parameters: {
-    type: "object",
-    properties: {
-      path: { type: "string" },
-      text: { type: "string" },
-    },
-    required: ["path", "text"],
-    additionalProperties: false,
-  },
-  effects: (args, context) => [
-    { kind: "file-write", path: writeTarget(args, context) },
-  ],
-  execute: async (args, context) => {
-    const path = writeTarget(args, context);
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, stringField(args, "text"), "utf8");
-    return { content: `Wrote ${path}.` };
-  },
-};
-
-/** Stands in for the command tool 03 adds: it declares the command it runs. */
-const runCommandTool: Tool = {
-  name: "run_command",
-  description: "Test stand-in for the command tool.",
-  parameters: {
-    type: "object",
-    properties: { command: { type: "string" } },
-    required: ["command"],
-    additionalProperties: false,
-  },
-  effects: (args) => [{ kind: "command", command: stringField(args, "command") }],
-  execute: async (args) => ({ content: `ran: ${stringField(args, "command")}` }),
-};
 
 /** Stands in for the browser tool 06 adds: it declares the page action. */
 const browserActTool: Tool = {
@@ -111,22 +71,28 @@ const browserActTool: Tool = {
 };
 
 it("asks once for a write outside the workspace and asks again for the next one", async () => {
-  const write = { path: "../outside/note.txt", text: "hello" };
   const { kernel, workspace } = await start({
     answers: [
       {
         toolCalls: [
-          { id: "call_1", name: "write_file", arguments: JSON.stringify(write) },
+          {
+            id: "call_1",
+            name: "write_file",
+            arguments: write("../outside/note.txt", "hello"),
+          },
         ],
       },
       {
         toolCalls: [
-          { id: "call_2", name: "write_file", arguments: JSON.stringify(write) },
+          {
+            id: "call_2",
+            name: "write_file",
+            arguments: write("../outside/note.txt", "hello"),
+          },
         ],
       },
       { text: ["Done."] },
     ],
-    tools: [writeFileTool],
   });
   const outside = resolve(workspace, "..", "outside", "note.txt");
   const events = await connectEvents(`${kernel.url}/events`);
@@ -199,17 +165,19 @@ it("asks once for a write outside the workspace and asks again for the next one"
 });
 
 it("does not run the action when the user refuses and says so to the model", async () => {
-  const write = { path: "../outside/note.txt", text: "hello" };
   const { kernel, model, workspace } = await start({
     answers: [
       {
         toolCalls: [
-          { id: "call_1", name: "write_file", arguments: JSON.stringify(write) },
+          {
+            id: "call_1",
+            name: "write_file",
+            arguments: write("../outside/note.txt", "hello"),
+          },
         ],
       },
       { text: ["I will not write there."] },
     ],
-    tools: [writeFileTool],
   });
   const outside = resolve(workspace, "..", "outside", "note.txt");
   const events = await connectEvents(`${kernel.url}/events`);
@@ -255,17 +223,19 @@ it("does not run the action when the user refuses and says so to the model", asy
 });
 
 it("writes inside the workspace without asking", async () => {
-  const write = { path: "src/note.txt", text: "hello" };
   const { kernel, workspace } = await start({
     answers: [
       {
         toolCalls: [
-          { id: "call_1", name: "write_file", arguments: JSON.stringify(write) },
+          {
+            id: "call_1",
+            name: "write_file",
+            arguments: write("src/note.txt", "hello"),
+          },
         ],
       },
       { text: ["Done."] },
     ],
-    tools: [writeFileTool],
   });
   const inside = join(workspace, "src", "note.txt");
   const events = await connectEvents(`${kernel.url}/events`);
@@ -287,12 +257,15 @@ it("writes inside the workspace without asking", async () => {
 });
 
 it("takes no effects off the table in the full-access scope", async () => {
-  const write = { path: "../outside/note.txt", text: "hello" };
   const { kernel, workspace } = await start({
     answers: [
       {
         toolCalls: [
-          { id: "call_1", name: "write_file", arguments: JSON.stringify(write) },
+          {
+            id: "call_1",
+            name: "write_file",
+            arguments: write("../outside/note.txt", "hello"),
+          },
         ],
       },
       {
@@ -303,7 +276,6 @@ it("takes no effects off the table in the full-access scope", async () => {
       { text: ["Done."] },
     ],
     scope: "full-access",
-    tools: [writeFileTool, runCommandTool],
   });
   const outside = resolve(workspace, "..", "outside", "note.txt");
   const events = await connectEvents(`${kernel.url}/events`);
@@ -332,12 +304,12 @@ it("refuses writes and commands in the read-only scope without asking", async ()
           {
             id: "call_1",
             name: "write_file",
-            arguments: JSON.stringify({ path: "src/note.txt", text: "hello" }),
+            arguments: write("src/note.txt", "hello"),
           },
           {
             id: "call_2",
             name: "write_file",
-            arguments: JSON.stringify({ path: "../outside/note.txt", text: "hello" }),
+            arguments: write("../outside/note.txt", "hello"),
           },
           { id: "call_3", name: "run_command", arguments: '{"command":"touch x"}' },
         ],
@@ -345,7 +317,6 @@ it("refuses writes and commands in the read-only scope without asking", async ()
       { text: ["Understood."] },
     ],
     scope: "read-only",
-    tools: [writeFileTool, runCommandTool],
   });
   const events = await connectEvents(`${kernel.url}/events`);
   const session = await createSession(kernel.url, workspace);
@@ -451,19 +422,21 @@ it("runs browser actions without approval when the setting is off", async () => 
 });
 
 it("switches the scope over HTTP, keeps it in the config file and applies it next", async () => {
-  const write = { path: "../outside/note.txt", text: "hello" };
   const { kernel, workspace, dataDir } = await start({
     answers: [
       {
         toolCalls: [
-          { id: "call_1", name: "write_file", arguments: JSON.stringify(write) },
+          {
+            id: "call_1",
+            name: "write_file",
+            arguments: write("../outside/note.txt", "hello"),
+          },
         ],
       },
       { text: ["Done."] },
     ],
     // The patch must merge into this file, not replace it.
     configFile: { model: { apiKey: "sk-keep-me" } },
-    tools: [writeFileTool],
   });
 
   const switched = await api<KernelSettings>(kernel.url, "/settings", {
