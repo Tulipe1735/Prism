@@ -1,3 +1,4 @@
+import type { RunningKernel } from "../../src/kernel/server.ts";
 import type { SessionSummary } from "../../src/kernel/session.ts";
 import { afterEach, expect, it } from "vitest";
 import { VERSION } from "../../src/shared/version.ts";
@@ -106,6 +107,105 @@ it("creates, lists, continues and deletes sessions over HTTP", async () => {
   expect(gone.body).toMatchObject({ error: { code: "SESSION_NOT_FOUND" } });
   events.close();
 });
+
+it("renames a session and keeps its entries", async () => {
+  const { kernel, workspace } = await start({ answers: [{ text: ["I am done"] }] });
+  const events = await connectEvents(`${kernel.url}/events`);
+  await events.waitFor((event) => event.type === "kernel.status");
+
+  const created = await api<{ session: SessionSummary }>(kernel.url, "/sessions", {
+    method: "POST",
+    body: { workspace, title: "working title" },
+  });
+  const sessionId = created.body.session.id;
+  await api(kernel.url, `/sessions/${sessionId}/messages`, {
+    method: "POST",
+    body: { text: "hello" },
+  });
+  // The rename refuses to rewrite the log while a task appends to it.
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 2,
+  );
+  await settle(kernel, sessionId);
+
+  const renamed = await api<{ session: SessionSummary }>(
+    kernel.url,
+    `/sessions/${sessionId}`,
+    { method: "PATCH", body: { title: "ship the workbench" } },
+  );
+  expect(renamed.status).toBe(200);
+  expect(renamed.body.session).toMatchObject({
+    id: sessionId,
+    title: "ship the workbench",
+    entryCount: 2,
+  });
+  await expect(
+    events.waitFor((event) => event.type === "session.updated"),
+  ).resolves.toMatchObject({ session: { id: sessionId, title: "ship the workbench" } });
+
+  const continued = await api<{ session: SessionSummary; entries: unknown[] }>(
+    kernel.url,
+    `/sessions/${sessionId}`,
+  );
+  expect(continued.body.session.title).toBe("ship the workbench");
+  expect(continued.body.entries).toHaveLength(2);
+
+  const empty = await api<{ error: { code: string } }>(
+    kernel.url,
+    `/sessions/${sessionId}`,
+    { method: "PATCH", body: { title: "  " } },
+  );
+  expect(empty.status).toBe(400);
+  expect(empty.body).toMatchObject({ error: { code: "INVALID_REQUEST" } });
+
+  const missing = await api<{ error: { code: string } }>(
+    kernel.url,
+    "/sessions/11111111-2222-3333-4444-555555555555",
+    { method: "PATCH", body: { title: "nothing here" } },
+  );
+  expect(missing.status).toBe(404);
+  expect(missing.body).toMatchObject({ error: { code: "SESSION_NOT_FOUND" } });
+  events.close();
+});
+
+it("refuses to rename a session while its task runs", async () => {
+  const { kernel, workspace } = await start({ answers: [{ text: ["start"], hold: true }] });
+  const created = await api<{ session: SessionSummary }>(kernel.url, "/sessions", {
+    method: "POST",
+    body: { workspace },
+  });
+  const sessionId = created.body.session.id;
+  await api(kernel.url, `/sessions/${sessionId}/messages`, {
+    method: "POST",
+    body: { text: "keep working" },
+  });
+
+  const renamed = await api<{ error: { code: string } }>(
+    kernel.url,
+    `/sessions/${sessionId}`,
+    { method: "PATCH", body: { title: "too early" } },
+  );
+  expect(renamed.status).toBe(409);
+  expect(renamed.body).toMatchObject({ error: { code: "TASK_RUNNING" } });
+
+  await api(kernel.url, `/sessions/${sessionId}/cancel`, { method: "POST" });
+  const after = await api<{ session: SessionSummary }>(
+    kernel.url,
+    `/sessions/${sessionId}`,
+    { method: "PATCH", body: { title: "too early" } },
+  );
+  expect(after.status).toBe(200);
+  expect(after.body.session.title).toBe("too early");
+});
+
+/** Waits until the kernel no longer counts a task as running for this session. */
+async function settle(kernel: RunningKernel, sessionId: string): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (!kernel.kernel.isRunning(sessionId)) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Task in session ${sessionId} never settled`);
+}
 
 it("answers unknown routes and malformed requests with coded errors", async () => {
   const { kernel, dataDir } = await start();

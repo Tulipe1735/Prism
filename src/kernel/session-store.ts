@@ -173,6 +173,21 @@ export class SessionStore {
     return this.readLog(await this.locate(sessionId), sessionId);
   }
 
+  /**
+   * Replaces the title in the header line. Entries are append-only, so the
+   * whole file is rewritten; the kernel refuses to rename a session whose task
+   * is running, which is the only time the log grows.
+   */
+  async rename(sessionId: string, title: string): Promise<SessionHeader> {
+    const path = await this.locate(sessionId);
+    const text = await readFile(path, "utf8");
+    const lines = text.split("\n");
+    const header = parseLine(headerSchema, lines[0] ?? "", sessionId);
+    const renamed: SessionHeader = { ...header, title };
+    await writeFile(path, [JSON.stringify(renamed), ...lines.slice(1)].join("\n"));
+    return renamed;
+  }
+
   async summary(sessionId: string): Promise<SessionSummary> {
     return summarize(await this.read(sessionId));
   }

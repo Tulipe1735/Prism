@@ -63,6 +63,7 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | GET    | `/sessions?workspace=<path>`         | 会话列表                |
 | POST   | `/sessions`                          | 新建会话                |
 | GET    | `/sessions/:id`                      | 继续会话（摘要 + 条目） |
+| PATCH  | `/sessions/:id`                      | 重命名会话（title）     |
 | DELETE | `/sessions/:id`                      | 删除会话                |
 | POST   | `/sessions/:id/messages`             | 发送用户消息            |
 | POST   | `/sessions/:id/cancel`               | 取消运行中的任务        |
@@ -126,6 +127,9 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
   `{ "session": <摘要>, "entries": [<会话条目>, ...] }`。条目形状见
   `src/kernel/session.ts`（`header`
   以外的日志行，按文件顺序）。工作台重连后由此恢复聊天与工具过程。
+- `PATCH /sessions/:id`，请求体 `{ "title": "<非空>" }` → 200
+  `{ "session": <摘要> }`，并发 `session.updated`。会话有运行中的任务时返回 409
+  `TASK_RUNNING`（日志正在被追加，重写头部不安全）；条目不受影响。
 - `DELETE /sessions/:id` → 200
   `{ "deleted": true }`；若该会话有任务在运行，先取消再删除。
 
