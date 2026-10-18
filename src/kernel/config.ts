@@ -5,7 +5,12 @@ import process from "node:process";
 import { z } from "zod";
 
 import { ConfigError } from "../shared/errors.ts";
-import { BROWSER_ENGINES, type BrowserEngine, PERMISSION_SCOPES, type PermissionScope } from "./types.ts";
+import {
+  BROWSER_ENGINES,
+  type BrowserEngine,
+  PERMISSION_SCOPES,
+  type PermissionScope,
+} from "./types.ts";
 
 export interface ModelConfig {
   /** OpenAI-compatible base URL; request paths are appended to it. */

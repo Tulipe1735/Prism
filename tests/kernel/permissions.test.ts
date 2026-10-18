@@ -32,7 +32,10 @@ async function createSession(url: string, workspace: string): Promise<SessionSum
 
 /** The session log as the workbench reads it, over HTTP. */
 async function readEntries(url: string, sessionId: string): Promise<SessionEntry[]> {
-  const response = await api<{ entries: SessionEntry[] }>(url, `/sessions/${sessionId}`);
+  const response = await api<{ entries: SessionEntry[] }>(
+    url,
+    `/sessions/${sessionId}`,
+  );
   return response.body.entries;
 }
 
@@ -135,8 +138,13 @@ it("asks once for a write outside the workspace and asks again for the next one"
   });
 
   const first = await events.waitFor((event) => event.type === "approval.requested");
-  if (first.type !== "approval.requested") throw new Error("Expected an approval request");
-  expect(first).toMatchObject({ sessionId: session.id, tool: "write_file", target: outside });
+  if (first.type !== "approval.requested")
+    throw new Error("Expected an approval request");
+  expect(first).toMatchObject({
+    sessionId: session.id,
+    tool: "write_file",
+    target: outside,
+  });
   expect(first.reason).toContain("outside the workspace");
   expect(first.impact).toContain(outside);
   await expect(readFile(outside, "utf8")).rejects.toThrow();
@@ -160,7 +168,8 @@ it("asks once for a write outside the workspace and asks again for the next one"
 
   // The same write again: the approval is never remembered (ADR-0005).
   const second = await events.waitFor((event) => event.type === "approval.requested");
-  if (second.type !== "approval.requested") throw new Error("Expected an approval request");
+  if (second.type !== "approval.requested")
+    throw new Error("Expected an approval request");
   expect(second).toMatchObject({ tool: "write_file", target: outside });
   expect(second.requestId).not.toBe(first.requestId);
   await api(kernel.url, `/sessions/${session.id}/approvals/${second.requestId}`, {
@@ -271,7 +280,9 @@ it("writes inside the workspace without asking", async () => {
   );
 
   expect(await readFile(inside, "utf8")).toBe("hello");
-  expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(
+    false,
+  );
   events.close();
 });
 
@@ -284,7 +295,11 @@ it("takes no effects off the table in the full-access scope", async () => {
           { id: "call_1", name: "write_file", arguments: JSON.stringify(write) },
         ],
       },
-      { toolCalls: [{ id: "call_2", name: "run_command", arguments: '{"command":"ls"}' }] },
+      {
+        toolCalls: [
+          { id: "call_2", name: "run_command", arguments: '{"command":"ls"}' },
+        ],
+      },
       { text: ["Done."] },
     ],
     scope: "full-access",
@@ -303,7 +318,9 @@ it("takes no effects off the table in the full-access scope", async () => {
   );
 
   expect(await readFile(outside, "utf8")).toBe("hello");
-  expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(
+    false,
+  );
   events.close();
 });
 
@@ -356,14 +373,20 @@ it("refuses writes and commands in the read-only scope without asking", async ()
     readFile(resolve(workspace, "..", "outside", "note.txt"), "utf8"),
   ).rejects.toThrow();
   // The read-only scope is a hard boundary: it never asks, it refuses.
-  expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(
+    false,
+  );
   events.close();
 });
 
 it("leaves browser actions alone by default and asks when the setting is on", async () => {
   const { kernel, workspace } = await start({
     answers: [
-      { toolCalls: [{ id: "call_1", name: "browser_act", arguments: '{"action":"click"}' }] },
+      {
+        toolCalls: [
+          { id: "call_1", name: "browser_act", arguments: '{"action":"click"}' },
+        ],
+      },
       { text: ["Done."] },
     ],
     browserActionsNeedApproval: true,
@@ -400,7 +423,11 @@ it("leaves browser actions alone by default and asks when the setting is on", as
 it("runs browser actions without approval when the setting is off", async () => {
   const { kernel, workspace } = await start({
     answers: [
-      { toolCalls: [{ id: "call_1", name: "browser_act", arguments: '{"action":"click"}' }] },
+      {
+        toolCalls: [
+          { id: "call_1", name: "browser_act", arguments: '{"action":"click"}' },
+        ],
+      },
       { text: ["Done."] },
     ],
     tools: [browserActTool],
@@ -415,7 +442,9 @@ it("runs browser actions without approval when the setting is off", async () => 
   await events.waitFor(
     (event) => event.type === "tool.completed" && event.callId === "call_1",
   );
-  expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(
+    false,
+  );
   events.close();
 });
 
@@ -442,9 +471,9 @@ it("switches the scope over HTTP, keeps it in the config file and applies it nex
     permissions: { scope: "full-access" },
     browser: { engine: "chromium", actionsNeedApproval: false },
   });
-  await expect(
-    api<KernelSettings>(kernel.url, "/settings"),
-  ).resolves.toMatchObject({ body: { permissions: { scope: "full-access" } } });
+  await expect(api<KernelSettings>(kernel.url, "/settings")).resolves.toMatchObject({
+    body: { permissions: { scope: "full-access" } },
+  });
   expect(
     JSON.parse(await readFile(join(dataDir, "config.json"), "utf8")),
   ).toMatchObject({ permissions: { scope: "full-access" } });
@@ -461,7 +490,9 @@ it("switches the scope over HTTP, keeps it in the config file and applies it nex
     (event) => event.type === "tool.completed" && event.callId === "call_1",
   );
   expect(await readFile(outside, "utf8")).toBe("hello");
-  expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(
+    false,
+  );
 
   const badScope = await api(kernel.url, "/settings", {
     method: "PUT",

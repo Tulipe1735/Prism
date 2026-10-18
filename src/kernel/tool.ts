@@ -1,4 +1,8 @@
-import type { ApprovalRequest, PermissionAction, PermissionPolicy } from "./permissions.ts";
+import type {
+  ApprovalRequest,
+  PermissionAction,
+  PermissionPolicy,
+} from "./permissions.ts";
 import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 
 /** JSON Schema for the arguments a tool accepts. */

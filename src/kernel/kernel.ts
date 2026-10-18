@@ -96,7 +96,8 @@ export class Kernel {
     this.permissions = new PermissionPolicy({
       scope: options.scope ?? options.config.permissions.scope,
       browserActionsNeedApproval:
-        options.browserActionsNeedApproval ?? options.config.browser.actionsNeedApproval,
+        options.browserActionsNeedApproval ??
+        options.config.browser.actionsNeedApproval,
     });
     this.target = options.target ?? "wsl";
   }

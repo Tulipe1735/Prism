@@ -102,7 +102,9 @@ export async function startKernel(
         sendJson(
           response,
           200,
-          (await kernel.updateSettings(parseSettingsPatch(body))) satisfies KernelSettings,
+          (await kernel.updateSettings(
+            parseSettingsPatch(body),
+          )) satisfies KernelSettings,
         );
         return;
       }
