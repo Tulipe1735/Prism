@@ -1,4 +1,7 @@
 import type { Tool, ToolContext } from "../../src/kernel/tool.ts";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { McpHost } from "../../src/mcp/host.ts";
@@ -79,6 +82,33 @@ describe("McpHost over stdio", () => {
     });
   });
 
+  it("stops a server that connects but cannot list its tools", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "prism-mcp-list-"));
+    const pidFile = join(directory, "pid");
+    try {
+      host = await McpHost.connect({
+        servers: {
+          good: { transport: "stdio", command: process.execPath, args: [fixture] },
+          listing: {
+            transport: "stdio",
+            command: process.execPath,
+            args: [fixture, "list-fails", pidFile],
+          },
+        },
+      });
+
+      expect(host.failures.map((failure) => failure.server)).toEqual(["listing"]);
+      expect(host.failures[0]?.message).toContain("tools/list is broken");
+      expect(host.tools.map((tool) => tool.name)).toContain("mcp__good__echo");
+
+      const pid = Number(await waitForPidFile(pidFile));
+      expect(pid).toBeGreaterThan(0);
+      expect(await waitForProcessExit(pid)).toBe(true);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("gives up on a server that never answers and reports why", async () => {
     const started = Date.now();
     host = await McpHost.connect(
@@ -114,4 +144,32 @@ function findTool(host: McpHost, name: string): Tool {
   const tool = host.tools.find((candidate) => candidate.name === name);
   if (!tool) throw new Error(`Tool ${name} is missing from the host.`);
   return tool;
+}
+
+async function waitForPidFile(path: string): Promise<string> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const pid = await readFile(path, "utf8").catch(() => undefined);
+    if (pid !== undefined) return pid;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`Timed out waiting for ${path}`);
+}
+
+async function waitForProcessExit(pid: number): Promise<boolean> {
+  const deadline = Date.now() + 8_000;
+  while (Date.now() < deadline) {
+    if (!isRunning(pid)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return false;
+}
+
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }

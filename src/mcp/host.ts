@@ -30,20 +30,12 @@ export interface McpServerFailure {
   message: string;
 }
 
-interface OpenServer {
-  client: Client;
-}
-
 export class McpHost {
-  readonly #servers: OpenServer[];
+  readonly #servers: Client[];
   readonly #tools: Tool[];
   readonly #failures: McpServerFailure[];
 
-  private constructor(
-    servers: OpenServer[],
-    tools: Tool[],
-    failures: McpServerFailure[],
-  ) {
+  private constructor(servers: Client[], tools: Tool[], failures: McpServerFailure[]) {
     this.#servers = servers;
     this.#tools = tools;
     this.#failures = failures;
@@ -55,16 +47,20 @@ export class McpHost {
     options: McpHostOptions = {},
   ): Promise<McpHost> {
     const timeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
-    const servers: OpenServer[] = [];
+    const servers: Client[] = [];
     const tools: Tool[] = [];
     const failures: McpServerFailure[] = [];
 
     for (const [server, serverConfig] of Object.entries(config.servers)) {
+      let client: Client | undefined;
       try {
-        const open = await openServer(serverConfig, timeoutMs);
-        servers.push(open);
-        tools.push(...(await listTools(server, open.client, timeoutMs)));
+        client = await openServer(serverConfig, timeoutMs);
+        tools.push(...(await listTools(server, client, timeoutMs)));
+        servers.push(client);
       } catch (error) {
+        // A server that cannot provide its tools is closed right away, not
+        // kept alive until the kernel shuts down.
+        await client?.close().catch(() => {});
         failures.push({ server, message: describeError(error) });
       }
     }
@@ -84,14 +80,11 @@ export class McpHost {
 
   async close(): Promise<void> {
     const servers = this.#servers.splice(0);
-    await Promise.all(servers.map((server) => server.client.close().catch(() => {})));
+    await Promise.all(servers.map((client) => client.close().catch(() => {})));
   }
 }
 
-async function openServer(
-  config: McpServerConfig,
-  timeoutMs: number,
-): Promise<OpenServer> {
+async function openServer(config: McpServerConfig, timeoutMs: number): Promise<Client> {
   const client = new Client({ name: "prism", version: VERSION });
   let stderr = "";
   let transport: StdioClientTransport | StreamableHTTPClientTransport;
@@ -124,7 +117,7 @@ async function openServer(
         : describeError(error),
     );
   }
-  return { client };
+  return client;
 }
 
 /**
