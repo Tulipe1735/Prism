@@ -3,7 +3,8 @@ import type { SkillSummary } from "../skills/loader.ts";
 import type { InstructionFile } from "./instructions.ts";
 import type { Kernel } from "./kernel.ts";
 import type { ChatMessage } from "./model.ts";
-import type { ToolContext, ToolResult } from "./tool.ts";
+import type { PermissionAction } from "./permissions.ts";
+import type { Tool, ToolContext, ToolResult } from "./tool.ts";
 import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { scanSkills } from "../skills/loader.ts";
@@ -140,12 +141,16 @@ export async function runTask(run: TaskRun): Promise<void> {
           content: text,
           id: entryId,
         });
-      for (const call of calls)
+      // The effects are decided before the log records the call, so the
+      // workbench can tell a file change from a read without guessing names.
+      const prepared = calls.map((call) => prepareCall(run, call));
+      for (const item of prepared)
         await kernel.store.append(sessionId, {
           type: "tool_call",
-          callId: call.id,
-          name: call.name,
-          arguments: call.arguments,
+          callId: item.call.id,
+          name: item.call.name,
+          arguments: item.call.arguments,
+          ...(item.effects.length === 0 ? {} : { effects: item.effects }),
         });
 
       if (calls.length === 0) {
@@ -153,7 +158,7 @@ export async function runTask(run: TaskRun): Promise<void> {
         return;
       }
 
-      for (const call of calls) {
+      for (const item of prepared) {
         let result: ToolResult;
         const started = !signal.aborted;
         if (!started) {
@@ -162,16 +167,16 @@ export async function runTask(run: TaskRun): Promise<void> {
           kernel.emit({
             type: "tool.started",
             sessionId,
-            callId: call.id,
-            name: call.name,
-            arguments: parseArguments(call.arguments),
+            callId: item.call.id,
+            name: item.call.name,
+            arguments: item.args,
           });
-          result = await executeTool(run, call);
+          result = await executeTool(run, item);
         }
         const content = truncate(result.content);
         await kernel.store.append(sessionId, {
           type: "tool_result",
-          callId: call.id,
+          callId: item.call.id,
           content,
           isError: result.isError === true,
         });
@@ -180,14 +185,14 @@ export async function runTask(run: TaskRun): Promise<void> {
             kernel.emit({
               type: "tool.failed",
               sessionId,
-              callId: call.id,
+              callId: item.call.id,
               error: content,
             });
           else
             kernel.emit({
               type: "tool.completed",
               sessionId,
-              callId: call.id,
+              callId: item.call.id,
               result: content,
             });
         }
@@ -215,16 +220,37 @@ export async function runTask(run: TaskRun): Promise<void> {
   }
 }
 
-async function executeTool(
+/** One tool call with everything the loop needs to log and run it. */
+interface PreparedCall {
+  call: { id: string; name: string; arguments: string };
+  /** Absent when the model asked for a tool the kernel does not have. */
+  tool?: Tool;
+  args: JsonValue;
+  context?: ToolContext;
+  /** What the call declares it will touch; empty when the tool declares nothing. */
+  effects: PermissionAction[];
+}
+
+/**
+ * Resolves one call the model made: the tool, its parsed arguments, the context
+ * of the call, and the effects the kernel judges before it runs. The effects are
+ * decided here so the log records them, and the permission check reuses them.
+ */
+function prepareCall(
   run: TaskRun,
   call: { id: string; name: string; arguments: string },
-): Promise<ToolResult> {
-  const { kernel, sessionId } = run;
-  const tool = kernel.tools.get(call.name);
-  if (tool === undefined)
-    return { content: `Unknown tool "${call.name}".`, isError: true };
+): PreparedCall {
+  const tool = run.kernel.tools.get(call.name);
   const args = parseArguments(call.arguments);
-  const context: ToolContext = {
+  if (tool === undefined) return { call, args, effects: [] };
+  const context = toolContext(run, tool.name);
+  return { call, tool, args, context, effects: tool.effects?.(args, context) ?? [] };
+}
+
+/** The live context of one tool call, shared by its effect check and its run. */
+function toolContext(run: TaskRun, toolName: string): ToolContext {
+  const { kernel, sessionId } = run;
+  return {
     sessionId,
     workspace: run.workspace,
     scope: kernel.permissions.scope,
@@ -232,16 +258,23 @@ async function executeTool(
     target: run.target,
     signal: run.signal,
     requestApproval: (request) =>
-      kernel.requestApproval(sessionId, { tool: tool.name, ...request }),
+      kernel.requestApproval(sessionId, { tool: toolName, ...request }),
     noteExplored: (path) => kernel.instructions.noteExplored(run.workspace, path),
   };
+}
+
+async function executeTool(run: TaskRun, prepared: PreparedCall): Promise<ToolResult> {
+  const { kernel } = run;
+  const { call, tool, args, context, effects } = prepared;
+  if (tool === undefined || context === undefined)
+    return { content: `Unknown tool "${call.name}".`, isError: true };
   try {
     // The permission scope is enforced here, before the tool runs: a call
     // whose action is out of scope needs approval first (ADR-0005).
-    const verdict = await kernel.permissions.authorizeAll(
-      tool.effects?.(args, context) ?? [],
-      { workspace: run.workspace, requestApproval: context.requestApproval },
-    );
+    const verdict = await kernel.permissions.authorizeAll(effects, {
+      workspace: run.workspace,
+      requestApproval: context.requestApproval,
+    });
     if (!verdict.allowed) return { content: verdict.refusal, isError: true };
     return await tool.execute(args, context);
   } catch (error) {

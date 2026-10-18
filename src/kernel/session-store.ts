@@ -46,6 +46,16 @@ const headerSchema = z.object({
   timestamp: z.string().min(1),
 });
 
+const permissionActionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("file-write"), path: z.string().min(1) }),
+  z.object({ kind: z.literal("command"), command: z.string() }),
+  z.object({
+    kind: z.literal("browser-action"),
+    action: z.string().min(1),
+    target: z.string(),
+  }),
+]);
+
 const entrySchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("message"),
@@ -63,6 +73,7 @@ const entrySchema = z.discriminatedUnion("type", [
     callId: z.string().min(1),
     name: z.string().min(1),
     arguments: z.string(),
+    effects: z.array(permissionActionSchema).optional(),
   }),
   z.object({
     type: z.literal("tool_result"),
@@ -148,6 +159,7 @@ export class SessionStore {
             callId: input.callId,
             name: input.name,
             arguments: input.arguments,
+            ...(input.effects === undefined ? {} : { effects: input.effects }),
           };
         case "tool_result":
           return {

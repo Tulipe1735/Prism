@@ -39,6 +39,21 @@ async function readEntries(url: string, sessionId: string): Promise<SessionEntry
   return response.body.entries;
 }
 
+/** Waits until the session has as many tool results as the script asked for. */
+async function waitForToolResults(
+  url: string,
+  sessionId: string,
+  count: number,
+): Promise<SessionEntry[]> {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    const entries = await readEntries(url, sessionId);
+    if (entries.filter((entry) => entry.type === "tool_result").length >= count)
+      return entries;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Session ${sessionId} never reached ${count} tool results`);
+}
+
 function stringField(args: JsonValue, key: string): string {
   if (typeof args !== "object" || args === null || Array.isArray(args)) return "";
   const value = (args as Record<string, JsonValue>)[key];
@@ -554,6 +569,49 @@ it("refuses the whole call when one action is denied, without asking about the r
     false,
   );
   events.close();
+});
+
+it("records the declared effects of each tool call in the session log", async () => {
+  const { kernel, workspace } = await start({
+    answers: [
+      {
+        toolCalls: [
+          {
+            id: "call_1",
+            name: "write_file",
+            arguments: write("note.txt", "hello"),
+          },
+          {
+            id: "call_2",
+            name: "run_command",
+            arguments: JSON.stringify({ command: "true" }),
+          },
+          { id: "call_3", name: "echo", arguments: '{"text":"no effects"}' },
+        ],
+      },
+      { text: ["Done."] },
+    ],
+  });
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "do three things" },
+  });
+  const entries = await waitForToolResults(kernel.url, session.id, 3);
+
+  const calls = entries.filter((entry) => entry.type === "tool_call");
+  expect(calls[0]).toMatchObject({
+    name: "write_file",
+    effects: [{ kind: "file-write", path: join(workspace, "note.txt") }],
+  });
+  expect(calls[1]).toMatchObject({
+    name: "run_command",
+    effects: [{ kind: "command" }],
+  });
+  // A tool that declares nothing says "unknown": no effects, not an empty list.
+  expect(calls[2]).toMatchObject({ name: "echo" });
+  expect(calls[2]).not.toHaveProperty("effects");
 });
 
 it("starts from the scope and the browser approval setting in the config file", async () => {

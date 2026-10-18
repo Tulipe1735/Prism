@@ -10,6 +10,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { unifiedDiff } from "../shared/diff.ts";
 import { TOOL_RESULT_LIMIT } from "./loop.ts";
 import {
   capText,
@@ -24,6 +25,44 @@ import {
 const READ_BYTES = TOOL_RESULT_LIMIT * 4;
 /** Glob matches collected per call; more than this is reported as truncated. */
 const MAX_GLOB_MATCHES = 1_000;
+/** Files at most this size are read back for a write diff; longer ones are not. */
+const MAX_DIFF_BYTES = 128 * 1024;
+/** Lines at most on either side of a write diff; `util.diff` is O(N*D). */
+const MAX_DIFF_LINES = 3_000;
+
+/**
+ * The content a write replaces, for the diff in its result. `undefined` when the
+ * file cannot be diffed (too large, too long or binary): reading it back is then
+ * not worth it, and the workbench falls back to the written content.
+ */
+async function readBeforeWrite(
+  path: string,
+  content: string,
+): Promise<{ text: string; created: boolean } | undefined> {
+  let buffer: Buffer;
+  try {
+    buffer = await readFile(path);
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT"
+      ? { text: "", created: true }
+      : undefined;
+  }
+  if (
+    buffer.byteLength > MAX_DIFF_BYTES ||
+    buffer.includes(0) ||
+    content.length > MAX_DIFF_BYTES ||
+    countLines(buffer.toString("utf8")) > MAX_DIFF_LINES ||
+    countLines(content) > MAX_DIFF_LINES
+  )
+    return undefined;
+  return { text: buffer.toString("utf8"), created: false };
+}
+
+function countLines(text: string): number {
+  let lines = 1;
+  for (const character of text) if (character === "\n") lines += 1;
+  return lines;
+}
 
 const readFileTool: Tool = {
   name: "read_file",
@@ -63,7 +102,7 @@ const readFileTool: Tool = {
 const writeFileTool: Tool = {
   name: "write_file",
   description:
-    "Writes a file, creating missing parent directories and replacing any existing content. Paths are absolute or relative to the workspace.",
+    "Writes a file, creating missing parent directories and replacing any existing content. Paths are absolute or relative to the workspace. The result carries a unified diff of the change.",
   parameters: {
     type: "object",
     properties: {
@@ -86,8 +125,20 @@ const writeFileTool: Tool = {
     const target = resolveToolPath(context, requested);
     try {
       await mkdir(dirname(target.path), { recursive: true });
+      const before = await readBeforeWrite(target.path, content);
       await writeFile(target.path, content);
-      return { content: `Wrote ${content.length} characters to ${target.display}.` };
+      const diff =
+        before === undefined
+          ? "" // Too large or binary to diff; the workbench shows the written content.
+          : unifiedDiff(before.text, content, {
+              path: target.display,
+              created: before.created,
+            });
+      return {
+        content: [`Wrote ${content.length} characters to ${target.display}.`, diff]
+          .filter((part) => part !== "")
+          .join("\n\n"),
+      };
     } catch (error) {
       return fileError(target.display, error) satisfies ToolResult;
     }

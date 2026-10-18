@@ -1,3 +1,5 @@
+import type { PermissionAction } from "./permissions.ts";
+
 export const SESSION_FORMAT_VERSION = 1;
 
 export type MessageRole = "user" | "assistant" | "system" | "tool";
@@ -30,6 +32,12 @@ export interface ToolCallEntry extends SessionEntryBase {
   callId: string;
   name: string;
   arguments: string;
+  /**
+   * What the call declared it would touch (`Tool.effects`), decided before it
+   * ran. Absent when the tool declares nothing (MCP tools, for example), which
+   * says "unknown", not "no effect".
+   */
+  effects?: PermissionAction[];
 }
 
 export interface ToolResultEntry extends SessionEntryBase {
@@ -63,6 +71,8 @@ export type SessionEntryInput =
       callId: string;
       name: string;
       arguments: string;
+      /** Declared effects of this call; omitted when the tool declares none. */
+      effects?: PermissionAction[];
       parentId?: string | null;
       id?: string;
     }
