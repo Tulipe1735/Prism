@@ -8,14 +8,15 @@ agent。桌面工作台运行在 Windows，agent 在 WSL 中围绕你的仓库�
 Prism 自己运行任务循环，内置 Prism 浏览器能力、MCP、skills、联网检索与跨会话记忆，默认使用 DeepSeek。
 
 代码：[浏览器能力](src/browser) · [浏览器 CLI](src/interfaces/cli.ts) ·
-[回执与会话](src/cli/sessions.ts)
+[回执与会话](src/cli/sessions.ts) · [工作台](src/workbench)
 
 ## 状态
 
-重构中。旧的个人研究助手已移除；新的 agent 内核已可 headless 运行，Electron 桌面端尚未实现。
+重构中。旧的个人研究助手已移除；新的 agent 内核已可 headless 运行，工作台（Electron 壳 + 本地 Web
+UI）已可对着内核跑通工作区、会话、聊天流式、工具过程、代码改动、审批与设置展示。
 
 当前可用：`prism`
-浏览器 CLI，用法见[浏览器指南](docs/browser-cli.md)；内核的会话、任务循环与工具执行经本地 HTTP/SSE 提供，接口见[内核接口契约](docs/kernel-contract.md)。
+浏览器 CLI，用法见[浏览器指南](docs/browser-cli.md)；内核的会话、任务循环与工具执行经本地 HTTP/SSE 提供，接口见[内核接口契约](docs/kernel-contract.md)；工作台的运行方式与结构见[工作台](docs/workbench.md)。
 
 ## 首版目标
 

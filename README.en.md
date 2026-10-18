@@ -10,17 +10,20 @@ Prism runs its own task loop and ships with a Prism browser tool, MCP, skills, w
 search, and cross-session memory. The default model is DeepSeek.
 
 Code: [browser capability](src/browser) · [browser CLI](src/interfaces/cli.ts) ·
-[receipts and sessions](src/cli/sessions.ts)
+[receipts and sessions](src/cli/sessions.ts) · [workbench](src/workbench)
 
 ## Status
 
 Under reconstruction. The previous personal research assistant has been removed; the new
-agent kernel runs headless today, the Electron desktop is not implemented yet.
+agent kernel runs headless today, and the workbench (Electron shell plus a local Web UI)
+already covers workspaces, sessions, streaming chat, the tool process, code changes,
+approvals and settings against the kernel.
 
 Available today: the `prism` browser CLI, documented in the
 [browser guide](docs/browser-cli.md); the kernel serves its sessions, task loop and tool
 execution over local HTTP/SSE, described in the
-[kernel contract](docs/kernel-contract.md).
+[kernel contract](docs/kernel-contract.md); how to run and read the workbench is in
+[docs/workbench.md](docs/workbench.md).
 
 ## First-version goals
 

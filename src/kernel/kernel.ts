@@ -194,6 +194,19 @@ export class Kernel {
       throw new KernelError("SESSION_NOT_FOUND", `Session ${sessionId} does not exist`);
   }
 
+  /** Rewrites the session title; a session with a running task is refused. */
+  async renameSession(sessionId: string, title: string): Promise<SessionSummary> {
+    if (this.runs.has(sessionId))
+      throw new KernelError(
+        "TASK_RUNNING",
+        `Session ${sessionId} has a running task; cancel it before renaming`,
+      );
+    await this.store.rename(sessionId, title);
+    const session = await this.store.summary(sessionId);
+    this.emit({ type: "session.updated", session });
+    return session;
+  }
+
   /** Appends the user message and starts the task in the background. */
   async sendMessage(sessionId: string, text: string): Promise<string> {
     const active = this.runs.get(sessionId);

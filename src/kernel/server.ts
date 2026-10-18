@@ -151,6 +151,13 @@ export async function startKernel(
         sendJson(response, 200, { deleted: true });
         return;
       }
+      if (segments.length === 2 && method === "PATCH") {
+        const body = await readJson(request);
+        sendJson(response, 200, {
+          session: await kernel.renameSession(sessionId, requireText(body, "title")),
+        });
+        return;
+      }
       if (segments[2] === "messages" && segments.length === 3 && method === "POST") {
         const body = await readJson(request);
         const entryId = await kernel.sendMessage(sessionId, requireText(body, "text"));
