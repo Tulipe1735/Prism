@@ -1,4 +1,3 @@
-import type { Buffer } from "node:buffer";
 import type { ShellOutcome } from "./shell.ts";
 import type { Tool, ToolResult } from "./tool.ts";
 import { spawn } from "node:child_process";
@@ -8,7 +7,6 @@ import {
   gatePath,
   isRefusal,
   missingArgument,
-  OutputBuffer,
   readNumber,
   readString,
 } from "./tool-support.ts";
@@ -24,7 +22,7 @@ export function createCommandTool(options: CommandToolOptions): Tool {
   return {
     name: "run_command",
     description:
-      "Runs a shell command and returns merged output, the exit code and the duration. The command runs in the workspace unless cwd says otherwise. The \"wsl\" environment runs it in the kernel's own shell; the \"windows\" environment runs it in cmd.exe on Windows through WSL interop.",
+      'Runs a shell command and returns merged output, the exit code and the duration. The command runs in the workspace unless cwd says otherwise. The "wsl" environment runs it in the kernel\'s own shell; the "windows" environment runs it in cmd.exe on Windows through WSL interop.',
     parameters: {
       type: "object",
       properties: {

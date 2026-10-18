@@ -1,5 +1,6 @@
 import type { Buffer } from "node:buffer";
 import type { ChildProcess } from "node:child_process";
+import process from "node:process";
 import { OutputBuffer } from "./tool-support.ts";
 
 /** Facts and merged output of one finished command. */

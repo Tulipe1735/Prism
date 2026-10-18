@@ -4,8 +4,8 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import process from "node:process";
-import { emptyOutcome, killProcessGroup, runProcess } from "./shell.ts";
 import { TOOL_RESULT_LIMIT } from "./loop.ts";
+import { emptyOutcome, killProcessGroup, runProcess } from "./shell.ts";
 
 /** Console code pages a piped cmd.exe writes its output with. */
 const CODE_PAGE_ENCODINGS: Record<number, string> = {
@@ -51,8 +51,7 @@ export interface WindowsInterop {
 }
 
 export type WindowsInteropStatus =
-  | { available: true; interop: WindowsInterop }
-  | { available: false; reason: string };
+  { available: true; interop: WindowsInterop } | { available: false; reason: string };
 
 /**
  * Checks that Windows commands can run (ADR-0002). The check runs on every
@@ -94,6 +93,10 @@ export async function runWindowsCommand(options: {
 }): Promise<ShellOutcome> {
   const status = await windowsInteropStatus();
   if (!status.available) return emptyOutcome(status.reason);
+  if (/[\r\n]/.test(options.command))
+    return emptyOutcome(
+      'The Windows target runs one cmd.exe command line, and cmd drops the lines after the first one. Join the steps with "&" or run them as separate commands.',
+    );
   const windowsCwd = await convert("-w", options.cwd);
   if (windowsCwd === null)
     return emptyOutcome(
@@ -107,16 +110,20 @@ export async function runWindowsCommand(options: {
     const kept = { stdout: 0, stderr: 0 };
     return {
       start: () =>
-        spawn(interop.command, ["/d", "/s", "/c", `set ${marker}=1 & %${COMMAND_VARIABLE}%`], {
-          cwd: interop.spawnDir,
-          env: {
-            ...process.env,
-            [COMMAND_VARIABLE]: `pushd "${windowsCwd}" && ${options.command}`,
-            WSLENV: passedThrough(process.env.WSLENV, COMMAND_VARIABLE),
+        spawn(
+          interop.command,
+          ["/d", "/s", "/c", `set ${marker}=1 & %${COMMAND_VARIABLE}%`],
+          {
+            cwd: interop.spawnDir,
+            env: {
+              ...process.env,
+              [COMMAND_VARIABLE]: `pushd "${windowsCwd}" && ${options.command}`,
+              WSLENV: passedThrough(process.env.WSLENV, COMMAND_VARIABLE),
+            },
+            detached: true,
+            stdio: ["ignore", "pipe", "pipe"],
           },
-          detached: true,
-          stdio: ["ignore", "pipe", "pipe"],
-        }),
+        ),
       onData: (stream, chunk) => {
         const room = RAW_LIMIT - kept[stream];
         if (room <= 0) return;
@@ -178,13 +185,14 @@ function capture(
     const chunks: Buffer[] = [];
     const child = spawn(file, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
     let settled = false;
+    let timer: NodeJS.Timeout | undefined;
     const finish = (result: Captured): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       resolve(result);
     };
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       child.kill("SIGKILL");
       finish({
         code: null,
@@ -206,8 +214,7 @@ function capture(
 async function convert(flag: "-u" | "-w", path: string): Promise<string | null> {
   const result = await capture("wslpath", [flag, path], "/");
   const converted = result.out.toString("utf8").trim();
-  if (result.error !== undefined || result.code !== 0 || converted === "")
-    return null;
+  if (result.error !== undefined || result.code !== 0 || converted === "") return null;
   return converted;
 }
 
@@ -234,11 +241,10 @@ function codePage(text: string): number {
 function encodingFor(page: number): string {
   const label = CODE_PAGE_ENCODINGS[page] ?? FALLBACK_ENCODING;
   try {
-    new TextDecoder(label);
+    return new TextDecoder(label).encoding;
   } catch {
     return FALLBACK_ENCODING;
   }
-  return label;
 }
 
 /** cmd writes the console code page to pipes; modern tools write UTF-8. */

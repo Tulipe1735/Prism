@@ -1,5 +1,4 @@
 import type { SessionSummary } from "../../src/kernel/session.ts";
-import { existsSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeAll, expect, it } from "vitest";
@@ -7,6 +6,7 @@ import { windowsInteropStatus } from "../../src/kernel/windows-command.ts";
 import { api, connectEvents, type KernelHarness, startTestKernel } from "./harness.ts";
 
 let harness: KernelHarness | undefined;
+const harnesses: KernelHarness[] = [];
 let unavailable = "";
 /** Directory on a Windows drive that Windows commands can start in. */
 let windowsDir = "";
@@ -21,6 +21,7 @@ beforeAll(async () => {
 afterEach(async () => {
   await harness?.cleanup();
   harness = undefined;
+  await Promise.all(harnesses.splice(0).map((started) => started.cleanup()));
   await Promise.all(
     created.splice(0).map((path) => rm(path, { recursive: true, force: true })),
   );
@@ -51,6 +52,7 @@ async function runCommand(
       { text: ["Done."] },
     ],
   });
+  harnesses.push(harness);
   const events = await connectEvents(`${harness.kernel.url}/events`);
   const session = await createSession(harness.kernel.url, harness.workspace);
   await options.prepare?.(harness.workspace);
@@ -103,7 +105,7 @@ it("converts a workspace on a Windows drive to its Windows path", async ({ skip 
     { workspace },
   );
   expect(result).toContain("exit code: 0");
-  expect(result).toMatch(/[A-Za-z]:\\/);
+  expect(result).toMatch(/[a-z]:\\/i);
   expect(result).toContain(workspace.split("/").at(-1) as string);
 });
 
@@ -126,14 +128,32 @@ it("runs inside a WSL workspace through the Windows side of the share", async ({
 
 it("kills the Windows process tree when the command times out", async ({ skip }) => {
   if (unavailable) skip(unavailable);
-  const { result, workspace } = await runCommand({
-    command: "ping -n 4 127.0.0.1 >nul & echo gone> late.txt",
+  const { result } = await runCommand({
+    command: "ping -n 6 127.0.0.1",
     environment: "windows",
     timeoutMs: 300,
   });
   expect(result).toContain("timed out after 300ms");
-  await new Promise((resolve) => setTimeout(resolve, 3_500));
-  expect(existsSync(join(workspace, "late.txt"))).toBe(false);
+
+  // The ping outlives the timeout only if taskkill missed the shell's children.
+  const survivors = await runCommand({
+    command: 'tasklist /nh /fi "IMAGENAME eq PING.EXE"',
+    environment: "windows",
+  });
+  expect(survivors.result).not.toContain("PING.EXE");
+});
+
+it("refuses a command with line breaks instead of running half of it", async ({
+  skip,
+}) => {
+  if (unavailable) skip(unavailable);
+  const { result, isError } = await runCommand({
+    command: "echo one\necho two",
+    environment: "windows",
+  });
+  expect(isError).toBe(true);
+  expect(result).toContain("one cmd.exe command line");
+  expect(result).not.toContain("exit code: 0");
 });
 
 it("reports an explicit error when WSL interop is unavailable", async () => {
