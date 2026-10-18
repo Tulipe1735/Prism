@@ -78,7 +78,9 @@ it("serves the workbench against a running kernel and stops on request", async (
     expect(shell.status).toBe(200);
     expect(await shell.text()).toContain('id="session-list"');
 
-    expect(await fetch(`${ready.url}/kernel/status`).then((r) => r.json())).toMatchObject({
+    expect(
+      await fetch(`${ready.url}/kernel/status`).then((r) => r.json()),
+    ).toMatchObject({
       status: "ready",
     });
 

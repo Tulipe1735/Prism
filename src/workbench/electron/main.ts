@@ -1,8 +1,8 @@
-import { app, BrowserWindow, dialog } from "electron";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { app, BrowserWindow, dialog } from "electron";
 import { launchKernel, type RunningKernelProcess } from "../kernel-process.ts";
-import { startUiServer, type RunningUiServer } from "../ui-server.ts";
+import { type RunningUiServer, startUiServer } from "../ui-server.ts";
 
 let kernel: RunningKernelProcess | null = null;
 let ui: RunningUiServer | null = null;

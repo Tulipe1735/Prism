@@ -1,7 +1,12 @@
 import type { KernelEvent, KernelStatus } from "../../kernel/events.ts";
 import type { KernelSettings } from "../../kernel/kernel.ts";
 import type { SessionEntry, SessionSummary } from "../../kernel/session.ts";
-import { groupSessions, isTaskRunning, searchSessions, type SessionGroup } from "./derive.ts";
+import {
+  groupSessions,
+  isTaskRunning,
+  searchSessions,
+  type SessionGroup,
+} from "./derive.ts";
 
 export type UiView = "artifacts" | "settings";
 
@@ -93,7 +98,10 @@ export function reduce(state: UiState, action: UiAction): UiState {
       return {
         ...state,
         workspace: action.workspace,
-        recents: [action.workspace, ...state.recents.filter((path) => path !== action.workspace)],
+        recents: [
+          action.workspace,
+          ...state.recents.filter((path) => path !== action.workspace),
+        ],
         ...(sameWorkspace
           ? {}
           : {
@@ -127,7 +135,13 @@ export function reduce(state: UiState, action: UiAction): UiState {
         taskRunning: isTaskRunning(action.entries),
       };
     case "close":
-      return { ...state, activeId: null, session: null, entries: [], taskRunning: false };
+      return {
+        ...state,
+        activeId: null,
+        session: null,
+        entries: [],
+        taskRunning: false,
+      };
     case "search":
       return { ...state, search: action.query };
     case "view":
@@ -153,7 +167,11 @@ function reduceEvent(state: UiState, event: KernelEvent): UiState {
       return {
         ...state,
         connected: true,
-        kernel: { status: event.status, version: event.version, dataDir: event.dataDir },
+        kernel: {
+          status: event.status,
+          version: event.version,
+          dataDir: event.dataDir,
+        },
       };
     case "session.updated":
       return {
@@ -221,10 +239,7 @@ export function selectKnownWorkspaces(state: UiState): string[] {
 }
 
 function upsert(sessions: SessionSummary[], session: SessionSummary): SessionSummary[] {
-  return [
-    ...sessions.filter((existing) => existing.id !== session.id),
-    session,
-  ];
+  return [...sessions.filter((existing) => existing.id !== session.id), session];
 }
 
 function sortSessions(sessions: SessionSummary[]): SessionSummary[] {

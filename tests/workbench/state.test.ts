@@ -1,6 +1,10 @@
 import type { SessionEntry, SessionSummary } from "../../src/kernel/session.ts";
 import { expect, it } from "vitest";
-import { emptyState, reduce, selectVisibleSessions } from "../../src/workbench/ui/state.ts";
+import {
+  emptyState,
+  reduce,
+  selectVisibleSessions,
+} from "../../src/workbench/ui/state.ts";
 
 function summary(overrides: Partial<SessionSummary> = {}): SessionSummary {
   return {
@@ -39,7 +43,12 @@ function assistantMessage(id: string): SessionEntry {
 it("shows the kernel state from the status event", () => {
   const state = reduce(emptyState(), {
     type: "event",
-    event: { type: "kernel.status", status: "ready", version: "0.1.6", dataDir: "/tmp" },
+    event: {
+      type: "kernel.status",
+      status: "ready",
+      version: "0.1.6",
+      dataDir: "/tmp",
+    },
   });
 
   expect(state.connected).toBe(true);
@@ -59,7 +68,11 @@ it("upserts session summaries from events and keeps them newest first", () => {
     type: "event",
     event: {
       type: "session.updated",
-      session: summary({ id: "old", updatedAt: "2026-10-18T11:00:00.000Z", entryCount: 4 }),
+      session: summary({
+        id: "old",
+        updatedAt: "2026-10-18T11:00:00.000Z",
+        entryCount: 4,
+      }),
     },
   });
   state = reduce(state, {
@@ -167,9 +180,16 @@ it("shows a pending approval once and drops it when it is answered", () => {
   let state = reduce(emptyState(), { type: "event", event: requested });
   state = reduce(state, { type: "event", event: requested });
   expect(state.approvals).toHaveLength(1);
-  expect(state.approvals[0]).toMatchObject({ requestId: "approval-1", tool: "write_file" });
+  expect(state.approvals[0]).toMatchObject({
+    requestId: "approval-1",
+    tool: "write_file",
+  });
 
-  state = reduce(state, { type: "approval.answer", requestId: "approval-1", approved: true });
+  state = reduce(state, {
+    type: "approval.answer",
+    requestId: "approval-1",
+    approved: true,
+  });
   expect(state.approvals).toEqual([]);
   expect(state.notice).toContain("允许");
 
@@ -220,12 +240,16 @@ it("filters the sidebar list by the search query", () => {
     search: "login",
   };
 
-  expect(selectVisibleSessions(state).map((group) => group.sessions[0]?.id)).toEqual(["a"]);
+  expect(selectVisibleSessions(state).map((group) => group.sessions[0]?.id)).toEqual([
+    "a",
+  ]);
 });
 
 it("switches the inspector between artifacts and settings", () => {
   expect(emptyState().view).toBe("artifacts");
-  expect(reduce(emptyState(), { type: "view", view: "settings" }).view).toBe("settings");
+  expect(reduce(emptyState(), { type: "view", view: "settings" }).view).toBe(
+    "settings",
+  );
 });
 
 it("remembers recently used workspaces without duplicates", () => {

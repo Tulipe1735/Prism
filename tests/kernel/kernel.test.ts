@@ -169,7 +169,9 @@ it("renames a session and keeps its entries", async () => {
 });
 
 it("refuses to rename a session while its task runs", async () => {
-  const { kernel, workspace } = await start({ answers: [{ text: ["start"], hold: true }] });
+  const { kernel, workspace } = await start({
+    answers: [{ text: ["start"], hold: true }],
+  });
   const created = await api<{ session: SessionSummary }>(kernel.url, "/sessions", {
     method: "POST",
     body: { workspace },

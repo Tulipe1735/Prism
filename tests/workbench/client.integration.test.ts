@@ -1,8 +1,12 @@
 import type { KernelEvent } from "../../src/kernel/events.ts";
-import type { SessionEntry, SessionSummary } from "../../src/kernel/session.ts";
+import type { SessionEntry } from "../../src/kernel/session.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
 import { expect, it } from "vitest";
-import { KernelApiError, KernelClient, parseSse } from "../../src/workbench/ui/client.ts";
+import {
+  KernelApiError,
+  KernelClient,
+  parseSse,
+} from "../../src/workbench/ui/client.ts";
 import { isTaskRunning } from "../../src/workbench/ui/derive.ts";
 import { startTestKernel } from "../kernel/harness.ts";
 
@@ -53,7 +57,9 @@ it("talks to the kernel over HTTP and maps coded errors", async () => {
       workspace: harness.workspace,
       title: "first",
     });
-    expect(await client.listSessions(harness.workspace)).toMatchObject([{ id: created.id }]);
+    expect(await client.listSessions(harness.workspace)).toMatchObject([
+      { id: created.id },
+    ]);
     expect(await client.listSessions("/elsewhere")).toEqual([]);
 
     const renamed = await client.renameSession(created.id, "second");
@@ -79,7 +85,9 @@ it("streams a task: deltas, tool process and session updates", async () => {
     answers: [
       {
         text: ["Let me look. "],
-        toolCalls: [{ id: "call-7", name: "echo", arguments: '{"text":"from the kernel"}' }],
+        toolCalls: [
+          { id: "call-7", name: "echo", arguments: '{"text":"from the kernel"}' },
+        ],
       },
       { text: ["Done."] },
     ],
@@ -89,7 +97,10 @@ it("streams a task: deltas, tool process and session updates", async () => {
     const session = await client.createSession({ workspace: harness.workspace });
     const events: KernelEvent[] = [];
     const close = client.openEvents({ onEvent: (event) => events.push(event) });
-    await waitFor(() => events.some((event) => event.type === "kernel.status"), "status");
+    await waitFor(
+      () => events.some((event) => event.type === "kernel.status"),
+      "status",
+    );
 
     await client.sendMessage(session.id, "please echo something");
     await waitFor(
@@ -100,13 +111,10 @@ it("streams a task: deltas, tool process and session updates", async () => {
       () => events.at(-1)?.type === "session.updated" && events.length > 3,
       "the session update after the turn",
     );
-    const log = await waitFor(
-      async () => {
-        const read = await client.readSession(session.id);
-        return isTaskRunning(read.entries) ? null : read;
-      },
-      "the finished turn",
-    );
+    const log = await waitFor(async () => {
+      const read = await client.readSession(session.id);
+      return isTaskRunning(read.entries) ? null : read;
+    }, "the finished turn");
 
     expect(
       events
@@ -148,7 +156,10 @@ it("answers an approval request and reports the outcome", async () => {
     const session = await client.createSession({ workspace: harness.workspace });
     const events: KernelEvent[] = [];
     const close = client.openEvents({ onEvent: (event) => events.push(event) });
-    await waitFor(() => events.some((event) => event.type === "kernel.status"), "status");
+    await waitFor(
+      () => events.some((event) => event.type === "kernel.status"),
+      "status",
+    );
 
     await client.sendMessage(session.id, "write outside the workspace");
     await waitFor(
@@ -207,7 +218,10 @@ it("refuses an approval so the tool reports the refusal", async () => {
     const session = await client.createSession({ workspace: harness.workspace });
     const events: KernelEvent[] = [];
     const close = client.openEvents({ onEvent: (event) => events.push(event) });
-    await waitFor(() => events.some((event) => event.type === "kernel.status"), "status");
+    await waitFor(
+      () => events.some((event) => event.type === "kernel.status"),
+      "status",
+    );
 
     await client.sendMessage(session.id, "write outside the workspace");
     await waitFor(
@@ -215,7 +229,11 @@ it("refuses an approval so the tool reports the refusal", async () => {
       "the approval request",
     );
     const requested = events.find((event) => event.type === "approval.requested");
-    await client.answerApproval(session.id, (requested as { requestId: string }).requestId, false);
+    await client.answerApproval(
+      session.id,
+      (requested as { requestId: string }).requestId,
+      false,
+    );
 
     await waitFor(async () => {
       const read = await client.readSession(session.id);
@@ -224,9 +242,9 @@ it("refuses an approval so the tool reports the refusal", async () => {
       );
     }, "the refusal result");
     const read = await client.readSession(session.id);
-    expect(
-      read.entries.find((entry) => entry.type === "tool_result"),
-    ).toMatchObject({ isError: true });
+    expect(read.entries.find((entry) => entry.type === "tool_result")).toMatchObject({
+      isError: true,
+    });
     close();
   } finally {
     await harness.cleanup();
@@ -234,7 +252,9 @@ it("refuses an approval so the tool reports the refusal", async () => {
 });
 
 it("cancels a running task and keeps the log consistent", async () => {
-  const harness = await startTestKernel({ answers: [{ text: ["thinking"], hold: true }] });
+  const harness = await startTestKernel({
+    answers: [{ text: ["thinking"], hold: true }],
+  });
   try {
     const client = new KernelClient({ baseUrl: harness.kernel.url });
     const session = await client.createSession({ workspace: harness.workspace });

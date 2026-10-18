@@ -109,7 +109,10 @@ export async function startUiServer(
     response: ServerResponse,
     url: URL,
   ): Promise<void> {
-    const target = new URL(url.pathname.slice(KERNEL_PREFIX.length) + url.search, kernelUrl);
+    const target = new URL(
+      url.pathname.slice(KERNEL_PREFIX.length) + url.search,
+      kernelUrl,
+    );
     const controller = new AbortController();
     const drop = (): void => controller.abort();
     response.on("close", drop);
@@ -146,7 +149,9 @@ export async function startUiServer(
       return;
     }
     await new Promise<void>((resolvePipe) => {
-      const body = Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]);
+      const body = Readable.fromWeb(
+        upstream.body as Parameters<typeof Readable.fromWeb>[0],
+      );
       body.on("error", () => response.end());
       response.on("close", () => body.destroy());
       body.pipe(response).on("finish", resolvePipe);
@@ -170,7 +175,9 @@ export async function startUiServer(
     url: `http://127.0.0.1:${address.port}`,
     port: address.port,
     close: async () => {
-      const closed = new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+      const closed = new Promise<void>((resolveClose) =>
+        server.close(() => resolveClose()),
+      );
       server.closeAllConnections();
       await closed;
     },

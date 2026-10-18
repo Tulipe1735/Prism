@@ -1,4 +1,8 @@
-import type { MessageRole, SessionEntry, SessionSummary } from "../../kernel/session.ts";
+import type {
+  MessageRole,
+  SessionEntry,
+  SessionSummary,
+} from "../../kernel/session.ts";
 
 /** Sessions of one workspace, most recent first. */
 export interface SessionGroup {
@@ -18,8 +22,9 @@ export function groupSessions(sessions: SessionSummary[]): SessionGroup[] {
     .map(([workspace, list]) => ({ workspace, sessions: byUpdated(list) }))
     .sort(
       (a, b) =>
-        (b.sessions[0]?.updatedAt ?? "").localeCompare(a.sessions[0]?.updatedAt ?? "") ||
-        a.workspace.localeCompare(b.workspace),
+        (b.sessions[0]?.updatedAt ?? "").localeCompare(
+          a.sessions[0]?.updatedAt ?? "",
+        ) || a.workspace.localeCompare(b.workspace),
     );
 }
 
@@ -129,7 +134,12 @@ export function toTimeline(
             ? {}
             : { target: targetOf(entry.arguments) as string }),
           ...(result === undefined ? {} : { result }),
-          state: result === undefined ? "running" : errors.has(entry.callId) ? "failed" : "ok",
+          state:
+            result === undefined
+              ? "running"
+              : errors.has(entry.callId)
+                ? "failed"
+                : "ok",
         });
         break;
       }
@@ -160,7 +170,8 @@ export interface DiffLine {
 }
 
 const DIFF_START = /^(?:diff --git |@@ |--- )/;
-const META = /^(?:diff --git |--- |\+\+\+ |index |new file mode |deleted file mode |similarity index |rename )/;
+const META =
+  /^(?:diff --git |--- |\+\+\+ |index |new file mode |deleted file mode |similarity index |rename )/;
 
 /**
  * Reads the first unified diff inside a tool result. Text before the diff
@@ -195,16 +206,15 @@ export interface FileChange {
 }
 
 /** Tools whose name says they only read; their path arguments are not changes. */
-const READ_ONLY = /^(?:read|cat|list|ls|glob|grep|search|find|skill|echo|status|observe|screenshot|web_)/i;
+const READ_ONLY =
+  /^(?:read|cat|list|ls|glob|grep|search|find|skill|echo|status|observe|screenshot|web_)/i;
 
 /** File changes a session made, oldest first. */
 export function toChanges(entries: SessionEntry[]): FileChange[] {
   return toTimeline(entries)
     .filter(
       (step): step is ToolStep =>
-        step.kind === "tool" &&
-        step.target !== undefined &&
-        !READ_ONLY.test(step.name),
+        step.kind === "tool" && step.target !== undefined && !READ_ONLY.test(step.name),
     )
     .map((step) => {
       const diff = parseUnifiedDiff(step.result ?? "");
@@ -245,7 +255,11 @@ export function toArtifacts(entries: SessionEntry[]): Artifact[] {
       result: change.result,
       calls: (seen?.calls ?? 0) + 1,
       ...(change.diff === null
-        ? { added: seen?.added ?? 0, removed: seen?.removed ?? 0, diff: seen?.diff ?? null }
+        ? {
+            added: seen?.added ?? 0,
+            removed: seen?.removed ?? 0,
+            diff: seen?.diff ?? null,
+          }
         : { added: change.added, removed: change.removed, diff: change.diff }),
     });
   }

@@ -1,6 +1,5 @@
 import type { SessionEntry, SessionSummary } from "../../src/kernel/session.ts";
 import { expect, it } from "vitest";
-import { emptyState, reduce, type UiState } from "../../src/workbench/ui/state.ts";
 import {
   escapeHtml,
   renderApprovals,
@@ -13,6 +12,7 @@ import {
   renderTimeline,
   renderWorkspaceOptions,
 } from "../../src/workbench/ui/render.ts";
+import { emptyState, reduce, type UiState } from "../../src/workbench/ui/state.ts";
 
 function summary(overrides: Partial<SessionSummary> = {}): SessionSummary {
   return {
@@ -80,16 +80,21 @@ it("escapes text that comes from the kernel or the user", () => {
 it("shows the kernel state and the workspaces the user opened", () => {
   let state = reduce(emptyState(), {
     type: "event",
-    event: { type: "kernel.status", status: "ready", version: "0.1.6", dataDir: "/tmp/data" },
+    event: {
+      type: "kernel.status",
+      status: "ready",
+      version: "0.1.6",
+      dataDir: "/tmp/data",
+    },
   });
   state = reduce(state, { type: "workspace", workspace: "/home/demo/app" });
 
   expect(renderKernelStatus(state)).toContain("就绪");
   expect(renderKernelStatus(state)).toContain("0.1.6");
   expect(renderKernelStatus(state)).toContain("/tmp/data");
-  expect(renderKernelStatus(reduce(state, { type: "connected", connected: false }))).toContain(
-    "已断开",
-  );
+  expect(
+    renderKernelStatus(reduce(state, { type: "connected", connected: false })),
+  ).toContain("已断开");
   expect(renderWorkspaceOptions(state)).toContain('<option value="/home/demo/app">');
 });
 
@@ -112,10 +117,18 @@ it("renders the session list grouped by workspace with row actions", () => {
   expect(html).toContain('data-action="rename-session" data-session="a"');
   expect(html).toContain('data-action="delete-session" data-session="b"');
 
-  const renaming = reduce(state, { type: "edit", edit: { kind: "rename", sessionId: "a" } });
+  const renaming = reduce(state, {
+    type: "edit",
+    edit: { kind: "rename", sessionId: "a" },
+  });
   expect(renderSessionList(renaming)).toContain('name="title"');
-  const deleting = reduce(state, { type: "edit", edit: { kind: "delete", sessionId: "b" } });
-  expect(renderSessionList(deleting)).toContain('data-action="delete-confirm" data-session="b"');
+  const deleting = reduce(state, {
+    type: "edit",
+    edit: { kind: "delete", sessionId: "b" },
+  });
+  expect(renderSessionList(deleting)).toContain(
+    'data-action="delete-confirm" data-session="b"',
+  );
   expect(renderSessionList(deleting)).toContain("确认删除");
 });
 
@@ -187,7 +200,11 @@ it("renders the effective settings read-only", () => {
     type: "settings",
     settings: {
       dataDir: "/home/demo/.prism",
-      model: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat", hasApiKey: true },
+      model: {
+        baseUrl: "https://api.deepseek.com/v1",
+        model: "deepseek-chat",
+        hasApiKey: true,
+      },
       browser: { engine: "chromium" },
       search: { provider: "deepseek" },
       permissions: { scope: "workspace-write" },
@@ -206,7 +223,10 @@ it("renders the effective settings read-only", () => {
 });
 
 it("renders a notice only while there is one", () => {
-  const state = reduce(emptyState(), { type: "notice", notice: "内核已断开，正在重连" });
+  const state = reduce(emptyState(), {
+    type: "notice",
+    notice: "内核已断开，正在重连",
+  });
   expect(renderNotice(state)).toContain("内核已断开");
   expect(renderNotice(emptyState())).toBe("");
 });

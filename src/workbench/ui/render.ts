@@ -1,16 +1,12 @@
-import type { ToolState } from "./derive.ts";
 import {
+  type DiffLine,
   parseUnifiedDiff,
   toArtifacts,
-  toTimeline,
-  type DiffLine,
+  type ToolState,
   type ToolStep,
+  toTimeline,
 } from "./derive.ts";
-import {
-  selectKnownWorkspaces,
-  selectVisibleSessions,
-  type UiState,
-} from "./state.ts";
+import { selectKnownWorkspaces, selectVisibleSessions, type UiState } from "./state.ts";
 
 const STATUS_LABELS: Record<string, string> = {
   starting: "启动中",
@@ -196,7 +192,8 @@ export function renderApprovals(state: UiState): string {
 
 export function renderArtifacts(state: UiState): string {
   const artifacts = toArtifacts(state.entries);
-  if (artifacts.length === 0) return `<h2>产物</h2><p class="empty">还没有文件改动。</p>`;
+  if (artifacts.length === 0)
+    return `<h2>产物</h2><p class="empty">还没有文件改动。</p>`;
   return `<h2>产物</h2>
 ${artifacts
   .map(
@@ -237,7 +234,9 @@ export function renderSettings(state: UiState): string {
 }
 
 export function renderNotice(state: UiState): string {
-  return state.notice === null ? "" : `<span class="notice">${escapeHtml(state.notice)}</span>`;
+  return state.notice === null
+    ? ""
+    : `<span class="notice">${escapeHtml(state.notice)}</span>`;
 }
 
 /** Short handle for session and request ids in compact places. */

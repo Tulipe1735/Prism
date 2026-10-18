@@ -19,7 +19,10 @@ let timelineSignature = "";
 document.addEventListener("click", (event) => void onClick(event));
 document.addEventListener("submit", (event) => void onSubmit(event));
 const workspaceInput = input("workspace-input");
-workspaceInput.addEventListener("change", () => void openWorkspace(workspaceInput.value));
+workspaceInput.addEventListener(
+  "change",
+  () => void openWorkspace(workspaceInput.value),
+);
 input("search").addEventListener("input", (event) => {
   dispatch({ type: "search", query: (event.target as HTMLInputElement).value });
 });
@@ -93,7 +96,8 @@ function queueReload(): void {
   void client
     .readSession(sessionId)
     .then((log) => {
-      if (state.activeId === log.session.id) dispatch({ type: "entries", entries: log.entries });
+      if (state.activeId === log.session.id)
+        dispatch({ type: "entries", entries: log.entries });
     })
     .catch((error: unknown) => dispatch({ type: "notice", notice: describe(error) }))
     .finally(() => {
@@ -122,7 +126,9 @@ async function refreshSettings(): Promise<void> {
 }
 
 async function onClick(event: MouseEvent): Promise<void> {
-  const target = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action]");
+  const target = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+    "[data-action]",
+  );
   if (target === null || target === undefined) return;
   const action = target.dataset.action;
   const sessionId = target.dataset.session;
@@ -159,15 +165,10 @@ async function onClick(event: MouseEvent): Promise<void> {
     case "approve":
     case "reject":
       if (sessionId !== undefined && target.dataset.request !== undefined)
-        await answerApproval(
-          sessionId,
-          target.dataset.request,
-          action === "approve",
-        );
+        await answerApproval(sessionId, target.dataset.request, action === "approve");
       return;
     case "cancel":
       await cancel();
-      return;
   }
 }
 
@@ -180,7 +181,8 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
   }
   if (form?.dataset.action === "rename-form" && form.dataset.session !== undefined) {
     event.preventDefault();
-    const title = form.querySelector<HTMLInputElement>('input[name="title"]')?.value ?? "";
+    const title =
+      form.querySelector<HTMLInputElement>('input[name="title"]')?.value ?? "";
     await rename(form.dataset.session, title);
   }
 }
@@ -331,7 +333,9 @@ function draw(): void {
  */
 function drawTimeline(): void {
   const timeline = element("timeline");
-  const steps = toTimeline(state.entries, { deltas: new Map(Object.entries(state.deltas)) });
+  const steps = toTimeline(state.entries, {
+    deltas: new Map(Object.entries(state.deltas)),
+  });
   const signature = steps
     .map((step) => `${step.kind}:${step.id}:${step.kind === "tool" ? step.state : ""}`)
     .join("|");

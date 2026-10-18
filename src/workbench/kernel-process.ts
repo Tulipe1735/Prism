@@ -1,5 +1,5 @@
+import type { Buffer } from "node:buffer";
 import type { ChildProcess } from "node:child_process";
-import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -97,7 +97,8 @@ export function planKernelLaunch(options: KernelLaunchOptions): KernelLaunchPlan
       );
     return { command: "wsl.exe", args: ["-e", node, entry, ...tail] };
   }
-  const entry = options.entry ?? resolveKernelEntry(options.projectRoot ?? process.cwd());
+  const entry =
+    options.entry ?? resolveKernelEntry(options.projectRoot ?? process.cwd());
   return { command: node, args: [...entry.flags, entry.path, ...tail] };
 }
 
@@ -120,7 +121,9 @@ export async function launchKernel(
     output: () => ready.output,
     close: async () => {
       if (child.exitCode === null && child.signalCode === null) {
-        const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+        const exited = new Promise<void>((resolve) =>
+          child.once("exit", () => resolve()),
+        );
         await fetch(`${ready.url}/shutdown`, { method: "POST" }).catch(() => undefined);
         await Promise.race([
           exited,
@@ -170,7 +173,9 @@ function waitForReadyLine(child: ChildProcess): Promise<ReadyLine> {
     });
     child.once("error", (error) => {
       clearTimeout(timer);
-      reject(new KernelLaunchError(`Could not start the kernel: ${error.message}`, stderr));
+      reject(
+        new KernelLaunchError(`Could not start the kernel: ${error.message}`, stderr),
+      );
     });
     child.once("exit", (code) => {
       clearTimeout(timer);
@@ -211,7 +216,9 @@ async function stopProcess(child: ChildProcess): Promise<void> {
   child.kill("SIGTERM");
   const killed = await Promise.race([
     exited.then(() => true),
-    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), STOP_TIMEOUT_MS)),
+    new Promise<boolean>((resolve) =>
+      setTimeout(() => resolve(false), STOP_TIMEOUT_MS),
+    ),
   ]);
   if (!killed) {
     child.kill("SIGKILL");

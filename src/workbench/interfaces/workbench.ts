@@ -2,11 +2,8 @@
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { VERSION } from "../../shared/version.ts";
-import {
-  launchKernel,
-  type RunningKernelProcess,
-} from "../kernel-process.ts";
-import { startUiServer, type RunningUiServer } from "../ui-server.ts";
+import { launchKernel, type RunningKernelProcess } from "../kernel-process.ts";
+import { startUiServer } from "../ui-server.ts";
 
 const HELP = `Prism workbench ${VERSION} — local Web UI for the kernel, over HTTP and SSE
 
@@ -58,9 +55,7 @@ async function main(): Promise<void> {
 
   const ui = await startUiServer({
     kernelUrl,
-    ...(values["ui-root"] === undefined
-      ? {}
-      : { uiRoot: values["ui-root"] }),
+    ...(values["ui-root"] === undefined ? {} : { uiRoot: values["ui-root"] }),
     ...(values.port === undefined ? {} : { port: parsePort(values.port) }),
   });
   process.stdout.write(

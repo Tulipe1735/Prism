@@ -58,7 +58,8 @@ export class KernelClient {
   }
 
   async listSessions(workspace?: string): Promise<SessionSummary[]> {
-    const query = workspace === undefined ? "" : `?workspace=${encodeURIComponent(workspace)}`;
+    const query =
+      workspace === undefined ? "" : `?workspace=${encodeURIComponent(workspace)}`;
     const { sessions } = await this.request<{ sessions: SessionSummary[] }>(
       `/sessions${query}`,
     );
@@ -77,7 +78,9 @@ export class KernelClient {
   }
 
   readSession(sessionId: string): Promise<SessionLogPayload> {
-    return this.request<SessionLogPayload>(`/sessions/${encodeURIComponent(sessionId)}`);
+    return this.request<SessionLogPayload>(
+      `/sessions/${encodeURIComponent(sessionId)}`,
+    );
   }
 
   async renameSession(sessionId: string, title: string): Promise<SessionSummary> {
@@ -89,7 +92,9 @@ export class KernelClient {
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    await this.request(`/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+    await this.request(`/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE",
+    });
   }
 
   async sendMessage(sessionId: string, text: string): Promise<string> {
@@ -126,9 +131,9 @@ export class KernelClient {
   /** Subscribes to `/events`; the returned function stops the stream for good. */
   openEvents(handlers: EventStreamHandlers): () => void {
     const controller = new AbortController();
-    let stopped = false;
     const run = async (): Promise<void> => {
-      while (!stopped) {
+      for (;;) {
+        if (controller.signal.aborted) return;
         try {
           const response = await this.fetchImpl(`${this.baseUrl}/events`, {
             headers: { accept: "text/event-stream" },
@@ -142,16 +147,13 @@ export class KernelClient {
           // Dropped or refused: report why and try again below.
           console.warn("Kernel event stream interrupted:", error);
         }
-        if (stopped) break;
+        if (controller.signal.aborted) return;
         handlers.onState?.("closed");
         await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
       }
     };
     void run();
-    return () => {
-      stopped = true;
-      controller.abort();
-    };
+    return () => controller.abort();
   }
 
   private async request<T = unknown>(
@@ -163,9 +165,9 @@ export class KernelClient {
       headers: options.body === undefined ? {} : { "content-type": "application/json" },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
-    const payload = (await response.json().catch(() => null)) as
-      | { error?: { code: string; message: string } }
-      | null;
+    const payload = (await response.json().catch(() => null)) as {
+      error?: { code: string; message: string };
+    } | null;
     if (!response.ok) {
       throw new KernelApiError(
         response.status,

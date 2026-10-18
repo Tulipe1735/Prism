@@ -1,6 +1,6 @@
 import type { SessionEntry, SessionSummary } from "../../src/kernel/session.ts";
+import type { TimelineStep, ToolStep } from "../../src/workbench/ui/derive.ts";
 import { expect, it } from "vitest";
-import { api, startTestKernel } from "../kernel/harness.ts";
 import {
   groupSessions,
   isTaskRunning,
@@ -10,7 +10,7 @@ import {
   toChanges,
   toTimeline,
 } from "../../src/workbench/ui/derive.ts";
-import type { TimelineStep, ToolStep } from "../../src/workbench/ui/derive.ts";
+import { api, startTestKernel } from "../kernel/harness.ts";
 
 const DIFF = `Changed 1 file:
 --- a/src/app.ts
@@ -122,7 +122,11 @@ it("groups sessions by workspace with the most recent group first", () => {
 
 it("searches sessions by title, workspace and id", () => {
   const sessions = [
-    summary({ id: "6f1c9a3e-1111", title: "Fix the login", workspace: "/home/demo/app" }),
+    summary({
+      id: "6f1c9a3e-1111",
+      title: "Fix the login",
+      workspace: "/home/demo/app",
+    }),
     summary({ id: "b0a1c2d3-2222", workspace: "/srv/website" }),
   ];
 
@@ -147,7 +151,11 @@ it("builds a timeline that pairs tool calls with their results", () => {
 
   const timeline = toTimeline([user, call, result, assistant]);
   expect(timeline.map((step) => step.kind)).toEqual(["message", "tool", "message"]);
-  expect(timeline[0]).toMatchObject({ kind: "message", role: "user", content: "please fix it" });
+  expect(timeline[0]).toMatchObject({
+    kind: "message",
+    role: "user",
+    content: "please fix it",
+  });
   expect(timeline[1]).toMatchObject({
     kind: "tool",
     callId: "call-1",
@@ -156,7 +164,11 @@ it("builds a timeline that pairs tool calls with their results", () => {
     result: DIFF,
     state: "ok",
   });
-  expect(timeline[2]).toMatchObject({ kind: "message", role: "assistant", content: "fixed" });
+  expect(timeline[2]).toMatchObject({
+    kind: "message",
+    role: "assistant",
+    content: "fixed",
+  });
 });
 
 it("marks a tool call without a result as running and a failed result as failed", () => {
@@ -230,15 +242,24 @@ it("collects file changes with their diff and latest artifact state", () => {
   const result = toolResult("call-1", DIFF, false, call.id);
   const read = toolCall("call-2", "read_file", { path: "README.md" }, result.id);
   const readResult = toolResult("call-2", "# Prism", false, read.id);
-  const failedWrite = toolCall("call-3", "write_file", { path: "src/app.ts" }, readResult.id);
+  const failedWrite = toolCall(
+    "call-3",
+    "write_file",
+    { path: "src/app.ts" },
+    readResult.id,
+  );
   const failedResult = toolResult("call-3", "permission denied", true, failedWrite.id);
 
-  expect(toChanges([call, result, read, readResult, failedWrite, failedResult])).toMatchObject([
+  expect(
+    toChanges([call, result, read, readResult, failedWrite, failedResult]),
+  ).toMatchObject([
     { path: "src/app.ts", tool: "edit_file", state: "ok", added: 2, removed: 1 },
     { path: "src/app.ts", tool: "write_file", state: "failed", added: 0, removed: 0 },
   ]);
 
-  expect(toArtifacts([call, result, read, readResult, failedWrite, failedResult])).toMatchObject([
+  expect(
+    toArtifacts([call, result, read, readResult, failedWrite, failedResult]),
+  ).toMatchObject([
     { path: "src/app.ts", calls: 2, state: "failed", added: 2, removed: 1 },
   ]);
 });
@@ -261,7 +282,12 @@ it("reads the task state from the last log entry", () => {
 it("derives the timeline from a real kernel session log", async () => {
   const harness = await startTestKernel({
     answers: [
-      { text: ["Let me change it."], toolCalls: [{ id: "call-42", name: "echo", arguments: '{"text":"hello kernel"}' }] },
+      {
+        text: ["Let me change it."],
+        toolCalls: [
+          { id: "call-42", name: "echo", arguments: '{"text":"hello kernel"}' },
+        ],
+      },
       { text: ["All done."] },
     ],
   });
@@ -275,7 +301,11 @@ it("derives the timeline from a real kernel session log", async () => {
       method: "POST",
       body: { text: "change something" },
     });
-    const log = await waitForLeaf(harness.kernel.url, created.body.session.id, "message");
+    const log = await waitForLeaf(
+      harness.kernel.url,
+      created.body.session.id,
+      "message",
+    );
 
     const timeline = toTimeline(log.entries);
     expect(timeline.map((step) => step.kind)).toEqual([

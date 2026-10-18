@@ -1,8 +1,13 @@
 import type { SessionSummary } from "../../src/kernel/session.ts";
-import { afterEach, expect, it } from "vitest";
 import type { RunningUiServer } from "../../src/workbench/ui-server.ts";
+import { afterEach, expect, it } from "vitest";
 import { startUiServer } from "../../src/workbench/ui-server.ts";
-import { api, connectEvents, type KernelHarness, startTestKernel } from "../kernel/harness.ts";
+import {
+  api,
+  connectEvents,
+  type KernelHarness,
+  startTestKernel,
+} from "../kernel/harness.ts";
 
 const UI_ROOT = new URL("../../src/workbench/ui/", import.meta.url).pathname;
 
@@ -81,10 +86,14 @@ it("streams kernel events through the proxy as they happen", async () => {
     events.waitFor((event) => event.type === "kernel.status"),
   ).resolves.toMatchObject({ status: "ready" });
 
-  const created = await api<{ session: SessionSummary }>(harness.kernel.url, "/sessions", {
-    method: "POST",
-    body: { workspace: harness.workspace },
-  });
+  const created = await api<{ session: SessionSummary }>(
+    harness.kernel.url,
+    "/sessions",
+    {
+      method: "POST",
+      body: { workspace: harness.workspace },
+    },
+  );
   await expect(
     events.waitFor((event) => event.type === "session.updated"),
   ).resolves.toMatchObject({ session: { id: created.body.session.id } });
