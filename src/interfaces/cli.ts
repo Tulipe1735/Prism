@@ -39,10 +39,10 @@ const COMMAND_HELP: Record<string, string> = {
   "session close":
     "prism session close --session <session>\nCloses only the tab owned by this session. Receipts remain queryable.",
   observe:
-    "prism observe --session <session> --scope relations\nReturns observation, evidence and target refs. A new observation expires old refs.",
+    "prism observe --session <session> --scope relations\nReturns target descriptions, explicit target state and refs, plus read-only state.controls/messages and coverage. A new observation expires old refs.",
   context:
     "prism context --session <session> --observation <observation> --target <ref> --scope structural\nReturns a target-specific evidence id; all fields come from visible page state.",
-  act: "prism act --session <s> --observation <o> --target <ref> --evidence <v> --operation fill --value 'example' --request-id <new-id>\nOr: prism act --stdin < action.json\nstdin requires the full act command object, including command=act and request_id.\nCopy refs and evidence ids from observe/context. Reusing the same request returns its receipt.\nChanged evidence refuses input. Unknown input outcomes require page inspection.",
+  act: "prism act --session <s> --observation <o> --target <ref> --evidence <v> --operation fill --value 'example' --request-id <new-id>\nOr: prism act --stdin < action.json\nstdin requires the full act command object, including command=act and request_id.\nNew executed/unknown actions return post_observation: captured with current local observation data, or failed independently of the receipt.\nCopy refs and evidence ids from observe/context. Exact replay returns only its durable receipt.\nChanged evidence refuses input. Unknown input outcomes require receipt and page inspection.",
   receipt:
     "prism receipt --session <session> --request-id <id>\nReads the durable receipt without requiring the broker to be running.",
   "daemon stop":

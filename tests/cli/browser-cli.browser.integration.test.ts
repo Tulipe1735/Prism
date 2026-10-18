@@ -1,4 +1,6 @@
 import type { BrowserConnection } from "../../src/browser/connect.ts";
+import type { TargetEvidence } from "../../src/browser/evidence.ts";
+import type { PublicState } from "../../src/browser/state.ts";
 import { execFile } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -8,19 +10,18 @@ import process from "node:process";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { connectBrowser, parseBrowserUrl } from "../../src/browser/connect.ts";
 
-interface Target {
+interface Target extends TargetEvidence {
   ref: string;
   operation: string;
-  label: string;
   option_value?: string;
-  relations?: { text: string }[];
-  context: { local?: string };
+  option_label?: string;
 }
 interface View {
   session: string;
   observation: string;
   evidence: string;
   targets: Target[];
+  state: PublicState;
 }
 interface Reply {
   ok: boolean;
@@ -43,7 +44,17 @@ describe.runIf(process.env.PRISM_EVAL_CHROME === "1")(
       <section><h2 id="group">Alpha</h2><article><p>Plan</p><button onclick="window.clicks++; document.querySelector('[role=status]').textContent='Clicks '+window.clicks">Choose</button></article></section>
       <section><h2 id="noise">Unrelated</h2><p>Other area</p></section>
       <form><label>Name <input id="name"></label><label>Region <select id="region"><option value="eu">Europe</option><option value="us">America</option></select></label></form>
-      <p role="status">Ready</p><div style="height:1800px"></div><script>window.clicks=0</script>`);
+      <label>Accept <input id="accept" type="checkbox"></label>
+      <button disabled>Locked</button><input aria-label="Read only" readonly value="Read">
+      <label>Single <select id="single"><option value="">Only</option></select></label>
+      <button role="tab" aria-selected="false" onclick="this.setAttribute('aria-selected','true')">Details tab</button>
+      <details><summary>Disclosure</summary><p>Details</p></details>
+      <input type="password" aria-label="Private password" value="password-secret">
+      <input type="file" aria-label="Private file"><input type="hidden" value="hidden-secret">
+      <button hidden>Hidden control</button><button aria-hidden="true">Inaccessible</button>
+      <button aria-label="Public name"><span aria-hidden="true">secret-name</span>Public</button>
+      <p role="status">Ready</p><p role="alert">Review required</p>
+      <div style="height:1800px"></div><button>Offscreen control</button><script>window.clicks=0</script>`);
     });
     async function cli(args: string[], input?: string): Promise<Reply> {
       const runtime = entry.endsWith(".ts")
@@ -182,8 +193,11 @@ describe.runIf(process.env.PRISM_EVAL_CHROME === "1")(
       );
       expect(await inspect("document.querySelector('#region').value")).toBe("us");
       view = await observe(session, "structural");
+      expect(
+        view.targets.find((item) => item.operation === "select")?.state.value,
+      ).toBe("us");
       target = view.targets.find(
-        (item) => item.operation === "click" && item.label === "Choose",
+        (item) => item.operation === "click" && item.description === 'button "Choose"',
       )!;
       const command = action(view, target, "click1");
       const replies = await Promise.all([act(command), act(command)]);
@@ -211,6 +225,253 @@ describe.runIf(process.env.PRISM_EVAL_CHROME === "1")(
         (await cli(["receipt", "--session", session, "--request-id", "click1"])).data
           .receipt.outcome,
       ).toBe("executed");
+    });
+
+    it("reads result controls and messages without granting state-only input authority", async () => {
+      const session = await openSession();
+      const view = await observe(session);
+      expect(view.state).toMatchObject({
+        source: "dom",
+        coverage: { scope: "viewport", truncated: false },
+      });
+      expect(view.state.controls).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "Accept", role: "checkbox", checked: false }),
+          expect.objectContaining({ name: "Locked", disabled: true }),
+          expect.objectContaining({ name: "Read only", readonly: true, value: "Read" }),
+          expect.objectContaining({
+            name: "Single",
+            value: "",
+            selected_options: [{ value: "", label: "Only" }],
+          }),
+          expect.objectContaining({ name: "Details tab", selected: false }),
+          expect.objectContaining({ name: "Disclosure", expanded: false }),
+        ]),
+      );
+      expect(view.state.messages).toEqual(
+        expect.arrayContaining([
+          { role: "status", text: "Ready" },
+          { role: "alert", text: "Review required" },
+        ]),
+      );
+      expect(view).not.toHaveProperty("page.status");
+      expect(
+        view.targets.some(
+          (target) =>
+            target.description.includes("Locked") ||
+            target.description.includes("Single"),
+        ),
+      ).toBe(false);
+      for (const name of [
+        "Private password",
+        "Private file",
+        "Hidden control",
+        "Inaccessible",
+        "Offscreen control",
+        "secret-name",
+        "password-secret",
+        "hidden-secret",
+      ])
+        expect(JSON.stringify(view.state)).not.toContain(name);
+      const refused = await act({
+        command: "act",
+        session,
+        observation: view.observation,
+        evidence: view.evidence,
+        target: "state:Locked",
+        operation: "click",
+        request_id: "state-only",
+      });
+      expect(refused.error?.code).toBe("TARGET_NOT_OFFERED");
+      expect(refused.data.receipt.outcome).toBe("not_executed");
+      expect(refused.data).not.toHaveProperty("post_observation");
+    });
+
+    it("verifies checkbox and empty field effects using current post-observation refs", async () => {
+      const session = await openSession();
+      let view = await observe(session);
+      let target = view.targets.find(
+        (item) => item.description === 'checkbox "Accept"',
+      )!;
+      expect(target.state.checked).toBe(false);
+      let reply = await act(action(view, target, "check"));
+      expect(reply.data.post_observation.status).toBe("captured");
+      view = reply.data.post_observation.data;
+      expect(
+        view.state.controls.find((control) => control.name === "Accept")?.checked,
+      ).toBe(true);
+      expect(await inspect("document.querySelector('#accept').checked")).toBe(true);
+      target = view.targets.find((item) => item.description === 'checkbox "Accept"')!;
+      expect(target.state.checked).toBe(true);
+      reply = await act(action(view, target, "uncheck"));
+      view = reply.data.post_observation.data;
+      expect(
+        view.state.controls.find((control) => control.name === "Accept")?.checked,
+      ).toBe(false);
+      target = view.targets.find(
+        (item) => item.operation === "fill" && item.description === 'textbox "Name"',
+      )!;
+      reply = await act(action(view, target, "type", view.evidence, "Ada"));
+      view = reply.data.post_observation.data;
+      target = view.targets.find(
+        (item) => item.operation === "fill" && item.description === 'textbox "Name"',
+      )!;
+      expect(target.state.value).toBe("Ada");
+      reply = await act(action(view, target, "clear", view.evidence, ""));
+      expect(
+        reply.data.post_observation.data.state.controls.find(
+          (control: { name: string }) => control.name === "Name",
+        )?.value,
+      ).toBe("");
+      expect(await inspect("document.querySelector('#name').value")).toBe("");
+      const replay = await act(action(view, target, "clear", view.evidence, ""));
+      expect(replay.data.replayed).toBe(true);
+      expect(replay.data).not.toHaveProperty("post_observation");
+    });
+
+    it("shares visible image names and multiline values between targets and result state", async () => {
+      const session = await openSession();
+      await inspect(
+        `document.body.innerHTML = ${JSON.stringify(`<button id="confirm"><img width="20" height="20" alt="Confirm" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='20' height='20'/%3E%3C/svg%3E"><span hidden>Secret</span></button><div role="textbox" contenteditable="true" aria-label="Message"><div>Line1</div><div>Line2</div></div>`)}`,
+      );
+      let view = await observe(session);
+      const image = view.state.controls.find((control) => control.name === "Confirm")!;
+      const { name, role, ...imageState } = image;
+      expect(
+        view.targets.find(
+          (target) => target.description === `${role} ${JSON.stringify(name)}`,
+        )?.state,
+      ).toEqual(imageState);
+      expect(JSON.stringify(view.targets)).not.toContain("Secret");
+      let editor = view.targets.find((target) => target.operation === "fill")!;
+      expect(editor.description).toBe('textbox "Message"');
+      expect(editor.state.value).toBe("Line1\nLine2");
+      expect(
+        view.state.controls.find((control) => control.name === "Message")?.value,
+      ).toBe(editor.state.value);
+      const reply = await act(
+        action(view, editor, "multiline", view.evidence, "First\nSecond"),
+      );
+      expect(reply.data.receipt.outcome).toBe("executed");
+      view = reply.data.post_observation.data;
+      editor = view.targets.find((target) => target.operation === "fill")!;
+      expect(editor.state.value).toBe("First\nSecond");
+      expect(
+        view.state.controls.find((control) => control.name === "Message")?.value,
+      ).toBe(editor.state.value);
+      await inspect("document.querySelector('#confirm').disabled=true");
+      view = await observe(session);
+      expect(
+        view.state.controls.find((control) => control.name === "Confirm")?.disabled,
+      ).toBe(true);
+      expect(
+        view.targets.some((target) => target.description === 'button "Confirm"'),
+      ).toBe(false);
+    });
+
+    it("rejects a non-first selected option change using the shared complete selection state", async () => {
+      const session = await openSession();
+      await inspect(
+        `document.body.innerHTML = ${JSON.stringify('<label>Regions <select id="regions" multiple><option value="a" selected>Alpha</option><option value="b" selected>Beta</option><option value="c">Gamma → More</option></select></label>')}`,
+      );
+      let view = await observe(session);
+      let target = view.targets.find((item) => item.option_value === "c")!;
+      expect(target.description).toBe('combobox "Regions"');
+      expect(target.option_label).toBe("Gamma → More");
+      const {
+        name: _name,
+        role: _role,
+        ...state
+      } = view.state.controls.find((control) => control.name === "Regions")!;
+      expect(target.state).toEqual(state);
+      expect(target.state.selected_options).toEqual([
+        { value: "a", label: "Alpha" },
+        { value: "b", label: "Beta" },
+      ]);
+      await inspect("document.querySelector('#regions').options[1].selected=false");
+      let reply = await act(action(view, target, "changed-selection"));
+      expect(reply.data.receipt.outcome).toBe("not_executed");
+      expect(reply.error?.code).toBe("EVIDENCE_CHANGED");
+      expect(
+        await inspect(
+          "[...document.querySelector('#regions').selectedOptions].map(option=>option.value)",
+        ),
+      ).toEqual(["a"]);
+      view = await observe(session);
+      target = view.targets.find((item) => item.option_value === "c")!;
+      reply = await act(action(view, target, "current-selection"));
+      expect(reply.data.receipt.outcome).toBe("executed");
+      expect(
+        reply.data.post_observation.data.state.controls.find(
+          (control: { name: string }) => control.name === "Regions",
+        ).selected_options,
+      ).toEqual([{ value: "c", label: "Gamma → More" }]);
+    });
+
+    it("refuses select input when the shared selection state is truncated", async () => {
+      const session = await openSession();
+      await inspect(
+        "document.body.innerHTML='<label>Many <select multiple>'+Array.from({length:52},(_,i)=>'<option value='+i+(i<51?' selected':'')+'>Item '+i+'</option>').join('')+'</select></label>'",
+      );
+      const view = await observe(session);
+      const target = view.targets.find((item) => item.option_value === "51")!;
+      expect(target.state.selected_options).toHaveLength(50);
+      expect(target.state.truncated).toBe(true);
+      const reply = await act(action(view, target, "incomplete-selection"));
+      expect(reply.error?.code).toBe("EVIDENCE_TRUNCATED");
+      expect(reply.data.receipt.outcome).toBe("not_executed");
+      expect(
+        await inspect("document.querySelector('select').selectedOptions.length"),
+      ).toBe(51);
+    });
+
+    it("exposes selected, expanded and mixed state and rejects state changes before input", async () => {
+      const session = await openSession();
+      let view = await observe(session);
+      let target = view.targets.find(
+        (item) => item.description === 'tab "Details tab"',
+      )!;
+      let reply = await act(action(view, target, "tab"));
+      view = reply.data.post_observation.data;
+      expect(
+        view.targets.find((item) => item.description === 'tab "Details tab"')?.state
+          .selected,
+      ).toBe(true);
+      target = view.targets.find((item) => item.description === 'button "Disclosure"')!;
+      reply = await act(action(view, target, "expand"));
+      view = reply.data.post_observation.data;
+      expect(
+        view.targets.find((item) => item.description === 'button "Disclosure"')?.state
+          .expanded,
+      ).toBe(true);
+      await inspect("document.querySelector('#accept').indeterminate=true");
+      view = await observe(session);
+      target = view.targets.find((item) => item.description === 'checkbox "Accept"')!;
+      expect(target.state.checked).toBe("mixed");
+      expect(
+        view.state.controls.find((control) => control.name === "Accept")?.checked,
+      ).toBe("mixed");
+      await inspect("document.querySelector('#accept').indeterminate=false");
+      reply = await act(action(view, target, "stale-mixed"));
+      expect(reply.data.receipt.outcome).toBe("not_executed");
+      expect(reply.error?.code).toBe("EVIDENCE_CHANGED");
+      expect(await inspect("document.querySelector('#accept').checked")).toBe(false);
+    });
+
+    it("reports state omissions and clipped values explicitly", async () => {
+      const session = await openSession();
+      await inspect(
+        "document.body.innerHTML='<input aria-label=Long value='+JSON.stringify('x'.repeat(2100))+'>'+Array.from({length:260},(_,i)=>'<button style=position:fixed;left:0;top:40px>Item '+i+'</button>').join('')",
+      );
+      const view = await observe(session);
+      expect(view.state.coverage).toMatchObject({
+        controls: { total: 261, returned: 250, omitted: 11 },
+        truncated: true,
+      });
+      const value = view.state.controls.find((control) => control.name === "Long");
+      expect(value?.value).toHaveLength(2000);
+      expect(value?.truncated).toBe(true);
+      expect(view.state.controls).toHaveLength(250);
     });
 
     it("refuses changed relation evidence on a fresh target but tolerates unrelated page changes", async () => {

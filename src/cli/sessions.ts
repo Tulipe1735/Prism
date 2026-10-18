@@ -1,11 +1,13 @@
 import type { BrowserConnection } from "../browser/connect.ts";
 import type { TargetEvidence } from "../browser/evidence.ts";
 import type { BrowserSession, Observation } from "../browser/session.ts";
-import type { SnapshotAction } from "../shared/types.ts";
+import type { ObservedAction } from "../browser/state.ts";
 import type { ActCommand, Command, Receipt, Reply } from "./protocol.ts";
+import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { performance } from "node:perf_hooks";
 import { connectBrowser, parseBrowserUrl } from "../browser/connect.ts";
 import {
   captureEvidence,
@@ -20,7 +22,7 @@ import { readReceipt, saveReceipt } from "./receipts.ts";
 interface Observed {
   id: string;
   snapshot: Observation;
-  targets: Map<string, SnapshotAction>;
+  targets: Map<string, ObservedAction>;
   views: Map<string, Map<string, TargetEvidence>>;
 }
 interface Session {
@@ -191,10 +193,13 @@ export class Sessions {
     command: Extract<Command, { command: "observe" }>,
     session: Session,
   ): Promise<Reply> {
-    const capture = await this.dependencies.capture(session.browser);
+    session.observed = undefined;
+    const start = performance.now();
+    const capture = await this.dependencies.capture(session.browser, command.scope);
+    const captureMs = performance.now() - start;
     const id = `o_${randomUUID()}`;
     const evidenceId = `v_${randomUUID()}`;
-    const targets = new Map<string, SnapshotAction>();
+    const targets = new Map<string, ObservedAction>();
     const view = new Map<string, TargetEvidence>();
     const data = {
       session: command.session,
@@ -204,8 +209,8 @@ export class Sessions {
       page: {
         url: capture.snapshot.url,
         title: capture.snapshot.title,
-        status: capture.status,
       },
+      state: capture.state,
       omitted_actions: capture.snapshot.omitted_actions,
       targets: capture.snapshot.actions.map((action) => {
         const ref = `${id}:${action.id}`;
@@ -220,14 +225,26 @@ export class Sessions {
         return {
           ref,
           operation: action.kind,
-          label: action.label,
-          ...(action.role ? { role: action.role } : {}),
-          ...(action.kind === "select" ? { option_value: action.value } : {}),
+          ...(action.kind === "select"
+            ? {
+                option_value: action.value,
+                option_label: action.option_label,
+              }
+            : {}),
           ...evidence,
         };
       }),
     };
-    await this.event(command.session, { type: "observed", data });
+    await this.event(command.session, {
+      type: "observed",
+      data,
+      metrics: {
+        capture_ms: captureMs,
+        output_bytes: Buffer.byteLength(JSON.stringify(data)),
+        target_count: data.targets.length,
+        control_count: capture.state.controls.length,
+      },
+    });
     session.observed = {
       id,
       snapshot: capture.snapshot,
@@ -245,7 +262,7 @@ export class Sessions {
       );
     return session.observed;
   }
-  private action(observed: Observed, ref: string): SnapshotAction {
+  private action(observed: Observed, ref: string): ObservedAction {
     const action = observed.targets.get(ref);
     if (!action)
       throw new ContractError(
@@ -257,7 +274,7 @@ export class Sessions {
   private async assertTarget(
     session: Session,
     observed: Observed,
-    action: SnapshotAction,
+    action: ObservedAction,
   ): Promise<void> {
     if (!(await session.browser.samePage(observed.snapshot)))
       throw new ContractError(
@@ -282,10 +299,15 @@ export class Sessions {
         "CONTEXT_BUDGET",
         "Observe again to start a new context budget.",
       );
+    const start = performance.now();
     await this.assertTarget(session, observed, action);
-    const captured = await this.dependencies.read(session.browser, action);
-    const evidence = targetEvidence(
+    const captured = await this.dependencies.read(
+      session.browser,
       action,
+      command.scope,
+    );
+    const evidence = targetEvidence(
+      captured.current,
       command.scope,
       captured.contexts[String(action.node)],
       captured.relations[String(action.node)],
@@ -299,7 +321,14 @@ export class Sessions {
       evidence: id,
       ...evidence,
     };
-    await this.event(command.session, { type: "context", data });
+    await this.event(command.session, {
+      type: "context",
+      data,
+      metrics: {
+        capture_ms: performance.now() - start,
+        output_bytes: Buffer.byteLength(JSON.stringify(data)),
+      },
+    });
     observed.views.set(id, new Map([[command.target, evidence]]));
     return success(data);
   }
@@ -312,8 +341,16 @@ export class Sessions {
       );
     return this.receiptReply(receipt, true);
   }
-  private receiptReply(receipt: Receipt, replayed: boolean): Reply {
-    const data = { receipt, replayed };
+  private receiptReply(
+    receipt: Receipt,
+    replayed: boolean,
+    postObservation?: unknown,
+  ): Reply {
+    const data = {
+      receipt,
+      replayed,
+      ...(postObservation === undefined ? {} : { post_observation: postObservation }),
+    };
     return receipt.outcome === "executed"
       ? success(data)
       : failure(
@@ -323,12 +360,29 @@ export class Sessions {
   }
 
   private async act(command: ActCommand, session: Session): Promise<Reply> {
+    const start = performance.now();
     const previous = await readReceipt(
       this.directory,
       command.session,
       command.request_id,
     );
     if (previous) return this.replay(command, previous);
+    const metrics = {
+      validation_ms: 0,
+      receipt_ms: 0,
+      execution_ms: 0,
+      post_observation_ms: 0,
+      total_ms: 0,
+    };
+    const persist = async (value: Receipt): Promise<void> => {
+      const writeStart = performance.now();
+      try {
+        await saveReceipt(this.directory, value);
+      } finally {
+        metrics.receipt_ms += performance.now() - writeStart;
+      }
+    };
+    const validationStart = performance.now();
     let receipt: Receipt = {
       session: command.session,
       request_id: command.request_id,
@@ -359,6 +413,11 @@ export class Sessions {
           "OPERATION_NOT_OFFERED",
           "Operation does not match the offered target operation.",
         );
+      if (action.kind === "select" && expected.state.truncated)
+        throw new ContractError(
+          "EVIDENCE_TRUNCATED",
+          "The selected control state is incomplete. Input cannot be validated.",
+        );
       if (action.kind === "fill" && command.value === undefined)
         throw new ContractError(
           "VALUE_REQUIRED",
@@ -370,9 +429,13 @@ export class Sessions {
           "Only fill accepts value. Select the offered option ref for select.",
         );
       await this.assertTarget(session, observed, action);
-      const current = await this.dependencies.read(session.browser, action);
-      const evidence = targetEvidence(
+      const current = await this.dependencies.read(
+        session.browser,
         action,
+        expected.scope,
+      );
+      const evidence = targetEvidence(
+        current.current,
         expected.scope,
         current.contexts[String(action.node)],
         current.relations[String(action.node)],
@@ -380,9 +443,10 @@ export class Sessions {
       if (digest(evidence) !== digest(expected))
         throw new ContractError(
           "EVIDENCE_CHANGED",
-          "Displayed context or relation fields changed. Observe again before choosing.",
+          "Displayed state, context or relation fields changed. Observe again before choosing.",
         );
       await this.assertTarget(session, observed, action);
+      metrics.validation_ms = performance.now() - validationStart;
       receipt = {
         ...receipt,
         outcome: "unknown",
@@ -391,9 +455,14 @@ export class Sessions {
         message: "Input is pending or its acknowledgement is unknown.",
         next_command: `prism receipt --session ${command.session} --request-id ${command.request_id}`,
       };
-      await saveReceipt(this.directory, receipt); // No input before the durable pending marker.
+      await persist(receipt); // No input before the durable pending marker.
       dispatchStarted = true;
-      await session.browser.act(action, observed.snapshot, command.value);
+      const executionStart = performance.now();
+      try {
+        await session.browser.act(action, observed.snapshot, command.value);
+      } finally {
+        metrics.execution_ms = performance.now() - executionStart;
+      }
       receipt = {
         ...receipt,
         outcome: "executed",
@@ -406,6 +475,8 @@ export class Sessions {
         next_command: `prism observe --session ${command.session}`,
       };
     } catch (error) {
+      if (metrics.validation_ms === 0)
+        metrics.validation_ms = performance.now() - validationStart;
       if (!dispatchStarted || error instanceof StalePageError) {
         receipt = {
           ...receipt,
@@ -436,7 +507,7 @@ export class Sessions {
     )
       session.observed = undefined;
     try {
-      await saveReceipt(this.directory, receipt);
+      await persist(receipt);
     } catch {
       return failure(
         new ContractError(
@@ -452,10 +523,26 @@ export class Sessions {
         },
       );
     }
-    await this.event(command.session, { type: "action", receipt }).catch((error) =>
-      console.error(`Prism event log: ${String(error)}`),
+    let postObservation;
+    if (receipt.outcome !== "not_executed") {
+      const observationStart = performance.now();
+      try {
+        const observed = await this.observe(
+          { command: "observe", session: command.session, scope: "local" },
+          session,
+        );
+        postObservation = { status: "captured", data: observed.data };
+      } catch (error) {
+        session.observed = undefined;
+        postObservation = { status: "failed", error: failure(error).error };
+      }
+      metrics.post_observation_ms = performance.now() - observationStart;
+    }
+    metrics.total_ms = performance.now() - start;
+    await this.event(command.session, { type: "action", receipt, metrics }).catch(
+      (error) => console.error(`Prism event log: ${String(error)}`),
     );
-    return this.receiptReply(receipt, false);
+    return this.receiptReply(receipt, false, postObservation);
   }
 
   private async event(session: string, data: unknown): Promise<void> {

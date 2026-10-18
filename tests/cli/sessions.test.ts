@@ -1,7 +1,8 @@
 import type { EvidenceCapture } from "../../src/browser/evidence.ts";
 import type { BrowserSession } from "../../src/browser/session.ts";
 import type { ActCommand, Reply } from "../../src/cli/protocol.ts";
-import { mkdtemp, rm } from "node:fs/promises";
+import { Buffer } from "node:buffer";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -18,7 +19,7 @@ afterEach(async () => {
 async function setup() {
   const directory = await mkdtemp(join(tmpdir(), "prism-contract-"));
   directories.push(directory);
-  const capture = {
+  const capture: EvidenceCapture = {
     snapshot: {
       url: "https://example.com/",
       title: "public page",
@@ -30,8 +31,26 @@ async function setup() {
       page_key: "page",
       omitted_actions: 0,
       actions: [
-        { id: "e1", kind: "click", label: "Choose", node: 1 },
-        { id: "e2", kind: "fill", label: "Name", node: 2 },
+        {
+          id: "e1",
+          kind: "click",
+          label: "Choose",
+          node: 1,
+          control: { name: "Choose", role: "button", disabled: false, readonly: false },
+        },
+        {
+          id: "e2",
+          kind: "fill",
+          label: "Name",
+          node: 2,
+          control: {
+            name: "Name",
+            role: "textbox",
+            disabled: false,
+            readonly: false,
+            value: "",
+          },
+        },
       ],
       guards: {},
       fingerprint: "test",
@@ -52,18 +71,36 @@ async function setup() {
     },
     relations: { "1": [{ tag: 1, text: "Alpha", scope: "section" }] },
     status: "",
-  } satisfies EvidenceCapture;
+    state: {
+      source: "dom",
+      observed_at: "2026-10-11T00:00:00.000Z",
+      controls: [],
+      messages: [],
+      coverage: {
+        scope: "viewport",
+        controls: { total: 0, returned: 0, omitted: 0 },
+        messages: { total: 0, returned: 0, omitted: 0 },
+        truncated: false,
+      },
+    },
+  };
   const browser = {
     samePage: vi.fn(async () => true),
     fresh: vi.fn(async () => true),
     act: vi.fn(async () => {}),
     close: vi.fn(async () => {}),
   };
+  const capturePage = vi.fn(async () => structuredClone(capture));
   const manager = new Sessions(directory, {
     connect: async () => ({ client: { send: vi.fn() }, close: async () => {} }),
     open: async () => browser as unknown as BrowserSession,
-    capture: async () => structuredClone(capture),
-    read: async () => structuredClone(capture),
+    capture: capturePage,
+    read: async (_session, action) => ({
+      ...structuredClone(capture),
+      current: structuredClone(
+        capture.snapshot.actions.find((item) => item.id === action.id)!,
+      ),
+    }),
   });
   const opened = await manager.handle({
     command: "open",
@@ -90,7 +127,7 @@ async function setup() {
     operation: "click",
     request_id: "r1",
   };
-  return { directory, capture, browser, manager, command, data };
+  return { directory, capture, capturePage, browser, manager, command, data };
 }
 function receipt(reply: Reply) {
   return (
@@ -99,6 +136,133 @@ function receipt(reply: Reply) {
 }
 
 describe("observation and execution contracts", () => {
+  it("returns explicit false and empty states without duplicate identity or context", async () => {
+    const { manager, command, capture } = await setup();
+    Object.assign(capture.snapshot.actions[0]!.control!, {
+      role: "checkbox",
+      checked: false,
+      value: "on",
+    });
+    const reply = await manager.handle({
+      command: "observe",
+      session: command.session,
+      scope: "local",
+    });
+    expect(reply).toMatchObject({
+      data: {
+        targets: [
+          {
+            description: 'checkbox "Choose"',
+            state: { checked: false, value: "on" },
+            context: { local: "Plan" },
+          },
+          { description: 'textbox "Name"', state: { value: "" } },
+        ],
+      },
+    });
+    const targets = (reply.data as { targets: object[] }).targets;
+    for (const target of targets) {
+      expect(target).not.toHaveProperty("label");
+      expect(target).not.toHaveProperty("role");
+    }
+  });
+  it("rejects changed current state even when a freshness check accepts the node", async () => {
+    const { manager, command, capture, browser } = await setup();
+    Object.assign(capture.snapshot.actions[0]!.control!, {
+      role: "checkbox",
+      checked: false,
+    });
+    const observed = await manager.handle({
+      command: "observe",
+      session: command.session,
+      scope: "local",
+    });
+    const view = observed.data as typeof command & { targets: { ref: string }[] };
+    capture.snapshot.actions[0]!.control!.checked = true;
+    const reply = await manager.handle({
+      ...command,
+      observation: view.observation,
+      evidence: view.evidence,
+      target: view.targets[0]!.ref,
+    });
+    expect(receipt(reply)).toMatchObject({
+      outcome: "not_executed",
+      code: "EVIDENCE_CHANGED",
+    });
+    expect(browser.act).not.toHaveBeenCalled();
+    expect(reply.data).not.toHaveProperty("post_observation");
+  });
+  it("offers current post-observation refs and never returns them on replay", async () => {
+    const { manager, command, capturePage, browser } = await setup();
+    const reply = await manager.handle(command);
+    const post = (
+      reply.data as {
+        post_observation: {
+          status: string;
+          data: typeof command & { targets: { ref: string }[] };
+        };
+      }
+    ).post_observation;
+    expect(post.status).toBe("captured");
+    expect(post.data.observation).not.toBe(command.observation);
+    expect(post.data).toHaveProperty("state");
+    expect(await manager.handle(command)).toMatchObject({ data: { replayed: true } });
+    expect((await manager.handle(command)).data).not.toHaveProperty("post_observation");
+    expect(capturePage).toHaveBeenCalledTimes(2);
+    expect(
+      receipt(
+        await manager.handle({
+          ...command,
+          request_id: "next",
+          observation: post.data.observation,
+          evidence: post.data.evidence,
+          target: post.data.targets[0]!.ref,
+        }),
+      ).outcome,
+    ).toBe("executed");
+    expect(browser.act).toHaveBeenCalledTimes(2);
+  });
+  it("keeps an acknowledged receipt when the post-observation fails", async () => {
+    const { manager, command, capturePage, directory, browser } = await setup();
+    capturePage.mockRejectedValueOnce(new Error("observation disconnected"));
+    const reply = await manager.handle(command);
+    expect(reply).toMatchObject({
+      ok: true,
+      data: {
+        receipt: { outcome: "executed" },
+        post_observation: {
+          status: "failed",
+          error: { message: "observation disconnected" },
+        },
+      },
+    });
+    expect(
+      (await readReceipt(directory, command.session, command.request_id))?.outcome,
+    ).toBe("executed");
+    expect((await manager.handle(command)).data).not.toHaveProperty("post_observation");
+    expect(browser.act).toHaveBeenCalledTimes(1);
+    expect(
+      receipt(await manager.handle({ ...command, request_id: "expired" })).code,
+    ).toBe("OBSERVATION_EXPIRED");
+  });
+  it("records private phase metrics without adding them to public observations", async () => {
+    const { manager, command, directory } = await setup();
+    const reply = await manager.handle(command);
+    expect(reply.data).not.toHaveProperty("metrics");
+    const files = await readdir(join(directory, "events"));
+    const events = (await readFile(join(directory, "events", files[0]!), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    const observed = events.find((event) => event.type === "observed");
+    expect(observed.metrics.output_bytes).toBe(
+      Buffer.byteLength(JSON.stringify(observed.data)),
+    );
+    const event = events.find((event) => event.type === "action");
+    for (const value of Object.values(event.metrics))
+      expect(value).toEqual(expect.any(Number));
+    expect(event.metrics.total_ms).toBeGreaterThanOrEqual(event.metrics.execution_ms);
+  });
   it("serializes concurrent duplicate requests and rejects reused ids for different decisions", async () => {
     const { manager, command, browser } = await setup();
     const replies = await Promise.all([
@@ -196,7 +360,10 @@ describe("observation and execution contracts", () => {
       ).toBe("unknown");
       throw new Error("CDP disconnected after input");
     });
-    expect(receipt(await manager.handle(command)).outcome).toBe("unknown");
+    const uncertain = await manager.handle(command);
+    expect(uncertain.ok).toBe(false);
+    expect(receipt(uncertain).outcome).toBe("unknown");
+    expect(uncertain.data).toMatchObject({ post_observation: { status: "captured" } });
     expect(receipt(await manager.handle(command)).outcome).toBe("unknown");
     await manager.closeAll();
     expect(receipt(await manager.handle(command)).outcome).toBe("unknown");
