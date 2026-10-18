@@ -1,12 +1,17 @@
 import type { AddressInfo } from "node:net";
-import type { IncomingMessage, ServerResponse } from "node:http";
 
-import { createServer, type Server } from "node:http";
+import { Buffer } from "node:buffer";
 import { once } from "node:events";
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { webFetch } from "../../src/web/fetch.ts";
-import { isPublicAddress, type AddressResolver } from "../../src/web/target.ts";
+import { type AddressResolver, isPublicAddress } from "../../src/web/target.ts";
 
 type Route = (request: IncomingMessage, response: ServerResponse) => void;
 
@@ -29,14 +34,14 @@ beforeAll(async () => {
   port = (server.address() as AddressInfo).port;
 });
 
+beforeEach(() => {
+  routes.clear();
+});
+
 afterAll(async () => {
   server.closeAllConnections();
   server.close();
   await once(server, "close");
-});
-
-beforeEach(() => {
-  routes.clear();
 });
 
 /** Reports a public address for every host name; the fake fetch still reaches the test server. */
@@ -44,7 +49,7 @@ const publicResolver: AddressResolver = async () => ["93.184.216.34"];
 
 /** Redirects connections for `public.test` to the local test server. */
 function publicFetch(): typeof fetch {
-  return ((input: RequestInfo | URL, init?: RequestInit) => {
+  return ((input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const target = new URL(input instanceof Request ? input.url : String(input));
     target.hostname = "127.0.0.1";
     target.port = String(port);
@@ -99,12 +104,12 @@ describe("webFetch target policy", () => {
 
   it("rejects non-HTTP schemes and URLs carrying credentials", async () => {
     const fetchImpl = vi.fn();
-    const fetch = fetchImpl as unknown as typeof fetch;
-    await expect(webFetch({ url: "file:///etc/passwd", fetchImpl: fetch })).rejects.toThrow(
-      /http and https/,
-    );
+    const stub = fetchImpl as unknown as typeof globalThis.fetch;
     await expect(
-      webFetch({ url: "https://user:secret@example.com/", fetchImpl: fetch }),
+      webFetch({ url: "file:///etc/passwd", fetchImpl: stub }),
+    ).rejects.toThrow(/http and https/);
+    await expect(
+      webFetch({ url: "https://user:secret@example.com/", fetchImpl: stub }),
     ).rejects.toThrow(/credentials/);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -201,7 +206,9 @@ describe("webFetch response handling", () => {
     });
     routes.set("/moved", (_request, response) => {
       response.writeHead(200, { "content-type": "text/html" });
-      response.end("<html><head><title>Moved</title></head><body><p>New home.</p></body></html>");
+      response.end(
+        "<html><head><title>Moved</title></head><body><p>New home.</p></body></html>",
+      );
     });
 
     const page = await webFetch({
@@ -243,7 +250,9 @@ describe("webFetch response handling", () => {
         ...extra,
       });
 
-    await expect(fetchPage("private")).rejects.toThrow(/127\.0\.0\.1.*not a public address/);
+    await expect(fetchPage("private")).rejects.toThrow(
+      /127\.0\.0\.1.*not a public address/,
+    );
     await expect(fetchPage("scheme")).rejects.toThrow(/http and https/);
     await expect(fetchPage("nowhere")).rejects.toThrow(/without a location/);
     await expect(fetchPage("loop", { maxRedirects: 3 })).rejects.toThrow(/more than 3/);
@@ -293,7 +302,7 @@ describe("webFetch limits", () => {
   it("decodes a declared legacy charset", async () => {
     routes.set("/latin", (_request, response) => {
       response.writeHead(200, { "content-type": "text/plain; charset=iso-8859-1" });
-      response.end(Buffer.from([0x63, 0x61, 0x66, 0xe9]));
+      response.end(Buffer.from([0x63, 0x61, 0x66, 0xE9]));
     });
 
     const page = await webFetch({
@@ -303,6 +312,55 @@ describe("webFetch limits", () => {
     });
 
     expect(page.text).toBe("café");
+  });
+});
+
+describe("webFetch failures", () => {
+  it("times out a page that never responds", async () => {
+    routes.set("/hang", () => {});
+    await expect(
+      webFetch({
+        url: "http://public.test/hang",
+        fetchImpl: publicFetch(),
+        resolveAddresses: publicResolver,
+        timeoutMs: 300,
+      }),
+    ).rejects.toThrow(/timed out after 300 ms/);
+  });
+
+  it("stops when the caller cancels the fetch", async () => {
+    routes.set("/hang", () => {});
+    const controller = new AbortController();
+    const pending = webFetch({
+      url: "http://public.test/hang",
+      fetchImpl: publicFetch(),
+      resolveAddresses: publicResolver,
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(new Error("Task cancelled")), 50);
+    await expect(pending).rejects.toThrow(/Task cancelled/);
+  });
+
+  it("reports a dropped connection and an unresolvable host", async () => {
+    routes.set("/reset", (_request, response) => {
+      response.socket?.destroy();
+    });
+    await expect(
+      webFetch({
+        url: "http://public.test/reset",
+        fetchImpl: publicFetch(),
+        resolveAddresses: publicResolver,
+      }),
+    ).rejects.toThrow(/Fetching http:\/\/public\.test\/reset failed/);
+
+    await expect(
+      webFetch({
+        url: "https://missing.example.com/",
+        resolveAddresses: async () => {
+          throw new Error("ENOTFOUND");
+        },
+      }),
+    ).rejects.toThrow(/could not resolve missing\.example\.com/);
   });
 });
 

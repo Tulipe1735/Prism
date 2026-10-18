@@ -22,7 +22,7 @@ export interface SearchRequest {
 /** A web search source the kernel can call. See docs/web-search.md to add one. */
 export interface SearchProvider {
   readonly name: string;
-  search(request: SearchRequest): Promise<SearchResult[]>;
+  search: (request: SearchRequest) => Promise<SearchResult[]>;
 }
 
 export interface WebSearchConfig {
@@ -86,7 +86,9 @@ function deepseekProvider(config: WebSearchConfig): SearchProvider {
           query: request.query,
           count,
           need_content: false,
-          ...(request.originalQuestion ? { ori_question: request.originalQuestion } : {}),
+          ...(request.originalQuestion
+            ? { ori_question: request.originalQuestion }
+            : {}),
         },
       });
       const parsed = searchResponseSchema.safeParse(payload);

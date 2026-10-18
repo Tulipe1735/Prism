@@ -31,7 +31,10 @@ function extractTitle(html: string): string {
 
 /** Collapses the blank-line runs that skipped elements leave behind. */
 function tidy(text: string): string {
-  return text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return text
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 const NAMED_ENTITIES: Record<string, string> = {
@@ -48,7 +51,7 @@ function decodeEntities(text: string): string {
     if (entity.startsWith("#")) {
       const hex = entity[1]?.toLowerCase() === "x";
       const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10);
-      if (Number.isInteger(code) && code > 0 && code <= 0x10_ffff)
+      if (Number.isInteger(code) && code > 0 && code <= 0x10_FFFF)
         return String.fromCodePoint(code);
       return match;
     }

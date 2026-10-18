@@ -4,7 +4,7 @@ import { isIP } from "node:net";
 import { UnsafeTargetError, WebFetchError } from "../shared/errors.ts";
 import { VERSION } from "../shared/version.ts";
 import { extractHtml } from "./html.ts";
-import { isPublicAddress, systemResolver, type AddressResolver } from "./target.ts";
+import { type AddressResolver, isPublicAddress, systemResolver } from "./target.ts";
 
 export interface WebFetchOptions {
   url: string;
@@ -42,32 +42,57 @@ export async function webFetch(options: WebFetchOptions): Promise<WebPage> {
   for (let redirects = 0; ; redirects += 1) {
     // Every hop is checked, so a public URL cannot redirect the kernel into the private network.
     await assertPublicTarget(url, resolve);
-    const response = await fetchImpl(url.href, {
-      redirect: "manual",
-      headers: {
-        "user-agent": `prism/${VERSION}`,
-        accept: "text/html,text/plain;q=0.9,*/*;q=0.1",
-      },
-      signal,
-    });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location)
+    try {
+      const response = await fetchImpl(url.href, {
+        redirect: "manual",
+        headers: {
+          "user-agent": `prism/${VERSION}`,
+          accept: "text/html,text/plain;q=0.9,*/*;q=0.1",
+        },
+        signal,
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (!location)
+          throw new WebFetchError(
+            `Fetching ${url.href} failed: the redirect response came without a location.`,
+          );
+        if (redirects >= maxRedirects)
+          throw new WebFetchError(
+            `Fetching ${url.href} failed: more than ${maxRedirects} redirects.`,
+          );
+        await response.body?.cancel().catch(() => {});
+        url = parseUrl(resolveLocation(location, url));
+        continue;
+      }
+      if (!response.ok)
         throw new WebFetchError(
-          `Fetching ${url.href} failed: the redirect response came without a location.`,
+          `Fetching ${url.href} failed with HTTP ${response.status}.`,
         );
-      if (redirects >= maxRedirects)
-        throw new WebFetchError(
-          `Fetching ${url.href} failed: more than ${maxRedirects} redirects.`,
-        );
-      await response.body?.cancel().catch(() => {});
-      url = parseUrl(resolveLocation(location, url));
-      continue;
+      return await readPage(url, response, options.maxBytes ?? DEFAULT_MAX_BYTES);
+    } catch (error) {
+      throw mapFailure(url, error, options);
     }
-    if (!response.ok)
-      throw new WebFetchError(`Fetching ${url.href} failed with HTTP ${response.status}.`);
-    return readPage(url, response, options.maxBytes ?? DEFAULT_MAX_BYTES);
   }
+}
+
+/** Turns transport errors into actionable messages and keeps this module's own errors intact. */
+function mapFailure(url: URL, error: unknown, options: WebFetchOptions): Error {
+  if (error instanceof WebFetchError || error instanceof UnsafeTargetError)
+    return error;
+  if (options.signal?.aborted) {
+    const reason: unknown = options.signal.reason;
+    return reason instanceof Error
+      ? reason
+      : new WebFetchError(`Fetching ${url.href} was cancelled.`);
+  }
+  const name = error instanceof Error ? error.name : "";
+  if (name === "TimeoutError" || name === "AbortError")
+    return new WebFetchError(
+      `Fetching ${url.href} timed out after ${options.timeoutMs ?? DEFAULT_TIMEOUT_MS} ms.`,
+    );
+  const message = error instanceof Error ? error.message : String(error);
+  return new WebFetchError(`Fetching ${url.href} failed: ${message}.`);
 }
 
 function resolveLocation(location: string, from: URL): string {
@@ -80,7 +105,11 @@ function resolveLocation(location: string, from: URL): string {
   }
 }
 
-async function readPage(url: URL, response: Response, maxBytes: number): Promise<WebPage> {
+async function readPage(
+  url: URL,
+  response: Response,
+  maxBytes: number,
+): Promise<WebPage> {
   const contentType = response.headers.get("content-type");
   const { text: body, truncated } = await readBody(response, maxBytes);
   const kind = bodyKind(contentType, body);
@@ -88,7 +117,8 @@ async function readPage(url: URL, response: Response, maxBytes: number): Promise
     throw new WebFetchError(
       `Fetching ${url.href} returned unsupported content type ${contentType}; only text pages are fetched.`,
     );
-  const content = kind === "html" ? extractHtml(body, url.href) : { title: "", text: body };
+  const content =
+    kind === "html" ? extractHtml(body, url.href) : { title: "", text: body };
   return {
     url: url.href,
     title: content.title,
@@ -103,7 +133,10 @@ async function readBody(
   maxBytes: number,
 ): Promise<{ text: string; truncated: boolean }> {
   const { bytes, truncated } = await readBytes(response, maxBytes);
-  return { text: decode(bytes, charsetOf(response.headers.get("content-type"))), truncated };
+  return {
+    text: decode(bytes, charsetOf(response.headers.get("content-type"))),
+    truncated,
+  };
 }
 
 /** Reads at most `maxBytes` of the body and reports whether the rest was dropped. */
@@ -152,7 +185,10 @@ function decode(bytes: Uint8Array, charset: string): string {
 }
 
 /** Chooses how to read a response body; unknown types fall back to sniffing the text. */
-function bodyKind(contentType: string | null, body: string): "html" | "text" | "binary" {
+function bodyKind(
+  contentType: string | null,
+  body: string,
+): "html" | "text" | "binary" {
   const type = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
   if (type === "text/html" || type === "application/xhtml+xml") return "html";
   if (type === "") return body.trimStart().startsWith("<") ? "html" : "text";
@@ -199,7 +235,9 @@ async function assertPublicTarget(url: URL, resolve: AddressResolver): Promise<v
   try {
     addresses = await resolve(hostname);
   } catch {
-    throw new WebFetchError(`Fetching ${url.href} failed: could not resolve ${hostname}.`);
+    throw new WebFetchError(
+      `Fetching ${url.href} failed: could not resolve ${hostname}.`,
+    );
   }
   const blocked = addresses.find((address) => !isPublicAddress(address));
   if (blocked)
