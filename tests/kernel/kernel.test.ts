@@ -157,6 +157,20 @@ it("answers unknown routes and malformed requests with coded errors", async () =
   expect(dataDir).toContain("data");
 });
 
+it("keeps serving after a workbench closes its event stream", async () => {
+  const { kernel, workspace } = await start();
+  const events = await connectEvents(`${kernel.url}/events`);
+  await events.waitFor((event) => event.type === "kernel.status");
+  events.close();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  const created = await api<{ session: SessionSummary }>(kernel.url, "/sessions", {
+    method: "POST",
+    body: { workspace },
+  });
+  expect(created.status).toBe(201);
+});
+
 it("shuts down cleanly on request and stops accepting connections", async () => {
   const { kernel } = await start();
   const events = await connectEvents(`${kernel.url}/events`);

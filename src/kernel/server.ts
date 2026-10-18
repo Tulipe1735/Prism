@@ -56,7 +56,9 @@ export async function startKernel(
   });
 
   const keepAlive = setInterval(() => {
-    for (const client of clients) client.write(": keep-alive\n\n");
+    for (const client of clients) {
+      if (!client.writableEnded) client.write(": keep-alive\n\n");
+    }
   }, KEEP_ALIVE_MS);
   keepAlive.unref();
 
@@ -175,7 +177,12 @@ export async function startKernel(
     response.write("retry: 2000\n\n");
     clients.add(response);
     writeEvent(response, kernel.statusEvent());
-    response.on("close", () => clients.delete(response));
+    const drop = (): void => {
+      clients.delete(response);
+    };
+    response.on("close", drop);
+    // A workbench that closes its window must not take the kernel down.
+    response.on("error", drop);
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -199,6 +206,7 @@ export async function startKernel(
 }
 
 function writeEvent(response: ServerResponse, event: KernelEvent): void {
+  if (response.writableEnded) return;
   response.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
 }
 
