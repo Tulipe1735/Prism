@@ -1,11 +1,10 @@
 import type { SessionSummary } from "../../src/kernel/session.ts";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, beforeAll, expect, it } from "vitest";
 import { windowsInteropStatus } from "../../src/kernel/windows-command.ts";
 import { api, connectEvents, type KernelHarness, startTestKernel } from "./harness.ts";
 
-let harness: KernelHarness | undefined;
 const harnesses: KernelHarness[] = [];
 let unavailable = "";
 /** Directory on a Windows drive that Windows commands can start in. */
@@ -19,8 +18,6 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
-  await harness?.cleanup();
-  harness = undefined;
   await Promise.all(harnesses.splice(0).map((started) => started.cleanup()));
   await Promise.all(
     created.splice(0).map((path) => rm(path, { recursive: true, force: true })),
@@ -41,7 +38,7 @@ async function runCommand(
   args: Record<string, unknown>,
   options: { workspace?: string; prepare?: (workspace: string) => Promise<void> } = {},
 ): Promise<{ result: string; isError: boolean; workspace: string }> {
-  harness = await startTestKernel({
+  const harness = await startTestKernel({
     ...(options.workspace === undefined ? {} : { workspace: options.workspace }),
     answers: [
       {
@@ -106,7 +103,7 @@ it("converts a workspace on a Windows drive to its Windows path", async ({ skip 
   );
   expect(result).toContain("exit code: 0");
   expect(result).toMatch(/[a-z]:\\/i);
-  expect(result).toContain(workspace.split("/").at(-1) as string);
+  expect(result).toContain(basename(workspace));
 });
 
 it("runs inside a WSL workspace through the Windows side of the share", async ({
@@ -158,7 +155,7 @@ it("refuses a command with line breaks instead of running half of it", async ({
 
 it("reports an explicit error when WSL interop is unavailable", async () => {
   const path = process.env.PATH;
-  harness = await startTestKernel({
+  const harness = await startTestKernel({
     answers: [
       {
         toolCalls: [
@@ -172,6 +169,7 @@ it("reports an explicit error when WSL interop is unavailable", async () => {
       { text: ["Done."] },
     ],
   });
+  harnesses.push(harness);
   const events = await connectEvents(`${harness.kernel.url}/events`);
   const session = await createSession(harness.kernel.url, harness.workspace);
   process.env.PATH = "/nonexistent";
