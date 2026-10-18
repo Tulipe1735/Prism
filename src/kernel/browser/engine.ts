@@ -1,31 +1,29 @@
 import type { Browser, BrowserContext } from "playwright";
+import type { BrowserEngine } from "../types.ts";
 
 import { chromium, firefox, webkit } from "playwright";
 import { ConfigError } from "../../shared/errors.ts";
-
-/** Engine names follow the Playwright browser types; Chromium is the default. */
-export const BROWSER_ENGINES = ["chromium", "firefox", "webkit"] as const;
-export type BrowserEngineName = (typeof BROWSER_ENGINES)[number];
+import { BROWSER_ENGINES } from "../types.ts";
 
 const TYPES = { chromium, firefox, webkit } as const;
 const VIEWPORT = { width: 1120, height: 780 } as const;
 
 export interface EngineOptions {
-  engine?: BrowserEngineName;
+  engine?: BrowserEngine;
   /** Chromium only: take over a running Chrome/Edge over CDP. */
   endpoint?: string;
   headless?: boolean;
 }
 
 export interface EngineHandle {
-  name: BrowserEngineName;
+  name: BrowserEngine;
   browser: Browser;
   context: BrowserContext;
   close: () => Promise<void>;
 }
 
 /** Playwright manages engine builds; this reports the command that installs one. */
-export function engineInstallCommand(name: BrowserEngineName): string {
+export function engineInstallCommand(name: BrowserEngine): string {
   return `npx playwright install ${name}`;
 }
 
@@ -78,7 +76,7 @@ async function takeOver(endpoint: string): Promise<EngineHandle> {
 }
 
 /** Turn missing builds and missing system libraries into actionable errors. */
-function launchProblem(name: BrowserEngineName, error: unknown): Error {
+function launchProblem(name: BrowserEngine, error: unknown): Error {
   const detail = message(error);
   if (detail.includes("Executable doesn't exist"))
     return new ConfigError(

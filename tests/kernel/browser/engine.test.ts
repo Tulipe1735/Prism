@@ -1,11 +1,11 @@
-import type { BrowserEngineName } from "../../../src/kernel/browser/engine.ts";
+import type { BrowserEngine } from "../../../src/kernel/types.ts";
 import { describe, expect, it } from "vitest";
 
 describe("browser engine selection", () => {
   it("rejects an unknown engine before doing anything else", async () => {
     const { openEngine } = await import("../../../src/kernel/browser/engine.ts");
     await expect(
-      openEngine({ engine: "netscape" as BrowserEngineName }),
+      openEngine({ engine: "netscape" as BrowserEngine }),
     ).rejects.toMatchObject({ name: "ConfigError" });
   });
 

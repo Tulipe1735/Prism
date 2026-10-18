@@ -11,13 +11,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { BROWSER_ENGINES, openEngine } from "../../../src/kernel/browser/engine.ts";
+import { openEngine } from "../../../src/kernel/browser/engine.ts";
 import {
   captureEvidence,
   readTargetEvidence,
 } from "../../../src/kernel/browser/evidence.ts";
 import { openBrowserSession } from "../../../src/kernel/browser/session.ts";
 import { BrowserTool } from "../../../src/kernel/browser/tool.ts";
+import { BROWSER_ENGINES } from "../../../src/kernel/types.ts";
 
 const PAGE = `<!doctype html><title>Prism kernel browser test</title>
 <section><h2 id="group">Alpha</h2><article><p>Plan</p><button id="choose">Choose</button></article></section>
