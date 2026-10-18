@@ -97,6 +97,15 @@ it("compacts a session on request and keeps the original entries", async () => {
     entryId: compacted.body.entryId,
     reason: "manual",
   });
+  // The log update that carries the entry comes before the compaction event.
+  const updatedIndex = events.events.findIndex(
+    (event) => event.type === "session.updated" && event.session.entryCount === 5,
+  );
+  const compactedIndex = events.events.findIndex(
+    (event) => event.type === "session.compacted",
+  );
+  expect(updatedIndex).toBeGreaterThanOrEqual(0);
+  expect(compactedIndex).toBeGreaterThan(updatedIndex);
 
   // The summary came from the session model, as an internal request without tools.
   const summaryRequest = model.requests.at(-1);
