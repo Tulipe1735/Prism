@@ -1,6 +1,8 @@
-import type { PrismConfig } from "./config.ts";
+import type { CompactionOutcome, CompactionReason } from "./compaction.ts";
 
+import type { PrismConfig } from "./config.ts";
 import type { KernelEvent, KernelStatus } from "./events.ts";
+import type { InstructionRoots } from "./instructions.ts";
 import type { SessionEntry, SessionSummary } from "./session.ts";
 import type { ApprovalRequest, Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
@@ -8,7 +10,9 @@ import type { ExecutionTarget, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { VERSION } from "../shared/version.ts";
 import { createCommandTool } from "./command-tool.ts";
+import { compactSession } from "./compaction.ts";
 import { createFileTools } from "./file-tools.ts";
+import { InstructionFiles } from "./instructions.ts";
 import { runTask } from "./loop.ts";
 import { SessionStore } from "./session-store.ts";
 import { createSkillTool, echoTool, ToolRegistry } from "./tools.ts";
@@ -33,6 +37,8 @@ export interface KernelOptions {
   tools?: Tool[];
   /** Roots of the skill scan; tests point them at temporary directories. */
   skillRoots?: SkillToolRoots;
+  /** Roots of the `AGENTS.md` scan; tests point them at temporary directories. */
+  instructionRoots?: InstructionRoots;
   scope?: PermissionScope;
   target?: ExecutionTarget;
 }
@@ -60,6 +66,7 @@ export class Kernel {
   readonly store: SessionStore;
   readonly tools: ToolRegistry;
   readonly skillRoots: SkillToolRoots;
+  readonly instructions: InstructionFiles;
   readonly target: ExecutionTarget;
   scope: PermissionScope;
   status: KernelStatus = "ready";
@@ -78,6 +85,7 @@ export class Kernel {
     this.config = options.config;
     this.store = new SessionStore(options.config.dataDir);
     this.skillRoots = options.skillRoots ?? {};
+    this.instructions = new InstructionFiles(options.instructionRoots ?? {});
     this.tools = new ToolRegistry([
       echoTool,
       createSkillTool(this.skillRoots),
@@ -189,6 +197,44 @@ export class Kernel {
 
   isRunning(sessionId: string): boolean {
     return this.runs.has(sessionId);
+  }
+
+  /**
+   * Compacts the session's context into a summary entry. The task loop calls
+   * this when the automatic trigger fires; the manual endpoint calls
+   * `compactManually` instead, which refuses a running task.
+   */
+  async compactSession(
+    sessionId: string,
+    options: { reason: CompactionReason; signal?: AbortSignal },
+  ): Promise<CompactionOutcome> {
+    const outcome = await compactSession({
+      store: this.store,
+      model: this.config.model,
+      compaction: this.config.compaction,
+      sessionId,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+    });
+    if (outcome.compacted && outcome.entryId !== undefined) {
+      await this.notifySession(sessionId);
+      this.emit({
+        type: "session.compacted",
+        sessionId,
+        entryId: outcome.entryId,
+        reason: options.reason,
+      });
+    }
+    return outcome;
+  }
+
+  /** Manual compaction from the workbench; refuses while the session runs a task. */
+  async compactManually(sessionId: string): Promise<CompactionOutcome> {
+    if (this.runs.has(sessionId))
+      throw new KernelError(
+        "TASK_RUNNING",
+        `Session ${sessionId} is running a task; cancel it or wait before compacting`,
+      );
+    return this.compactSession(sessionId, { reason: "manual" });
   }
 
   /** Stops the running task; pending approvals of that session are refused. */

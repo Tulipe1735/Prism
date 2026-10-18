@@ -23,6 +23,13 @@ export interface SearchConfig {
   apiKey?: string;
 }
 
+export interface CompactionConfig {
+  /** Estimated context tokens that trigger automatic compaction. */
+  triggerTokens: number;
+  /** Newest history kept verbatim after a compaction, in estimated tokens. */
+  keepTokens: number;
+}
+
 export interface CommandConfig {
   /** Wall-clock limit for one command; the tool may override it per call. */
   timeoutMs: number;
@@ -34,6 +41,7 @@ export interface PrismConfig {
   model: ModelConfig;
   browser: BrowserConfig;
   search: SearchConfig;
+  compaction: CompactionConfig;
   command: CommandConfig;
 }
 
@@ -41,6 +49,7 @@ export interface PrismConfigOverrides {
   model?: Partial<ModelConfig>;
   browser?: Partial<BrowserConfig>;
   search?: Partial<SearchConfig>;
+  compaction?: Partial<CompactionConfig>;
   command?: Partial<CommandConfig>;
 }
 
@@ -48,6 +57,7 @@ const DEFAULTS = {
   model: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
   browser: { engine: "chromium" },
   search: { provider: "deepseek" },
+  compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
   command: { timeoutMs: 120_000 },
 } as const;
 
@@ -69,6 +79,14 @@ const configFileSchema = z
       .optional(),
     search: z
       .object({ provider: z.string().min(1), apiKey: z.string().min(1) })
+      .partial()
+      .strict()
+      .optional(),
+    compaction: z
+      .object({
+        triggerTokens: z.number().int().positive(),
+        keepTokens: z.number().int().positive(),
+      })
       .partial()
       .strict()
       .optional(),
@@ -105,6 +123,11 @@ export async function loadConfig(
     model: { ...DEFAULTS.model, ...file.model, ...options.overrides?.model },
     browser: { ...DEFAULTS.browser, ...file.browser, ...options.overrides?.browser },
     search: { ...DEFAULTS.search, ...file.search, ...options.overrides?.search },
+    compaction: {
+      ...DEFAULTS.compaction,
+      ...file.compaction,
+      ...options.overrides?.compaction,
+    },
     command: { ...DEFAULTS.command, ...file.command, ...options.overrides?.command },
   };
 }

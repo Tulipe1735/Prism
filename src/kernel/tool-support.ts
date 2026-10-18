@@ -65,7 +65,8 @@ export interface PathRequest {
 
 /**
  * Resolves a path and, when it leaves the workspace, asks the user once.
- * Returns the resolved path, or the refusal result for the model.
+ * Returns the resolved path, or the refusal result for the model. The resolved
+ * path is reported as explored, so nested `AGENTS.md` files on the way load.
  */
 export async function gatePath(
   context: ToolContext,
@@ -73,6 +74,7 @@ export async function gatePath(
   request: PathRequest,
 ): Promise<{ path: string; display: string } | ToolResult> {
   const { path, inside } = resolveWorkspacePath(context.workspace, requested);
+  context.noteExplored?.(path);
   if (!inside) {
     const approved = await context.requestApproval({
       reason: request.reason,

@@ -26,6 +26,7 @@ describe("kernel config", () => {
       model: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
       browser: { engine: "chromium" },
       search: { provider: "deepseek" },
+      compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
       command: { timeoutMs: 120_000 },
     });
   });
@@ -55,8 +56,29 @@ describe("kernel config", () => {
       },
       browser: { engine: "firefox" },
       search: { provider: "brave", apiKey: "search-from-file" },
+      compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
       command: { timeoutMs: 5_000 },
     });
+  });
+
+  it("reads compaction thresholds from the config file and explicit overrides", async () => {
+    await writeFile(
+      configPath(dataDir),
+      JSON.stringify({ compaction: { keepTokens: 5_000 } }),
+    );
+
+    expect((await loadConfig({ dataDir })).compaction).toEqual({
+      triggerTokens: 100_000,
+      keepTokens: 5_000,
+    });
+    expect(
+      (
+        await loadConfig({
+          dataDir,
+          overrides: { compaction: { triggerTokens: 400 } },
+        })
+      ).compaction,
+    ).toEqual({ triggerTokens: 400, keepTokens: 5_000 });
   });
 
   it("reads the PRISM_DATA_DIR environment variable when no data directory is passed", async () => {
