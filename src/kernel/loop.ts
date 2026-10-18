@@ -6,6 +6,7 @@ import type { ToolResult } from "./tool.ts";
 import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { scanSkills } from "../skills/loader.ts";
+import { estimateContextTokens } from "./compaction.ts";
 import { streamChat, toModelMessages } from "./model.ts";
 import { rebuildContext } from "./session.ts";
 
@@ -37,18 +38,45 @@ export async function runTask(run: TaskRun): Promise<void> {
     const log = await kernel.store.read(sessionId);
     const workspace = log.header.workspace;
     const skills = (await scanSkills({ workspace, ...kernel.skillRoots })).skills;
-    const messages: ChatMessage[] = [
+    /** Once a summary fails the run keeps its full history instead of retrying. */
+    let compactionFailed = false;
+
+    /** The request the loop sends next, rebuilt from the session log. */
+    const requestMessages = async (): Promise<ChatMessage[]> => [
       {
         role: "system",
         content: buildSystemPrompt({ workspace, scope: run.scope, skills }),
       },
-      ...toModelMessages(rebuildContext(log.entries)),
+      ...toModelMessages(rebuildContext((await kernel.store.read(sessionId)).entries)),
     ];
 
     for (let round = 0; round < MAX_MODEL_ROUNDS; round += 1) {
       if (signal.aborted) {
         await finish(run, "The user cancelled the task.");
         return;
+      }
+      let messages = await requestMessages();
+      if (
+        !compactionFailed &&
+        estimateContextTokens(messages) > kernel.config.compaction.triggerTokens
+      ) {
+        try {
+          const outcome = await kernel.compactSession(sessionId, {
+            reason: "auto",
+            signal,
+          });
+          if (outcome.compacted) messages = await requestMessages();
+        } catch (error) {
+          if (signal.aborted) throw error;
+          compactionFailed = true;
+          await kernel.store.append(sessionId, {
+            type: "message",
+            role: "system",
+            content: `Automatic compaction failed: ${error instanceof Error ? error.message : String(error)}. The task continues with the full history.`,
+          });
+          await kernel.notifySession(sessionId);
+          messages = await requestMessages();
+        }
       }
       const entryId = randomUUID();
       let text = "";
@@ -103,11 +131,6 @@ export async function runTask(run: TaskRun): Promise<void> {
           name: call.name,
           arguments: call.arguments,
         });
-      messages.push({
-        role: "assistant",
-        content: text,
-        ...(calls.length === 0 ? {} : { toolCalls: calls }),
-      });
 
       if (calls.length === 0) {
         await kernel.notifySession(sessionId);
@@ -152,7 +175,6 @@ export async function runTask(run: TaskRun): Promise<void> {
               result: content,
             });
         }
-        messages.push({ role: "tool", content, toolCallId: call.id });
       }
       await kernel.notifySession(sessionId);
 
