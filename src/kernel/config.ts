@@ -35,12 +35,18 @@ export interface SearchConfig {
   apiKey?: string;
 }
 
+export interface CommandConfig {
+  /** Wall-clock limit for one command; the tool may override it per call. */
+  timeoutMs: number;
+}
+
 export interface PrismConfig {
   /** Directory holding sessions, receipts and the config file itself. */
   dataDir: string;
   model: ModelConfig;
   browser: BrowserConfig;
   search: SearchConfig;
+  command: CommandConfig;
   permissions: PermissionsConfig;
 }
 
@@ -48,6 +54,7 @@ export interface PrismConfigOverrides {
   model?: Partial<ModelConfig>;
   browser?: Partial<BrowserConfig>;
   search?: Partial<SearchConfig>;
+  command?: Partial<CommandConfig>;
 }
 
 /** Settings a running kernel may change; other sections stay as they are. */
@@ -60,6 +67,7 @@ const DEFAULTS = {
   model: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
   browser: { engine: "chromium", actionsNeedApproval: false },
   search: { provider: "deepseek" },
+  command: { timeoutMs: 120_000 },
   permissions: { scope: "workspace-write" },
 } as const;
 
@@ -87,6 +95,7 @@ const configFileSchema = z
       .partial()
       .strict()
       .optional(),
+    command: z.object({ timeoutMs: z.number().int().positive() }),
     permissions: z
       .object({ scope: z.enum(PERMISSION_SCOPES) })
       .partial()
@@ -120,6 +129,7 @@ export async function loadConfig(
     model: { ...DEFAULTS.model, ...file.model, ...options.overrides?.model },
     browser: { ...DEFAULTS.browser, ...file.browser, ...options.overrides?.browser },
     search: { ...DEFAULTS.search, ...file.search, ...options.overrides?.search },
+    command: { ...DEFAULTS.command, ...file.command, ...options.overrides?.command },
     permissions: { ...DEFAULTS.permissions, ...file.permissions },
   };
 }

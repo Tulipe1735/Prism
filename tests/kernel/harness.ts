@@ -1,5 +1,6 @@
 import type { Buffer } from "node:buffer";
 import type { Server } from "node:http";
+import type { CommandConfig } from "../../src/kernel/config.ts";
 import type { KernelEvent } from "../../src/kernel/events.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
 import type { PermissionScope } from "../../src/kernel/types.ts";
@@ -267,6 +268,7 @@ export async function startTestKernel(
     /** Written to `<dataDir>/config.json` before the kernel loads it. */
     configFile?: Record<string, unknown>;
     workspace?: string;
+    command?: Partial<CommandConfig>;
   } = {},
 ): Promise<KernelHarness> {
   const base = await mkdtemp(join(tmpdir(), "prism-kernel-"));
@@ -291,6 +293,7 @@ export async function startTestKernel(
     dataDir,
     overrides: {
       model: { baseUrl: model.baseUrl, model: "scripted-model", apiKey: "test-key" },
+      ...(options.command === undefined ? {} : { command: options.command }),
     },
   });
   const kernel = await startKernel({

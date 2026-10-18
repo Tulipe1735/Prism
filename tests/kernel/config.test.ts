@@ -26,6 +26,7 @@ describe("kernel config", () => {
       model: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
       browser: { engine: "chromium", actionsNeedApproval: false },
       search: { provider: "deepseek" },
+      command: { timeoutMs: 120_000 },
       permissions: { scope: "workspace-write" },
     });
   });
@@ -37,6 +38,7 @@ describe("kernel config", () => {
         model: { apiKey: "sk-from-file", model: "deepseek-reasoner" },
         browser: { engine: "firefox", actionsNeedApproval: true },
         search: { provider: "brave", apiKey: "search-from-file" },
+        command: { timeoutMs: 5_000 },
         permissions: { scope: "read-only" },
       }),
     );
@@ -55,6 +57,7 @@ describe("kernel config", () => {
       },
       browser: { engine: "firefox", actionsNeedApproval: true },
       search: { provider: "brave", apiKey: "search-from-file" },
+      command: { timeoutMs: 5_000 },
       permissions: { scope: "read-only" },
     });
   });
@@ -77,6 +80,12 @@ describe("kernel config", () => {
     await writeFile(
       configPath(dataDir),
       JSON.stringify({ search: { provider: "brave" }, extra: 1 }),
+    );
+    await expect(loadConfig({ dataDir })).rejects.toThrow(/config\.json/);
+
+    await writeFile(
+      configPath(dataDir),
+      JSON.stringify({ command: { timeoutMs: -1 } }),
     );
     await expect(loadConfig({ dataDir })).rejects.toThrow(/config\.json/);
   });
