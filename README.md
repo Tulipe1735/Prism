@@ -12,9 +12,10 @@ Prism 自己运行任务循环，内置 Prism 浏览器能力、MCP、skills、�
 
 ## 状态
 
-重构中。旧的个人研究助手已移除；新的 agent 内核与 Electron 桌面端尚未实现。
+重构中。旧的个人研究助手已移除；新的 agent 内核已可 headless 运行，Electron 桌面端尚未实现。
 
-当前可用：`prism` 浏览器 CLI，用法见[浏览器指南](docs/browser-cli.md)。
+当前可用：`prism`
+浏览器 CLI，用法见[浏览器指南](docs/browser-cli.md)；内核的会话、任务循环与工具执行经本地 HTTP/SSE 提供，接口见[内核接口契约](docs/kernel-contract.md)。
 
 ## 首版目标
 
@@ -54,6 +55,14 @@ pnpm build
 已有浏览器 CLI 的 agent skill 见
 [skills/prism](skills/prism/SKILL.md)；内核的 skills 目录约定与优先级见
 [docs/skills.md](docs/skills.md)。
+
+内核可 headless 启动，监听 `127.0.0.1` 并把地址写成一行 JSON 输出（接口见
+[docs/kernel-contract.md](docs/kernel-contract.md)）：
+
+```bash
+node --experimental-strip-types --disable-warning=ExperimentalWarning \
+  src/interfaces/kernel.ts [--port <n>] [--data-dir <path>]
+```
 
 MIT License。README 的组织方式参考
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。

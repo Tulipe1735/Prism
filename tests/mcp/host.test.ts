@@ -14,6 +14,7 @@ const context: ToolContext = {
   scope: "read-only",
   target: "wsl",
   signal: new AbortController().signal,
+  requestApproval: async () => false,
 };
 
 describe("McpHost over stdio", () => {
