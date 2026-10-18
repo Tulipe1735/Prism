@@ -49,15 +49,15 @@ Electron 只做三件事：经 `wsl.exe`（Windows）或本地
 
 ## UI 结构
 
-| 区域     | 内容                                                                     | 来源                                             |
-| -------- | ------------------------------------------------------------------------ | ------------------------------------------------ |
-| 顶栏     | 内核连接、状态、版本、数据目录                                           | `kernel.status` 事件与 `/status`                 |
-| 工作区   | 输入或从最近使用中选一个 WSL 路径                                        | 本地记忆 + 会话列表中的工作区                    |
-| 会话列表 | 按工作区分组、新建、继续、重命名、删除、搜索                             | `/sessions*` 与 `session.updated`                |
-| 聊天     | 助手文本流式增量、工具卡片（参数、结果、diff）、压缩提示                 | `message.delta`、`tool.*` 与 `GET /sessions/:id` |
-| 审批     | 逐次审批卡片：工具、理由、目标、影响，按钮只有「允许一次」与「拒绝」     | `approval.requested` 与 `/approvals/:requestId`  |
-| 产物     | 本次会话触碰过的文件、最新状态与最新 diff                                | 由会话日志推导（见下）                           |
-| 设置     | 模型端点与名称、密钥是否已设置、浏览器引擎、搜索来源、权限范围、数据目录 | `GET /settings`（本版只读）                      |
+| 区域     | 内容                                                                                                       | 来源                                             |
+| -------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| 顶栏     | 内核连接、状态、版本、数据目录                                                                             | `kernel.status` 事件与 `/status`                 |
+| 工作区   | 输入或从最近使用中选一个 WSL 路径                                                                          | 本地记忆 + 会话列表中的工作区                    |
+| 会话列表 | 按工作区分组、新建、继续、重命名、删除、搜索                                                               | `/sessions*` 与 `session.updated`                |
+| 聊天     | 助手文本流式增量、工具卡片（参数、结果、diff）、压缩提示                                                   | `message.delta`、`tool.*` 与 `GET /sessions/:id` |
+| 审批     | 逐次审批卡片：工具、理由、目标、影响，按钮只有「允许一次」与「拒绝」                                       | `approval.requested` 与 `/approvals/:requestId`  |
+| 产物     | 本次会话触碰过的文件、最新状态与最新 diff（工具没给 diff 时显示写入内容）                                  | 由会话日志推导（见下）                           |
+| 设置     | 模型端点与名称、密钥是否已设置、浏览器引擎、搜索来源、数据目录（只读）；权限范围与浏览器动作审批（可切换） | `GET /settings` 与 `PUT /settings`               |
 
 事件驱动，不轮询：界面只按 SSE 事件重画。事件流断开时自动重连，重连后按契约用
 `GET /sessions/:id` 取回日志，因为内核不重放历史事件。
@@ -72,7 +72,10 @@ Electron 只做三件事：经 `wsl.exe`（Windows）或本地
 - **任务状态**：日志的最后一条是模型消息（assistant）或系统消息（system）时任务已结束，其它情况（用户消息、工具调用、工具结果、压缩）视为运行中。这是从 02 循环的落盘顺序推出的唯一判据，不额外请求内核。
 - **代码改动与产物**：工具调用的 JSON 参数里有 `path` / `file` / `filePath` /
   `file_path` / `filename` 这类路径字段，且工具名不像只读工具（`read`、`grep`、`web_*`
-  等）时算一次文件改动；工具结果里含统一 diff（`diff --git`、`--- `、`@@`）时渲染成 diff，否则原样显示结果。产物按路径归并，状态取最新一次，diff 取最近一次带 diff 的结果。
+  等）时算一次文件改动；工具结果里含统一 diff（`diff --git`、`--- `、`@@`）时渲染成 diff，否则原样显示结果；一次写整个文件的工具（如
+  `write_file`）没有 diff，界面改显示它的 `content`
+  参数（本次写入的内容）。产物按路径归并，状态取最新一次，diff 取最近一次带 diff 的结果。
+- **压缩**：`session.compacted` 只触发一次日志重读，压缩条目本身随日志进入时间线。
 
 ## 测试
 
@@ -84,16 +87,19 @@ PRISM_ELECTRON_SMOKE=1 pnpm vitest run tests/workbench/electron.smoke.test.ts
 ```
 
 - `tests/workbench/derive.test.ts`、`render.test.ts`、`state.test.ts`：视图与状态推导，纯函数断言 HTML 与状态，另有一条用真实内核日志驱动的推导。
-- `tests/workbench/client.integration.test.ts`：真内核 + 脚本化模型，覆盖会话 CRUD、重命名、取消、审批通过与拒绝、事件流。
+- `tests/workbench/client.integration.test.ts`：真内核 + 脚本化模型，覆盖会话 CRUD、重命名、取消、设置写入、审批通过与拒绝（含 04 对工作区外写入的真实审批）与事件流。
 - `tests/workbench/ui-server.integration.test.ts`：UI 服务器与 `/kernel`
   代理（含 SSE 与内核断开）。
 - `tests/workbench/workbench-cli.test.ts`：命令行入口，自己拉内核与对着已有内核两种模式。
 - `tests/workbench/browser.smoke.test.ts`：真实 Chromium 跑完整验收路径（工作区 → 新会话 → 流式消息 → 工具过程与 diff
-  → 一次审批 → 产物 → 重命名/搜索/删除）。需要 `pnpm build`，且构建产物必须比源码新。
+  → 一次审批 → 产物 → 权限范围切换 → 重命名/搜索/删除）。需要
+  `pnpm build`，且构建产物必须比源码新。
 - `tests/workbench/electron.smoke.test.ts`：Electron 壳冒烟，需要 Electron 运行时与显示器。
 
 ## 本版限制
 
-- 设置只读：写入端点由 04（权限范围）与后续 ticket 定义；界面显示当前生效值与配置文件位置。
+- 设置里只有权限范围与浏览器动作审批可写（04 的
+  `PUT /settings`）；模型端点、浏览器引擎与搜索来源只读，改动写在
+  `<dataDir>/config.json`。
 - 没有原生目录选择器：工作区路径由用户输入或从最近使用中选择，因为工作台不接触文件系统。
 - 产物视图只包含本次会话的工具改动，不是仓库级 diff。
