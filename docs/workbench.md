@@ -12,7 +12,7 @@ UI。它承担工作区选择、会话、聊天、工具执行过程、代码改
 ```bash
 pnpm build
 pnpm workbench                       # 自己拉起内核，打印一行 JSON 与可点开的 URL
-pnpm workbench -- --kernel http://127.0.0.1:41234   # 对着已有内核跑
+pnpm workbench --kernel http://127.0.0.1:41234      # 对着已有内核跑
 ```
 
 Electron 壳（与用户环境一致的方式）：

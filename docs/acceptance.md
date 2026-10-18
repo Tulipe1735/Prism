@@ -36,12 +36,12 @@
 
 ## 1. 启动工作台
 
-| 方式         | 命令                                                | 适用                                                 |
-| ------------ | --------------------------------------------------- | ---------------------------------------------------- |
-| 浏览器 UI    | `pnpm build && pnpm workbench`                      | 开发与验收的主要方式；自己拉起内核并打印可点开的 URL |
-| 对着已有内核 | `pnpm workbench -- --kernel http://127.0.0.1:41234` | 内核已单独启动，或要观察内核 stderr                  |
-| Electron 壳  | `pnpm build && pnpm workbench:electron`             | 与你的 Windows 环境一致的方式                        |
-| 仅内核       | `node dist/kernel.js --port 0 --data-dir ~/.prism`  | headless 调用与接口自测                              |
+| 方式         | 命令                                               | 适用                                                 |
+| ------------ | -------------------------------------------------- | ---------------------------------------------------- |
+| 浏览器 UI    | `pnpm build && pnpm workbench`                     | 开发与验收的主要方式；自己拉起内核并打印可点开的 URL |
+| 对着已有内核 | `pnpm workbench --kernel http://127.0.0.1:41234`   | 内核已单独启动，或要观察内核 stderr                  |
+| Electron 壳  | `pnpm build && pnpm workbench:electron`            | 与你的 Windows 环境一致的方式                        |
+| 仅内核       | `node dist/kernel.js --port 0 --data-dir ~/.prism` | headless 调用与接口自测                              |
 
 Windows 上 Electron 经 `wsl.exe` 启动 WSL 里的内核，路径无法推导，必须先给出：
 
