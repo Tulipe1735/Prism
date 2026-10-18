@@ -1,9 +1,11 @@
 import type { Buffer } from "node:buffer";
 import type { Server } from "node:http";
+import type { CompactionConfig } from "../../src/kernel/config.ts";
 import type { KernelEvent } from "../../src/kernel/events.ts";
+import type { SessionEntry } from "../../src/kernel/session.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
 import type { PermissionScope } from "../../src/kernel/types.ts";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -258,12 +260,33 @@ export interface KernelHarness {
   cleanup: () => Promise<void>;
 }
 
+/** The session log as it sits on disk, the way the workbench would replay it. */
+export async function readSessionLog(
+  dataDir: string,
+  sessionId: string,
+): Promise<SessionEntry[]> {
+  const root = join(dataDir, "sessions");
+  for (const directory of await readdir(root)) {
+    try {
+      const lines = (await readFile(join(root, directory, `${sessionId}.jsonl`), "utf8"))
+        .split("\n")
+        .filter((line) => line !== "");
+      return lines.slice(1).map((line) => JSON.parse(line) as SessionEntry);
+    } catch {
+      // Not this workspace directory.
+    }
+  }
+  throw new Error(`Session ${sessionId} was not written under ${root}`);
+}
+
 export async function startTestKernel(
   options: {
     answers?: FakeAnswer[];
     tools?: Tool[];
     scope?: PermissionScope;
     workspace?: string;
+    /** Overrides for `compaction` in the kernel config. */
+    compaction?: Partial<CompactionConfig>;
   } = {},
 ): Promise<KernelHarness> {
   const base = await mkdtemp(join(tmpdir(), "prism-kernel-"));
@@ -281,6 +304,7 @@ export async function startTestKernel(
     dataDir,
     overrides: {
       model: { baseUrl: model.baseUrl, model: "scripted-model", apiKey: "test-key" },
+      ...(options.compaction === undefined ? {} : { compaction: options.compaction }),
     },
   });
   const kernel = await startKernel({

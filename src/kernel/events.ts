@@ -1,3 +1,4 @@
+import type { CompactionReason } from "./compaction.ts";
 import type { SessionSummary } from "./session.ts";
 import type { JsonValue } from "./types.ts";
 
@@ -36,4 +37,11 @@ export type KernelEvent =
       approved: boolean;
     }
   | { type: "session.updated"; session: SessionSummary }
+  | {
+      type: "session.compacted";
+      sessionId: string;
+      /** Id of the `compaction` entry written to the session log. */
+      entryId: string;
+      reason: CompactionReason;
+    }
   | { type: "kernel.status"; status: KernelStatus; version: string; dataDir: string };

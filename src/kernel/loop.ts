@@ -6,8 +6,8 @@ import type { ToolResult } from "./tool.ts";
 import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { scanSkills } from "../skills/loader.ts";
-import { streamChat } from "./model.ts";
-import { type ContextMessage, rebuildContext } from "./session.ts";
+import { streamChat, toModelMessages } from "./model.ts";
+import { rebuildContext } from "./session.ts";
 
 /** Tool output longer than this is cut before it reaches the model and the log. */
 export const TOOL_RESULT_LIMIT = 8_000;
@@ -226,15 +226,6 @@ function truncate(content: string): string {
   return content.length <= TOOL_RESULT_LIMIT
     ? content
     : content.slice(0, TOOL_RESULT_LIMIT) + TRUNCATION_NOTICE;
-}
-
-export function toModelMessages(messages: ContextMessage[]): ChatMessage[] {
-  return messages.map((message) => ({
-    role: message.role,
-    content: message.content,
-    ...(message.toolCalls === undefined ? {} : { toolCalls: message.toolCalls }),
-    ...(message.toolCallId === undefined ? {} : { toolCallId: message.toolCallId }),
-  }));
 }
 
 /** Workspace, permission scope and available skills, stated once per task. */

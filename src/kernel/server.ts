@@ -143,6 +143,10 @@ export async function startKernel(
         sendJson(response, 200, { cancelled: kernel.cancelSession(sessionId) });
         return;
       }
+      if (segments[2] === "compact" && segments.length === 3 && method === "POST") {
+        sendJson(response, 200, await kernel.compactManually(sessionId));
+        return;
+      }
       if (
         segments[2] === "approvals" &&
         segments.length === 4 &&
