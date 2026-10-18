@@ -7,6 +7,7 @@ import type { SkillToolRoots } from "./tools.ts";
 import type { ExecutionTarget, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { VERSION } from "../shared/version.ts";
+import { createFileTools } from "./file-tools.ts";
 import { runTask } from "./loop.ts";
 import { SessionStore } from "./session-store.ts";
 import { createSkillTool, echoTool, ToolRegistry } from "./tools.ts";
@@ -79,6 +80,7 @@ export class Kernel {
     this.tools = new ToolRegistry([
       echoTool,
       createSkillTool(this.skillRoots),
+      ...createFileTools(),
       ...(options.tools ?? []),
     ]);
     this.scope = options.scope ?? "workspace-write";
