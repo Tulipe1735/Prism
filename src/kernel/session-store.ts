@@ -2,8 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   appendFile,
   mkdir,
-  readFile,
   readdir,
+  readFile,
   rm,
   rmdir,
   stat,
@@ -22,9 +22,7 @@ import {
 } from "./session.ts";
 
 export type SessionStoreErrorCode =
-  | "SESSION_NOT_FOUND"
-  | "INVALID_SESSION_LOG"
-  | "INVALID_INPUT";
+  "SESSION_NOT_FOUND" | "INVALID_SESSION_LOG" | "INVALID_INPUT";
 
 export class SessionStoreError extends Error {
   readonly code: SessionStoreErrorCode;
@@ -36,7 +34,7 @@ export class SessionStoreError extends Error {
   }
 }
 
-const SESSION_ID_PATTERN = /^[0-9a-zA-Z-]{8,64}$/;
+const SESSION_ID_PATTERN = /^[0-9a-z-]{8,64}$/i;
 
 const headerSchema = z.object({
   type: z.literal("header"),
@@ -100,9 +98,13 @@ export class SessionStore {
     };
     const directory = join(this.dataDir, "sessions", workspaceKey(header.workspace));
     await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, `${header.id}.jsonl`), `${JSON.stringify(header)}\n`, {
-      flag: "wx",
-    });
+    await writeFile(
+      join(directory, `${header.id}.jsonl`),
+      `${JSON.stringify(header)}\n`,
+      {
+        flag: "wx",
+      },
+    );
     return header;
   }
 

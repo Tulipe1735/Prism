@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { rebuildContext } from "../../src/kernel/session.ts";
 import { SessionStore, SessionStoreError } from "../../src/kernel/session-store.ts";
+import { rebuildContext } from "../../src/kernel/session.ts";
 
 describe("session store", () => {
   let dataDir: string;
@@ -59,12 +59,16 @@ describe("session store", () => {
 
   it("rebuilds the context from the summary and the entries kept by a compaction", async () => {
     const header = await store.create({ workspace: "/work/demo" });
-    const one = await store.append(header.id, {
+    await store.append(header.id, {
       type: "message",
       role: "user",
       content: "one",
     });
-    await store.append(header.id, { type: "message", role: "assistant", content: "two" });
+    await store.append(header.id, {
+      type: "message",
+      role: "assistant",
+      content: "two",
+    });
     const three = await store.append(header.id, {
       type: "message",
       role: "user",
