@@ -29,7 +29,8 @@ Available today: the `prism` browser CLI, documented in the
   workspace, with verifiable results.
 - **Preset capabilities**:
   - Prism browser: observation, target references, action validation, and input
-    receipts; serves the built-in agent first, and may open up to external agents later.
+    receipts, implemented by the [kernel browser module](docs/kernel-browser.md); serves
+    the built-in agent first, and may open up to external agents later.
   - MCP: connect external tool servers, configured in [mcp.json](docs/mcp.md).
   - Skills: loaded on demand from directory conventions.
   - Web search: built-in `web_search` and `web_fetch`, DeepSeek by default,
