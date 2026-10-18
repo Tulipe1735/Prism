@@ -5,7 +5,7 @@ import type { KernelEvent } from "../../src/kernel/events.ts";
 import type { SessionEntry } from "../../src/kernel/session.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
 import type { PermissionScope } from "../../src/kernel/types.ts";
-import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -286,6 +286,9 @@ export async function startTestKernel(
     answers?: FakeAnswer[];
     tools?: Tool[];
     scope?: PermissionScope;
+    browserActionsNeedApproval?: boolean;
+    /** Written to `<dataDir>/config.json` before the kernel loads it. */
+    configFile?: Record<string, unknown>;
     workspace?: string;
     /** Overrides for `compaction` in the kernel config. */
     compaction?: Partial<CompactionConfig>;
@@ -302,7 +305,14 @@ export async function startTestKernel(
     mkdir(workspace, { recursive: true }),
     mkdir(home, { recursive: true }),
     mkdir(bundled, { recursive: true }),
+    mkdir(dataDir, { recursive: true }),
   ]);
+  if (options.configFile !== undefined)
+    await writeFile(
+      join(dataDir, "config.json"),
+      JSON.stringify(options.configFile),
+      "utf8",
+    );
   const model = await startFakeModel(options.answers ?? []);
   const config = await loadConfig({
     dataDir,
@@ -315,6 +325,9 @@ export async function startTestKernel(
   const kernel = await startKernel({
     config,
     ...(options.scope === undefined ? {} : { scope: options.scope }),
+    ...(options.browserActionsNeedApproval === undefined
+      ? {}
+      : { browserActionsNeedApproval: options.browserActionsNeedApproval }),
     ...(options.tools === undefined ? {} : { tools: options.tools }),
     skillRoots: { home, bundled },
     instructionRoots: { home },

@@ -1,11 +1,16 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import process from "node:process";
 import { z } from "zod";
 
 import { ConfigError } from "../shared/errors.ts";
-import { BROWSER_ENGINES, type BrowserEngine } from "./types.ts";
+import {
+  BROWSER_ENGINES,
+  type BrowserEngine,
+  PERMISSION_SCOPES,
+  type PermissionScope,
+} from "./types.ts";
 
 export interface ModelConfig {
   /** OpenAI-compatible base URL; request paths are appended to it. */
@@ -14,8 +19,15 @@ export interface ModelConfig {
   apiKey?: string;
 }
 
+export interface PermissionsConfig {
+  /** Boundary in effect at start; the workbench may switch it at runtime. */
+  scope: PermissionScope;
+}
+
 export interface BrowserConfig {
   engine: BrowserEngine;
+  /** When true, every browser action goes through one-time approval (US-30). */
+  actionsNeedApproval: boolean;
 }
 
 export interface SearchConfig {
@@ -43,6 +55,7 @@ export interface PrismConfig {
   search: SearchConfig;
   compaction: CompactionConfig;
   command: CommandConfig;
+  permissions: PermissionsConfig;
 }
 
 export interface PrismConfigOverrides {
@@ -53,12 +66,19 @@ export interface PrismConfigOverrides {
   command?: Partial<CommandConfig>;
 }
 
+/** Settings a running kernel may change; other sections stay as they are. */
+export interface ConfigPatch {
+  browser?: { actionsNeedApproval?: boolean };
+  permissions?: { scope?: PermissionScope };
+}
+
 const DEFAULTS = {
   model: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
-  browser: { engine: "chromium" },
+  browser: { engine: "chromium", actionsNeedApproval: false },
   search: { provider: "deepseek" },
   compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
   command: { timeoutMs: 120_000 },
+  permissions: { scope: "workspace-write" },
 } as const;
 
 const configFileSchema = z
@@ -73,7 +93,10 @@ const configFileSchema = z
       .strict()
       .optional(),
     browser: z
-      .object({ engine: z.enum(BROWSER_ENGINES) })
+      .object({
+        engine: z.enum(BROWSER_ENGINES),
+        actionsNeedApproval: z.boolean(),
+      })
       .partial()
       .strict()
       .optional(),
@@ -92,6 +115,11 @@ const configFileSchema = z
       .optional(),
     command: z
       .object({ timeoutMs: z.number().int().positive() })
+      .partial()
+      .strict()
+      .optional(),
+    permissions: z
+      .object({ scope: z.enum(PERMISSION_SCOPES) })
       .partial()
       .strict()
       .optional(),
@@ -129,24 +157,59 @@ export async function loadConfig(
       ...options.overrides?.compaction,
     },
     command: { ...DEFAULTS.command, ...file.command, ...options.overrides?.command },
+    permissions: { ...DEFAULTS.permissions, ...file.permissions },
   };
 }
 
+/**
+ * Merges settings into `<dataDir>/config.json` so the next kernel start reads
+ * them back; every other section stays as it is.
+ */
+export async function saveConfigPatch(
+  dataDir: string,
+  patch: ConfigPatch,
+): Promise<void> {
+  const path = configPath(dataDir);
+  const existing = await readRawConfig(path);
+  const merged = {
+    ...existing,
+    ...(patch.browser === undefined
+      ? {}
+      : { browser: { ...asRecord(existing.browser), ...patch.browser } }),
+    ...(patch.permissions === undefined
+      ? {}
+      : { permissions: { ...asRecord(existing.permissions), ...patch.permissions } }),
+  };
+  const result = configFileSchema.safeParse(merged);
+  if (!result.success)
+    throw new ConfigError(`${path} is invalid: ${result.error.message}`);
+  await mkdir(dataDir, { recursive: true });
+  await writeFile(path, `${JSON.stringify(result.data, null, 2)}\n`, "utf8");
+}
+
 async function readConfigFile(path: string): Promise<ConfigFile> {
+  const parsed = await readRawConfig(path);
+  const result = configFileSchema.safeParse(parsed);
+  if (!result.success)
+    throw new ConfigError(`${path} is invalid: ${result.error.message}`);
+  return result.data;
+}
+
+async function readRawConfig(path: string): Promise<Record<string, unknown>> {
   const text = await readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return null;
     throw error;
   });
   if (text === null) return {};
-
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    return asRecord(JSON.parse(text));
   } catch (error) {
     throw new ConfigError(`${path} is not valid JSON: ${(error as Error).message}`);
   }
-  const result = configFileSchema.safeParse(parsed);
-  if (!result.success)
-    throw new ConfigError(`${path} is invalid: ${result.error.message}`);
-  return result.data;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? { ...(value as Record<string, unknown>) }
+    : {};
 }

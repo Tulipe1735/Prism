@@ -4,12 +4,11 @@ import { spawn } from "node:child_process";
 import process from "node:process";
 import { StringDecoder } from "node:string_decoder";
 import {
-  gatePath,
-  isRefusal,
   missingArgument,
   OutputBuffer,
   readNumber,
   readString,
+  resolveToolPath,
 } from "./tool-support.ts";
 
 /** How long one command may run before the kernel kills it. */
@@ -46,6 +45,9 @@ export function createCommandTool(options: CommandToolOptions): Tool {
       required: ["command"],
       additionalProperties: false,
     },
+    effects: (args) => [
+      { kind: "command", command: readString(args, "command") ?? "" },
+    ],
     execute: async (args, context) => {
       const command = readString(args, "command");
       if (command === undefined || command.trim() === "")
@@ -64,12 +66,7 @@ export function createCommandTool(options: CommandToolOptions): Tool {
         };
 
       const cwd = readString(args, "cwd") ?? ".";
-      const gate = await gatePath(context, cwd, {
-        reason: "Runs a command outside the workspace",
-        impact:
-          "The command runs with a working directory the workspace does not cover.",
-      });
-      if (isRefusal(gate)) return gate;
+      const target = resolveToolPath(context, cwd);
 
       const requestedTimeout = readNumber(args, "timeoutMs");
       if (
@@ -83,7 +80,7 @@ export function createCommandTool(options: CommandToolOptions): Tool {
       const timeoutMs = requestedTimeout ?? options.timeoutMs;
 
       const outcome = await runShell(command, {
-        cwd: gate.path,
+        cwd: target.path,
         timeoutMs,
         signal: context.signal,
       });

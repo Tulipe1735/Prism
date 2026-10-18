@@ -3,17 +3,20 @@ import type { CompactionOutcome, CompactionReason } from "./compaction.ts";
 import type { PrismConfig } from "./config.ts";
 import type { KernelEvent, KernelStatus } from "./events.ts";
 import type { InstructionRoots } from "./instructions.ts";
+import type { ApprovalRequest } from "./permissions.ts";
 import type { SessionEntry, SessionSummary } from "./session.ts";
-import type { ApprovalRequest, Tool } from "./tool.ts";
+import type { Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
 import type { ExecutionTarget, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { VERSION } from "../shared/version.ts";
 import { createCommandTool } from "./command-tool.ts";
 import { compactSession } from "./compaction.ts";
+import { saveConfigPatch } from "./config.ts";
 import { createFileTools } from "./file-tools.ts";
 import { InstructionFiles } from "./instructions.ts";
 import { runTask } from "./loop.ts";
+import { PermissionPolicy } from "./permissions.ts";
 import { SessionStore } from "./session-store.ts";
 import { createSkillTool, echoTool, ToolRegistry } from "./tools.ts";
 
@@ -40,15 +43,23 @@ export interface KernelOptions {
   /** Roots of the `AGENTS.md` scan; tests point them at temporary directories. */
   instructionRoots?: InstructionRoots;
   scope?: PermissionScope;
+  /** Forces browser actions through approval, independent of the scope. */
+  browserActionsNeedApproval?: boolean;
   target?: ExecutionTarget;
 }
 
 export interface KernelSettings {
   dataDir: string;
   model: { baseUrl: string; model: string; hasApiKey: boolean };
-  browser: { engine: string };
+  browser: { engine: string; actionsNeedApproval: boolean };
   search: { provider: string };
   permissions: { scope: PermissionScope };
+}
+
+/** Settings the workbench may change while the kernel runs. */
+export interface SettingsPatch {
+  scope?: PermissionScope;
+  browserActionsNeedApproval?: boolean;
 }
 
 export interface KernelStatusReport {
@@ -68,7 +79,8 @@ export class Kernel {
   readonly skillRoots: SkillToolRoots;
   readonly instructions: InstructionFiles;
   readonly target: ExecutionTarget;
-  scope: PermissionScope;
+  /** Live permission settings: every task and tool call reads this object. */
+  readonly permissions: PermissionPolicy;
   status: KernelStatus = "ready";
 
   private readonly listeners = new Set<(event: KernelEvent) => void>();
@@ -93,7 +105,12 @@ export class Kernel {
       createCommandTool({ timeoutMs: this.config.command.timeoutMs }),
       ...(options.tools ?? []),
     ]);
-    this.scope = options.scope ?? "workspace-write";
+    this.permissions = new PermissionPolicy({
+      scope: options.scope ?? options.config.permissions.scope,
+      browserActionsNeedApproval:
+        options.browserActionsNeedApproval ??
+        options.config.browser.actionsNeedApproval,
+    });
     this.target = options.target ?? "wsl";
   }
 
@@ -119,10 +136,35 @@ export class Kernel {
     return {
       dataDir: this.config.dataDir,
       model: { baseUrl, model, hasApiKey: apiKey !== undefined && apiKey !== "" },
-      browser: { engine: this.config.browser.engine },
+      browser: {
+        engine: this.config.browser.engine,
+        actionsNeedApproval: this.permissions.browserActionsNeedApproval,
+      },
       search: { provider: this.config.search.provider },
-      permissions: { scope: this.scope },
+      permissions: { scope: this.permissions.scope },
     };
+  }
+
+  /**
+   * Applies the settings the workbench changed, keeps them for the next kernel
+   * start and reports the settings now in effect (04, `PUT /settings`).
+   */
+  async updateSettings(patch: SettingsPatch): Promise<KernelSettings> {
+    if (patch.scope !== undefined) {
+      this.permissions.scope = patch.scope;
+      this.config.permissions.scope = patch.scope;
+    }
+    if (patch.browserActionsNeedApproval !== undefined) {
+      this.permissions.browserActionsNeedApproval = patch.browserActionsNeedApproval;
+      this.config.browser.actionsNeedApproval = patch.browserActionsNeedApproval;
+    }
+    await saveConfigPatch(this.config.dataDir, {
+      ...(patch.scope === undefined ? {} : { permissions: { scope: patch.scope } }),
+      ...(patch.browserActionsNeedApproval === undefined
+        ? {}
+        : { browser: { actionsNeedApproval: patch.browserActionsNeedApproval } }),
+    });
+    return this.settings();
   }
 
   async createSession(input: {
@@ -178,7 +220,7 @@ export class Kernel {
       kernel: this,
       sessionId,
       workspace: session.workspace,
-      scope: this.scope,
+      scope: this.permissions.scope,
       target: this.target,
       signal: controller.signal,
     })

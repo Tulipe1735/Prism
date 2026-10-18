@@ -3,13 +3,14 @@ import type { SkillSummary } from "../skills/loader.ts";
 import type { InstructionFile } from "./instructions.ts";
 import type { Kernel } from "./kernel.ts";
 import type { ChatMessage } from "./model.ts";
-import type { ToolResult } from "./tool.ts";
+import type { ToolContext, ToolResult } from "./tool.ts";
 import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { scanSkills } from "../skills/loader.ts";
 import { estimateContextTokens } from "./compaction.ts";
 import { instructionNote, instructionPrompt } from "./instructions.ts";
 import { streamChat, toModelMessages } from "./model.ts";
+import { describeScope } from "./permissions.ts";
 import { rebuildContext } from "./session.ts";
 
 /** Tool output longer than this is cut before it reaches the model and the log. */
@@ -222,17 +223,27 @@ async function executeTool(
   const tool = kernel.tools.get(call.name);
   if (tool === undefined)
     return { content: `Unknown tool "${call.name}".`, isError: true };
+  const args = parseArguments(call.arguments);
+  const context: ToolContext = {
+    sessionId,
+    workspace: run.workspace,
+    scope: kernel.permissions.scope,
+    permissions: kernel.permissions,
+    target: run.target,
+    signal: run.signal,
+    requestApproval: (request) =>
+      kernel.requestApproval(sessionId, { tool: tool.name, ...request }),
+    noteExplored: (path) => kernel.instructions.noteExplored(run.workspace, path),
+  };
   try {
-    return await tool.execute(parseArguments(call.arguments), {
-      sessionId,
-      workspace: run.workspace,
-      scope: run.scope,
-      target: run.target,
-      signal: run.signal,
-      requestApproval: (request) =>
-        kernel.requestApproval(sessionId, { tool: tool.name, ...request }),
-      noteExplored: (path) => kernel.instructions.noteExplored(run.workspace, path),
-    });
+    // The permission scope is enforced here, before the tool runs: a call
+    // whose action is out of scope needs approval first (ADR-0005).
+    const verdict = await kernel.permissions.authorizeAll(
+      tool.effects?.(args, context) ?? [],
+      { workspace: run.workspace, requestApproval: context.requestApproval },
+    );
+    if (!verdict.allowed) return { content: verdict.refusal, isError: true };
+    return await tool.execute(args, context);
   } catch (error) {
     return {
       content: `Tool "${call.name}" failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -276,7 +287,7 @@ export function buildSystemPrompt(input: {
   const lines = [
     "You are Prism, a coding agent working in the user's own repository.",
     `Workspace: ${input.workspace}. Keep every file operation inside it.`,
-    `Permission scope: ${input.scope}. Actions outside the scope need one-time user approval; if approval is refused, change your approach or report honestly instead of asking again.`,
+    `Permission scope: ${input.scope} — ${describeScope(input.scope)}. If an action is refused, change your approach or report honestly instead of asking again.`,
     "Use the tools to inspect and change the workspace; answer in the user's language and keep tool output out of your prose unless asked.",
   ];
   const instructions = instructionPrompt(input.instructions ?? []);

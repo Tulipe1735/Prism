@@ -1,3 +1,8 @@
+import type {
+  ApprovalRequest,
+  PermissionAction,
+  PermissionPolicy,
+} from "./permissions.ts";
 import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 
 /** JSON Schema for the arguments a tool accepts. */
@@ -14,6 +19,8 @@ export interface ToolContext {
   workspace: string;
   /** Boundary in effect for this call; actions outside it need approval. */
   scope: PermissionScope;
+  /** Live permission settings; `decide` answers what an action would need. */
+  permissions: PermissionPolicy;
   /** Environment file operations and commands run in. */
   target: ExecutionTarget;
   /** Aborts when the user cancels the running task. */
@@ -32,13 +39,6 @@ export interface ToolContext {
   noteExplored?: (path: string) => void;
 }
 
-/** Why an action leaves the scope, what it touches and what that implies. */
-export interface ApprovalRequest {
-  reason: string;
-  target: string;
-  impact: string;
-}
-
 export interface ToolResult {
   /** Text the model reads as the tool output. */
   content: string;
@@ -50,5 +50,12 @@ export interface Tool {
   name: string;
   description: string;
   parameters: ToolParameters;
+  /**
+   * What every call touches, checked before `execute` runs: a call whose action
+   * is refused never happens. Declare each file write, command and browser
+   * action; tools that declare nothing (the MCP tools of 09) stay outside the
+   * three permission scopes by design.
+   */
+  effects?: (args: JsonValue, context: ToolContext) => PermissionAction[];
   execute: (args: JsonValue, context: ToolContext) => Promise<ToolResult>;
 }
