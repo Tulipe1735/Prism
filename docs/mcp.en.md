@@ -88,3 +88,12 @@ description and JSON Schema — comes from the server.
   problem findable.
 - A failed tool call comes back to the model as a tool result (it does not abort the
   task). The result names the failing tool and the reason.
+
+## Kernel integration
+
+The kernel reads `<data dir>/mcp.json` at startup and connects the configured servers
+(`src/kernel/server.ts`); their tools join the built-in ones. A missing file means zero
+servers. A malformed file prints one line `MCP configuration could not be read: …` and
+the kernel keeps serving; a server that fails to start prints
+`MCP server "<name>" is unavailable: …`. Both lines go to kernel stderr; fix the
+configuration or the server and restart the kernel.

@@ -1,6 +1,7 @@
 # 联网检索：`web_search` 与 `web_fetch`
 
-实现位置：[`src/web`](../src/web)；测试：[`tests/web`](../tests/web)。两者都是只读网络访问，不写工作区；内核工具注册（`web_search`、`web_fetch`）由端到端 ticket 联调完成。
+实现位置：[`src/web`](../src/web)；测试：[`tests/web`](../tests/web)。两者都是只读网络访问，不写工作区；内核工具注册在
+[`src/kernel/web-tools.ts`](../src/kernel/web-tools.ts)，形状见文末「内核工具形态」。
 
 ## `web_search`
 
@@ -31,7 +32,7 @@ DeepSeek 有公开可用的 Search API，2026-10-18 依据官方文档核实：
 | ----------- | -------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `provider`  | `deepseek`                 | 搜索来源，与内核配置 `search.provider` 一致                                                                 |
 | `apiKey`    | 必填                       | 与模型共用 DeepSeek key（内核配置的 `search.apiKey` 或 `model.apiKey`）；缺失时 `createSearchProvider` 报错 |
-| `baseUrl`   | `https://api.deepseek.com` | 可指向网关、代理或自建兼容端点                                                                              |
+| `baseUrl`   | `https://api.deepseek.com` | 可指向网关、代理或自建兼容端点；内核配置 `search.baseUrl` 映射到它                                          |
 | `count`     | `10`                       | 默认结果数，1–50                                                                                            |
 | `timeoutMs` | `25000`                    | 单次请求超时（HTTP 层对 429/503/529 重试）                                                                  |
 | `fetchImpl` | 全局 `fetch`               | 注入点，测试与离线验证用                                                                                    |
@@ -110,3 +111,13 @@ API），因此 SSRF 策略、大小与超时都由内核把关。
 
 两者都不需要权限范围审批（只读、不改工作区）；`web_fetch`
 的目标校验与权限档位无关，任何档位下都拒绝非公网目标。
+
+内核注册形态（`src/kernel/web-tools.ts`）：
+
+- 搜索来源在**第一次调用**时才建立：没有配置 key 的内核照常启动，调用时把配置错误作为工具结果返回，而不是让整个内核起不来。
+- `web_search`
+  把每条结果渲染成「标题 / 链接 / 来源与日期 / 摘要」的文本块，模型可以原样引用链接；结果超长按工具结果上限截断。
+- `web_fetch` 返回「标题 / 最终 URL
+  / 正文」，正文超过抓取上限时在正文前标注；私网目标返回 `UnsafeTargetError`
+  的原文，模型看到的是「not a public address」，而不是伪造的正文。
+- 两者的网络访问都随任务的取消信号一起中止。

@@ -301,8 +301,20 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
 
 ## 工具
 
-工具按 `src/kernel/tool.ts` 的 `Tool` 形状注册进注册表，模型可见的
-`name`/`description`/`parameters` 直接取自注册项。02 接入：
+工具按 `src/kernel/tools.ts` 的 `Tool` 形状注册进注册表，模型可见的
+`name`/`description`/`parameters` 直接取自注册项。内核启动时注册的内置工具：
+
+| 工具                                                                                               | 用途                                                | `effects`                                             |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------- |
+| `read_file` `write_file` `list_directory` `glob` `grep`                                            | 工作区内读写与查找（03）                            | 仅 `write_file` 声明 `file-write`                     |
+| `command`                                                                                          | 执行 shell 命令（03）                               | `command`                                             |
+| `skill`                                                                                            | 列出或读取技能（见下）                              | 无                                                    |
+| `browser_open` `browser_observe` `browser_context` `browser_act` `browser_receipt` `browser_close` | Playwright 浏览器（06）：观察、引用、单步动作与回执 | `browser_open` 与 `browser_act` 声明 `browser-action` |
+| `web_search` `web_fetch`                                                                           | 联网检索（07）：检索与抓取，不改工作区              | 无                                                    |
+| `mcp__<服务器>__<工具>`                                                                            | 配置的 MCP 服务器提供的工具（09），出厂 0 个        | 无                                                    |
+| `echo`                                                                                             | 占位工具，返回入参文本；保留用于自测                | 无                                                    |
+
+02 接入：
 
 - `skill`：`{ "name": "<技能名>" }` 时返回该技能正文；省略 `name`
   时列出可用技能（名称、描述、来源）。技能发现与读取用
