@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { isIP } from "node:net";
 
 import { UnsafeTargetError, WebFetchError } from "../shared/errors.ts";
@@ -26,28 +27,62 @@ export interface WebPage {
 }
 
 const DEFAULT_TIMEOUT_MS = 20_000;
+const DEFAULT_MAX_REDIRECTS = 5;
+const DEFAULT_MAX_BYTES = 2_000_000;
 
 export async function webFetch(options: WebFetchOptions): Promise<WebPage> {
-  const url = parseUrl(options.url);
-  await assertPublicTarget(url, options.resolveAddresses ?? systemResolver);
   const fetchImpl = options.fetchImpl ?? fetch;
-  const response = await fetchImpl(url.href, {
-    redirect: "manual",
-    headers: {
-      "user-agent": `prism/${VERSION}`,
-      accept: "text/html,text/plain;q=0.9,*/*;q=0.1",
-    },
-    signal: AbortSignal.any([
-      AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-      ...(options.signal ? [options.signal] : []),
-    ]),
-  });
-  return readPage(url, response);
+  const resolve = options.resolveAddresses ?? systemResolver;
+  const maxRedirects = options.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
+  const signal = AbortSignal.any([
+    AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+    ...(options.signal ? [options.signal] : []),
+  ]);
+  let url = parseUrl(options.url);
+  for (let redirects = 0; ; redirects += 1) {
+    // Every hop is checked, so a public URL cannot redirect the kernel into the private network.
+    await assertPublicTarget(url, resolve);
+    const response = await fetchImpl(url.href, {
+      redirect: "manual",
+      headers: {
+        "user-agent": `prism/${VERSION}`,
+        accept: "text/html,text/plain;q=0.9,*/*;q=0.1",
+      },
+      signal,
+    });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location)
+        throw new WebFetchError(
+          `Fetching ${url.href} failed: the redirect response came without a location.`,
+        );
+      if (redirects >= maxRedirects)
+        throw new WebFetchError(
+          `Fetching ${url.href} failed: more than ${maxRedirects} redirects.`,
+        );
+      await response.body?.cancel().catch(() => {});
+      url = parseUrl(resolveLocation(location, url));
+      continue;
+    }
+    if (!response.ok)
+      throw new WebFetchError(`Fetching ${url.href} failed with HTTP ${response.status}.`);
+    return readPage(url, response, options.maxBytes ?? DEFAULT_MAX_BYTES);
+  }
 }
 
-async function readPage(url: URL, response: Response): Promise<WebPage> {
-  const body = await response.text();
+function resolveLocation(location: string, from: URL): string {
+  try {
+    return new URL(location, from).href;
+  } catch {
+    throw new WebFetchError(
+      `Fetching ${from.href} failed: the redirect location "${location}" is not a valid URL.`,
+    );
+  }
+}
+
+async function readPage(url: URL, response: Response, maxBytes: number): Promise<WebPage> {
   const contentType = response.headers.get("content-type");
+  const { text: body, truncated } = await readBody(response, maxBytes);
   const kind = bodyKind(contentType, body);
   if (kind === "binary")
     throw new WebFetchError(
@@ -58,9 +93,62 @@ async function readPage(url: URL, response: Response): Promise<WebPage> {
     url: url.href,
     title: content.title,
     text: kind === "html" ? content.text : content.text.trim(),
-    truncated: false,
+    truncated,
     contentType,
   };
+}
+
+async function readBody(
+  response: Response,
+  maxBytes: number,
+): Promise<{ text: string; truncated: boolean }> {
+  const { bytes, truncated } = await readBytes(response, maxBytes);
+  return { text: decode(bytes, charsetOf(response.headers.get("content-type"))), truncated };
+}
+
+/** Reads at most `maxBytes` of the body and reports whether the rest was dropped. */
+async function readBytes(
+  response: Response,
+  maxBytes: number,
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
+  if (!response.body) {
+    const buffer = new Uint8Array(await response.arrayBuffer());
+    return {
+      bytes: buffer.subarray(0, maxBytes),
+      truncated: buffer.byteLength > maxBytes,
+    };
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  let truncated = false;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const remaining = maxBytes - size;
+    if (value.byteLength > remaining) {
+      if (remaining > 0) chunks.push(value.subarray(0, remaining));
+      truncated = true;
+      await reader.cancel().catch(() => {});
+      break;
+    }
+    chunks.push(value);
+    size += value.byteLength;
+  }
+  return { bytes: new Uint8Array(Buffer.concat(chunks)), truncated };
+}
+
+function charsetOf(contentType: string | null): string {
+  const match = /charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType ?? "");
+  return match?.[1] ?? "utf-8";
+}
+
+function decode(bytes: Uint8Array, charset: string): string {
+  try {
+    return new TextDecoder(charset).decode(bytes);
+  } catch {
+    return new TextDecoder("utf-8").decode(bytes);
+  }
 }
 
 /** Chooses how to read a response body; unknown types fall back to sniffing the text. */

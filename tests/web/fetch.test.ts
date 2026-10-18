@@ -262,6 +262,50 @@ describe("webFetch response handling", () => {
   });
 });
 
+describe("webFetch limits", () => {
+  it("stops reading a body beyond the size limit and marks it truncated", async () => {
+    routes.set("/big", (_request, response) => {
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.end("x".repeat(50_000));
+    });
+    routes.set("/exact", (_request, response) => {
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.end("y".repeat(1_000));
+    });
+
+    const fetchPage = (path: string, extra = {}) =>
+      webFetch({
+        url: `http://public.test/${path}`,
+        fetchImpl: publicFetch(),
+        resolveAddresses: publicResolver,
+        ...extra,
+      });
+
+    const big = await fetchPage("big", { maxBytes: 1_000 });
+    expect(big.text).toHaveLength(1_000);
+    expect(big.truncated).toBe(true);
+
+    const exact = await fetchPage("exact", { maxBytes: 1_000 });
+    expect(exact.text).toHaveLength(1_000);
+    expect(exact.truncated).toBe(false);
+  });
+
+  it("decodes a declared legacy charset", async () => {
+    routes.set("/latin", (_request, response) => {
+      response.writeHead(200, { "content-type": "text/plain; charset=iso-8859-1" });
+      response.end(Buffer.from([0x63, 0x61, 0x66, 0xe9]));
+    });
+
+    const page = await webFetch({
+      url: "http://public.test/latin",
+      fetchImpl: publicFetch(),
+      resolveAddresses: publicResolver,
+    });
+
+    expect(page.text).toBe("café");
+  });
+});
+
 describe("isPublicAddress", () => {
   it.each([
     "8.8.8.8",
