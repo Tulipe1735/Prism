@@ -124,15 +124,14 @@ export function toTimeline(
         break;
       case "tool_call": {
         const result = results.get(entry.callId);
+        const target = targetOf(entry.arguments);
         steps.push({
           kind: "tool",
           id: entry.id,
           callId: entry.callId,
           name: entry.name,
           arguments: entry.arguments,
-          ...(targetOf(entry.arguments) === undefined
-            ? {}
-            : { target: targetOf(entry.arguments) as string }),
+          ...(target === undefined ? {} : { target }),
           ...(result === undefined ? {} : { result }),
           state:
             result === undefined
