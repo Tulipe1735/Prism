@@ -210,6 +210,7 @@ it("compacts automatically near the context limit and carries the session on", a
   await events.waitFor(
     (event) => event.type === "session.updated" && event.session.entryCount === 2,
   );
+  const original = await readSessionLog(dataDir, session.id);
 
   await sendMessage(kernel.url, session.id, "carry on ".repeat(60));
   const compacted = await events.waitFor((event) => event.type === "session.compacted");
@@ -253,5 +254,8 @@ it("compacts automatically near the context limit and carries the session on", a
   // The task continued after the compaction and nothing was dropped from disk.
   expect(log.at(-1)).toMatchObject({ role: "assistant", content: "Done." });
   expect(log).toHaveLength(5);
+  expect(original.every((entry) => log.some((kept) => kept.id === entry.id))).toBe(
+    true,
+  );
   events.close();
 });
