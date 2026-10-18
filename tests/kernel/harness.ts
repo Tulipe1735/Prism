@@ -3,7 +3,7 @@ import type { Server } from "node:http";
 import type { KernelEvent } from "../../src/kernel/events.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
 import type { PermissionScope } from "../../src/kernel/types.ts";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -264,6 +264,8 @@ export async function startTestKernel(
     tools?: Tool[];
     scope?: PermissionScope;
     browserActionsNeedApproval?: boolean;
+    /** Written to `<dataDir>/config.json` before the kernel loads it. */
+    configFile?: Record<string, unknown>;
     workspace?: string;
   } = {},
 ): Promise<KernelHarness> {
@@ -276,7 +278,14 @@ export async function startTestKernel(
     mkdir(workspace, { recursive: true }),
     mkdir(home, { recursive: true }),
     mkdir(bundled, { recursive: true }),
+    mkdir(dataDir, { recursive: true }),
   ]);
+  if (options.configFile !== undefined)
+    await writeFile(
+      join(dataDir, "config.json"),
+      JSON.stringify(options.configFile),
+      "utf8",
+    );
   const model = await startFakeModel(options.answers ?? []);
   const config = await loadConfig({
     dataDir,

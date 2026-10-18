@@ -1,3 +1,4 @@
+import type { KernelSettings } from "../../src/kernel/kernel.ts";
 import type { SessionEntry, SessionSummary } from "../../src/kernel/session.ts";
 import type { Tool, ToolContext } from "../../src/kernel/tool.ts";
 import type { JsonValue } from "../../src/kernel/types.ts";
@@ -416,4 +417,84 @@ it("runs browser actions without approval when the setting is off", async () => 
   );
   expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
   events.close();
+});
+
+it("switches the scope over HTTP, keeps it in the config file and applies it next", async () => {
+  const write = { path: "../outside/note.txt", text: "hello" };
+  const { kernel, workspace, dataDir } = await start({
+    answers: [
+      {
+        toolCalls: [
+          { id: "call_1", name: "write_file", arguments: JSON.stringify(write) },
+        ],
+      },
+      { text: ["Done."] },
+    ],
+    tools: [writeFileTool],
+  });
+
+  const switched = await api<KernelSettings>(kernel.url, "/settings", {
+    method: "PUT",
+    body: { permissions: { scope: "full-access" } },
+  });
+  expect(switched.status).toBe(200);
+  expect(switched.body).toMatchObject({
+    permissions: { scope: "full-access" },
+    browser: { engine: "chromium", actionsNeedApproval: false },
+  });
+  await expect(
+    api<KernelSettings>(kernel.url, "/settings"),
+  ).resolves.toMatchObject({ body: { permissions: { scope: "full-access" } } });
+  expect(
+    JSON.parse(await readFile(join(dataDir, "config.json"), "utf8")),
+  ).toMatchObject({ permissions: { scope: "full-access" } });
+
+  // The next action already runs under the new scope, without approval.
+  const outside = resolve(workspace, "..", "outside", "note.txt");
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "write the note" },
+  });
+  await events.waitFor(
+    (event) => event.type === "tool.completed" && event.callId === "call_1",
+  );
+  expect(await readFile(outside, "utf8")).toBe("hello");
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
+
+  const badScope = await api(kernel.url, "/settings", {
+    method: "PUT",
+    body: { permissions: { scope: "everything" } },
+  });
+  expect(badScope.status).toBe(400);
+  expect(badScope.body).toMatchObject({ error: { code: "INVALID_REQUEST" } });
+  const badFlag = await api(kernel.url, "/settings", {
+    method: "PUT",
+    body: { browser: { actionsNeedApproval: "yes" } },
+  });
+  expect(badFlag.status).toBe(400);
+  const nothing = await api(kernel.url, "/settings", { method: "PUT", body: {} });
+  expect(nothing.status).toBe(400);
+  const unknown = await api(kernel.url, "/settings", {
+    method: "PUT",
+    body: { model: { model: "other" } },
+  });
+  expect(unknown.status).toBe(400);
+  events.close();
+});
+
+it("starts from the scope and the browser approval setting in the config file", async () => {
+  const { kernel } = await start({
+    configFile: {
+      permissions: { scope: "read-only" },
+      browser: { actionsNeedApproval: true },
+    },
+  });
+
+  const settings = await api<KernelSettings>(kernel.url, "/settings");
+  expect(settings.body).toMatchObject({
+    permissions: { scope: "read-only" },
+    browser: { engine: "chromium", actionsNeedApproval: true },
+  });
 });

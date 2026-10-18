@@ -11,6 +11,11 @@ export const PERMISSION_SCOPES = [
 /** Boundary the kernel may touch: files and actions outside it need approval. */
 export type PermissionScope = (typeof PERMISSION_SCOPES)[number];
 
+/** True when `value` is one of the three scope literals (config and requests). */
+export function isPermissionScope(value: unknown): value is PermissionScope {
+  return (PERMISSION_SCOPES as readonly string[]).includes(value as string);
+}
+
 export const EXECUTION_TARGETS = ["wsl", "windows"] as const;
 
 /** Environment a file operation or command runs in. */

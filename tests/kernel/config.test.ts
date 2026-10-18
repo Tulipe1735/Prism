@@ -24,8 +24,9 @@ describe("kernel config", () => {
     expect(await loadConfig({ dataDir: "/data/prism" })).toEqual({
       dataDir: "/data/prism",
       model: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
-      browser: { engine: "chromium" },
+      browser: { engine: "chromium", actionsNeedApproval: false },
       search: { provider: "deepseek" },
+      permissions: { scope: "workspace-write" },
     });
   });
 
@@ -34,8 +35,9 @@ describe("kernel config", () => {
       configPath(dataDir),
       JSON.stringify({
         model: { apiKey: "sk-from-file", model: "deepseek-reasoner" },
-        browser: { engine: "firefox" },
+        browser: { engine: "firefox", actionsNeedApproval: true },
         search: { provider: "brave", apiKey: "search-from-file" },
+        permissions: { scope: "read-only" },
       }),
     );
 
@@ -51,8 +53,9 @@ describe("kernel config", () => {
         model: "deepseek-chat",
         apiKey: "sk-explicit",
       },
-      browser: { engine: "firefox" },
+      browser: { engine: "firefox", actionsNeedApproval: true },
       search: { provider: "brave", apiKey: "search-from-file" },
+      permissions: { scope: "read-only" },
     });
   });
 

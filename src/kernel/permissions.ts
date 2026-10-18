@@ -1,6 +1,6 @@
-import { isAbsolute, relative, resolve } from "node:path";
-
 import type { PermissionScope } from "./types.ts";
+
+import { isAbsolute, relative, resolve } from "node:path";
 
 /** Why an action leaves the scope, what it touches and what that implies. */
 export interface ApprovalRequest {

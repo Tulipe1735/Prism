@@ -1,13 +1,14 @@
 import type { PrismConfig } from "./config.ts";
 
 import type { KernelEvent, KernelStatus } from "./events.ts";
-import type { ApprovalRequest, PermissionSettings } from "./permissions.ts";
+import type { ApprovalRequest } from "./permissions.ts";
 import type { SessionEntry, SessionSummary } from "./session.ts";
 import type { Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
 import type { ExecutionTarget, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { VERSION } from "../shared/version.ts";
+import { saveConfigPatch } from "./config.ts";
 import { runTask } from "./loop.ts";
 import { PermissionPolicy } from "./permissions.ts";
 import { SessionStore } from "./session-store.ts";
@@ -42,9 +43,15 @@ export interface KernelOptions {
 export interface KernelSettings {
   dataDir: string;
   model: { baseUrl: string; model: string; hasApiKey: boolean };
-  browser: { engine: string };
+  browser: { engine: string; actionsNeedApproval: boolean };
   search: { provider: string };
   permissions: { scope: PermissionScope };
+}
+
+/** Settings the workbench may change while the kernel runs. */
+export interface SettingsPatch {
+  scope?: PermissionScope;
+  browserActionsNeedApproval?: boolean;
 }
 
 export interface KernelStatusReport {
@@ -87,8 +94,9 @@ export class Kernel {
       ...(options.tools ?? []),
     ]);
     this.permissions = new PermissionPolicy({
-      scope: options.scope ?? "workspace-write",
-      browserActionsNeedApproval: options.browserActionsNeedApproval ?? false,
+      scope: options.scope ?? options.config.permissions.scope,
+      browserActionsNeedApproval:
+        options.browserActionsNeedApproval ?? options.config.browser.actionsNeedApproval,
     });
     this.target = options.target ?? "wsl";
   }
@@ -115,10 +123,35 @@ export class Kernel {
     return {
       dataDir: this.config.dataDir,
       model: { baseUrl, model, hasApiKey: apiKey !== undefined && apiKey !== "" },
-      browser: { engine: this.config.browser.engine },
+      browser: {
+        engine: this.config.browser.engine,
+        actionsNeedApproval: this.permissions.browserActionsNeedApproval,
+      },
       search: { provider: this.config.search.provider },
       permissions: { scope: this.permissions.scope },
     };
+  }
+
+  /**
+   * Applies the settings the workbench changed, keeps them for the next kernel
+   * start and reports the settings now in effect (04, `PUT /settings`).
+   */
+  async updateSettings(patch: SettingsPatch): Promise<KernelSettings> {
+    if (patch.scope !== undefined) {
+      this.permissions.scope = patch.scope;
+      this.config.permissions.scope = patch.scope;
+    }
+    if (patch.browserActionsNeedApproval !== undefined) {
+      this.permissions.browserActionsNeedApproval = patch.browserActionsNeedApproval;
+      this.config.browser.actionsNeedApproval = patch.browserActionsNeedApproval;
+    }
+    await saveConfigPatch(this.config.dataDir, {
+      ...(patch.scope === undefined ? {} : { permissions: { scope: patch.scope } }),
+      ...(patch.browserActionsNeedApproval === undefined
+        ? {}
+        : { browser: { actionsNeedApproval: patch.browserActionsNeedApproval } }),
+    });
+    return this.settings();
   }
 
   async createSession(input: {
