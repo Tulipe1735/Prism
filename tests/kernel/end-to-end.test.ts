@@ -21,6 +21,27 @@ import {
 let harness: KernelHarness | undefined;
 let page: Server;
 let pageUrl = "";
+/** Controlled HTTP service standing in for the search source and public pages. */
+let web: Server;
+let webOrigin = "";
+const webRequests: { method: string; path: string }[] = [];
+
+const SEARCH_ANSWER = {
+  results: [
+    {
+      title: "Playwright browsers",
+      url: "http://public.test/page",
+      snippet: "Chromium, Firefox and WebKit are driven by one API.",
+      summary: "One API for three engines.",
+      site_name: "example.com",
+      date: "2026-10-18",
+    },
+  ],
+};
+
+const PUBLIC_PAGE = `<!doctype html><title>Prism notes</title>
+<h1>Prism notes</h1><p>Extract this text.</p>
+<script>window.shouldNotAppear = "script text";</script>`;
 
 beforeAll(async () => {
   page = createServer((_request, response) => {
@@ -32,10 +53,38 @@ beforeAll(async () => {
   if (address === null || typeof address === "string")
     throw new Error("The end-to-end page server did not listen");
   pageUrl = `http://127.0.0.1:${address.port}/`;
+
+  web = createServer((request, response) => {
+    const path = (request.url ?? "/").split("?")[0]!;
+    webRequests.push({ method: request.method ?? "GET", path });
+    if (path === "/v1/tools/search" && request.method === "POST") {
+      let raw = "";
+      request.on("data", (chunk: Buffer) => (raw += chunk.toString()));
+      request.on("end", () => {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify(SEARCH_ANSWER));
+      });
+      return;
+    }
+    if (path === "/page" && request.method === "GET") {
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end(PUBLIC_PAGE);
+      return;
+    }
+    response.writeHead(404, { "content-type": "text/plain" });
+    response.end("missing");
+  });
+  await new Promise<void>((resolve) => web.listen(0, "127.0.0.1", resolve));
+  const webAddress = web.address();
+  if (webAddress === null || typeof webAddress === "string")
+    throw new Error("The end-to-end web server did not listen");
+  webOrigin = `http://127.0.0.1:${webAddress.port}`;
 });
 
 afterAll(async () => {
   await new Promise<void>((resolve) => page.close(() => resolve()));
+  web.closeAllConnections();
+  await new Promise<void>((resolve) => web.close(() => resolve()));
 });
 
 afterEach(async () => {
@@ -217,6 +266,60 @@ function engineProblem(entries: SessionEntry[]): string | undefined {
     ? failed.content
     : undefined;
 }
+
+it("searches through the configured source and fetches a page as text", async () => {
+  const { kernel, model, workspace, dataDir } = await start({
+    configFile: {
+      search: { provider: "deepseek", baseUrl: webOrigin, apiKey: "search-key" },
+    },
+    webFetch: {
+      // The controlled service is public: the resolver and transport keep the
+      // real policy code and point the connection at the test server.
+      resolveAddresses: async () => ["93.184.216.34"],
+      fetchImpl: ((input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        const target = new URL(input instanceof Request ? input.url : String(input));
+        target.hostname = new URL(webOrigin).hostname;
+        target.port = new URL(webOrigin).port;
+        return fetch(target, init);
+      }) as typeof fetch,
+    },
+    answers: [
+      call("call_search", "web_search", { query: "playwright firefox", count: 3 }),
+      call("call_fetch", "web_fetch", { url: "http://public.test/page" }),
+      // Loopback is refused before any connection is made (SSRF).
+      call("call_private", "web_fetch", { url: `${webOrigin}/admin` }),
+      { text: ["Done."] },
+    ],
+  });
+  const sessionId = await createSession(kernel.url, workspace);
+  await send(kernel.url, sessionId, "look this up");
+
+  await waitForTaskEnd(kernel.url, sessionId);
+  const results = toolResults(await readSessionLog(dataDir, sessionId));
+  expect(results.map((entry) => entry.isError)).toEqual([false, false, true]);
+  // The preset tools are announced to the model in the same request.
+  expect(model.requests[0]?.tools?.map((tool) => tool.function.name)).toEqual(
+    expect.arrayContaining(["web_search", "web_fetch", "browser_open", "skill"]),
+  );
+
+  // The search ran against the configured source and reported its results.
+  expect(results[0]!.content).toContain("Playwright browsers");
+  expect(results[0]!.content).toContain("http://public.test/page");
+  expect(results[0]!.content).toContain(
+    "Chromium, Firefox and WebKit are driven by one API.",
+  );
+  expect(webRequests).toContainEqual({ method: "POST", path: "/v1/tools/search" });
+
+  // The fetch returned the page text, without the script it contains.
+  expect(results[1]!.content).toContain("Prism notes");
+  expect(results[1]!.content).toContain("Extract this text.");
+  expect(results[1]!.content).not.toContain("script text");
+  expect(webRequests).toContainEqual({ method: "GET", path: "/page" });
+
+  // A private target is refused, and nothing connected to it.
+  expect(results[2]!.content).toContain("not a public address");
+  expect(webRequests.some((request) => request.path === "/admin")).toBe(false);
+});
 
 for (const engine of BROWSER_ENGINES) {
   it(`drives a real ${engine} page through open, observe, act and receipt`, async ({

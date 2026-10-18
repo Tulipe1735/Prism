@@ -35,6 +35,8 @@ export interface BrowserConfig {
 export interface SearchConfig {
   provider: string;
   apiKey?: string;
+  /** Overrides the source endpoint; defaults to the provider's own. */
+  baseUrl?: string;
 }
 
 export interface CompactionConfig {
@@ -104,7 +106,11 @@ const configFileSchema = z
       .strict()
       .optional(),
     search: z
-      .object({ provider: z.string().min(1), apiKey: z.string().min(1) })
+      .object({
+        provider: z.string().min(1),
+        apiKey: z.string().min(1),
+        baseUrl: z.string().min(1),
+      })
       .partial()
       .strict()
       .optional(),

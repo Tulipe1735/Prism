@@ -5,6 +5,7 @@ import type { KernelEvent } from "../../src/kernel/events.ts";
 import type { SessionEntry } from "../../src/kernel/session.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
 import type { SkillToolRoots } from "../../src/kernel/tools.ts";
+import type { WebFetchOverrides } from "../../src/kernel/web-tools.ts";
 import type { PermissionScope } from "../../src/kernel/types.ts";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -324,6 +325,8 @@ export async function startTestKernel(
     command?: Partial<CommandConfig>;
     /** Overrides the bundled skills root; the real one resolves by default. */
     skillRoots?: SkillToolRoots;
+    /** Test seam: transport overrides for a controlled HTTP service. */
+    webFetch?: WebFetchOverrides;
   } = {},
 ): Promise<KernelHarness> {
   const base = await mkdtemp(join(tmpdir(), "prism-kernel-"));
@@ -365,6 +368,7 @@ export async function startTestKernel(
       ? {}
       : { browserActionsNeedApproval: options.browserActionsNeedApproval }),
     ...(options.tools === undefined ? {} : { tools: options.tools }),
+    ...(options.webFetch === undefined ? {} : { webFetch: options.webFetch }),
     skillRoots: options.skillRoots ?? { home, bundled },
     instructionRoots: { home },
   });

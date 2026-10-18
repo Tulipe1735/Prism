@@ -18,6 +18,7 @@ import {
 } from "./kernel.ts";
 import { SessionStoreError } from "./session-store.ts";
 import { isPermissionScope, PERMISSION_SCOPES } from "./types.ts";
+import { createWebTools, type WebFetchOverrides } from "./web-tools.ts";
 
 /** Cap on request bodies; the workbench sends small JSON documents. */
 const MAX_BODY_BYTES = 1_000_000;
@@ -32,6 +33,8 @@ export interface KernelServerOptions {
   tools?: Tool[];
   skillRoots?: SkillToolRoots;
   instructionRoots?: InstructionRoots;
+  /** Test seam: a controlled HTTP service instead of the public network. */
+  webFetch?: WebFetchOverrides;
 }
 
 export interface RunningKernel {
@@ -54,9 +57,20 @@ export async function startKernel(
       ? {}
       : { endpoint: options.config.browser.endpoint }),
   });
+  const web = createWebTools({
+    // The search source shares the model's DeepSeek key unless it sets its own.
+    search: {
+      provider: options.config.search.provider,
+      apiKey: options.config.search.apiKey ?? options.config.model.apiKey,
+      ...(options.config.search.baseUrl === undefined
+        ? {}
+        : { baseUrl: options.config.search.baseUrl }),
+    },
+    ...(options.webFetch === undefined ? {} : { fetch: options.webFetch }),
+  });
   const kernel = new Kernel({
     ...options,
-    tools: [...browser.tools, ...(options.tools ?? [])],
+    tools: [...browser.tools, ...web, ...(options.tools ?? [])],
   });
   const clients = new Set<ServerResponse>();
   const unsubscribe = kernel.subscribe((event) => {
