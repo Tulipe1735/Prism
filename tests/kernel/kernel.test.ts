@@ -1,6 +1,11 @@
 import type { RunningKernel } from "../../src/kernel/server.ts";
 import type { SessionSummary } from "../../src/kernel/session.ts";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
+import { loadConfig } from "../../src/kernel/config.ts";
+import { Kernel } from "../../src/kernel/kernel.ts";
 import { VERSION } from "../../src/shared/version.ts";
 import {
   api,
@@ -58,6 +63,22 @@ it("reads the settings in effect without handing back the model key", async () =
   });
   expect(JSON.stringify(settings.body)).not.toContain("test-key");
   expect(workspace).not.toBe("");
+});
+
+it("ships no echo placeholder in the production tool registry", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "prism-tools-"));
+  const config = await loadConfig({ dataDir });
+  const kernel = new Kernel({ config });
+  try {
+    const names = kernel.tools.list().map((tool) => tool.name);
+    expect(names).not.toContain("echo");
+    expect(names).toEqual(
+      expect.arrayContaining(["read_file", "write_file", "run_command", "skill"]),
+    );
+  } finally {
+    await kernel.close();
+    await rm(dataDir, { recursive: true, force: true });
+  }
 });
 
 it("creates, lists, continues and deletes sessions over HTTP", async () => {

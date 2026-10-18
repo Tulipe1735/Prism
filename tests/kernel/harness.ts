@@ -13,6 +13,28 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadConfig } from "../../src/kernel/config.ts";
 import { type RunningKernel, startKernel } from "../../src/kernel/server.ts";
+import { readString } from "../../src/kernel/tool-support.ts";
+
+/**
+ * Stands in for a tool with no side effect: the tests use it to drive the loop
+ * without touching the workspace. The production kernel does not ship it.
+ */
+export const echoTool: Tool = {
+  name: "echo",
+  description: "Returns the given text unchanged. Test double for the task loop.",
+  parameters: {
+    type: "object",
+    properties: { text: { type: "string", description: "Text to return." } },
+    required: ["text"],
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    const text = readString(args, "text");
+    if (text === undefined)
+      return { content: 'The "text" argument must be a string.', isError: true };
+    return { content: text };
+  },
+};
 
 /** One scripted `/chat/completions` answer, consumed in order by the fake model. */
 export interface FakeAnswer {
@@ -369,7 +391,7 @@ export async function startTestKernel(
     ...(options.browserActionsNeedApproval === undefined
       ? {}
       : { browserActionsNeedApproval: options.browserActionsNeedApproval }),
-    ...(options.tools === undefined ? {} : { tools: options.tools }),
+    tools: [echoTool, ...(options.tools ?? [])],
     ...(options.webFetch === undefined ? {} : { webFetch: options.webFetch }),
     skillRoots: options.skillRoots ?? {
       home,

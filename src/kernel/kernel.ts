@@ -18,7 +18,7 @@ import { InstructionFiles } from "./instructions.ts";
 import { runTask } from "./loop.ts";
 import { PermissionPolicy } from "./permissions.ts";
 import { SessionStore } from "./session-store.ts";
-import { createSkillTool, echoTool, ToolRegistry } from "./tools.ts";
+import { createSkillTool, ToolRegistry } from "./tools.ts";
 
 export type KernelErrorCode =
   "INVALID_REQUEST" | "SESSION_NOT_FOUND" | "APPROVAL_NOT_FOUND" | "TASK_RUNNING";
@@ -105,7 +105,6 @@ export class Kernel {
     this.skillRoots = options.skillRoots ?? {};
     this.instructions = new InstructionFiles(options.instructionRoots ?? {});
     this.tools = new ToolRegistry([
-      echoTool,
       createSkillTool(this.skillRoots),
       ...createFileTools(),
       createCommandTool({ timeoutMs: this.config.command.timeoutMs }),
