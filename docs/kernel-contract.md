@@ -66,6 +66,7 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | DELETE | `/sessions/:id`                      | 删除会话                |
 | POST   | `/sessions/:id/messages`             | 发送用户消息            |
 | POST   | `/sessions/:id/cancel`               | 取消运行中的任务        |
+| POST   | `/sessions/:id/compact`              | 手动压缩上下文          |
 | POST   | `/sessions/:id/approvals/:requestId` | 应答审批                |
 | GET    | `/events`                            | SSE 事件流              |
 | POST   | `/shutdown`                          | 关闭内核                |
@@ -160,6 +161,36 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 `tool_call` 都有 `tool_result`」；随后写入一条 `system`
 消息说明任务被用户取消。取消后该会话不再产生本次任务的任何事件。
 
+### 压缩
+
+`POST /sessions/:id/compact` → 200。压缩把上下文里较早的部分替换为一条模型写的摘要，写进
+`compaction` 条目；原始条目一条不删。
+
+```json
+{ "compacted": true, "entryId": "<compaction 条目 id>" }
+```
+
+整个上下文仍在保留窗口内时返回 `{ "compacted": false }`
+（没有可压缩的内容，端点不改动会话）。该会话有任务在运行时返回 409 `TASK_RUNNING`。
+
+`compaction` 条目形状见 `src/kernel/session.ts`：`summary` 是摘要正文，
+`firstKeptEntryId` 是其之前全部条目被摘要取代的那条日志条目（`null`
+表示上下文里没有逐字保留的条目）；上下文重建见 `rebuildContext`。
+
+- **自动压缩**：每一轮模型请求前估算当前上下文（约 4 字符 1 token）；超过
+  `compaction.triggerTokens` 时先生成摘要、写入条目，再用压缩后的上下文继续本轮任务。
+- **保留窗口**：最近 `compaction.keepTokens` 估算大小的消息逐字保留；起点不会落在 `tool`
+  结果上，避免留下找不到对应工具调用的消息。
+- **摘要请求**：用会话模型发一次不带工具的内部请求，要求按「目标、决策、进行中、下一步、相关文件」分节；摘要内容就是
+  `summary`。
+- **摘要失败**：不中断任务、不写 `compaction` 条目；追加一条 `system`
+  消息说明失败原因，本次任务沿用完整历史，不再重试压缩。
+- **配置**：`<dataDir>/config.json` 的 `compaction` 段，缺省
+  `{ "triggerTokens": 100000, "keepTokens": 15000 }`；`GET /settings` 不报告这两个值。
+
+写入 `compaction` 条目后内核先发 `session.updated`（`entryCount` 已含该条目），再发
+`session.compacted`。
+
 ### 审批应答
 
 `POST /sessions/:id/approvals/:requestId`，请求体 `{ "approved": true }` → 200
@@ -193,18 +224,19 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
 - 不重放历史事件：重连后工作台用 `GET /sessions/:id` 取回状态。事件只用于增量。
 - 事件不带 `id:`，客户端不需要 `Last-Event-ID`。
 
-事件类型（定义见 `src/kernel/events.ts`，共 8 种）：
+事件类型（定义见 `src/kernel/events.ts`，共 9 种）：
 
-| 类型                 | 载荷（除 `type` 外）                                           | 语义                                            |
-| -------------------- | -------------------------------------------------------------- | ----------------------------------------------- |
-| `message.delta`      | `sessionId`, `entryId`, `delta`                                | 助手文本增量；`entryId` 是该消息落盘后的条目 id |
-| `tool.started`       | `sessionId`, `callId`, `name`, `arguments`                     | 工具开始执行                                    |
-| `tool.completed`     | `sessionId`, `callId`, `result`                                | 工具成功结束（`result` 已按上限截断）           |
-| `tool.failed`        | `sessionId`, `callId`, `error`                                 | 工具失败结束                                    |
-| `approval.requested` | `sessionId`, `requestId`, `tool`, `reason`, `target`, `impact` | 需要用户逐次审批                                |
-| `approval.resolved`  | `sessionId`, `requestId`, `approved`                           | 审批已应答                                      |
-| `session.updated`    | `session`（会话摘要）                                          | 会话日志已变化，含最后 `entryCount`/`leafId`    |
-| `kernel.status`      | `status`, `version`, `dataDir`                                 | 连接建立时与状态切换时                          |
+| 类型                 | 载荷（除 `type` 外）                                           | 语义                                                     |
+| -------------------- | -------------------------------------------------------------- | -------------------------------------------------------- |
+| `message.delta`      | `sessionId`, `entryId`, `delta`                                | 助手文本增量；`entryId` 是该消息落盘后的条目 id          |
+| `tool.started`       | `sessionId`, `callId`, `name`, `arguments`                     | 工具开始执行                                             |
+| `tool.completed`     | `sessionId`, `callId`, `result`                                | 工具成功结束（`result` 已按上限截断）                    |
+| `tool.failed`        | `sessionId`, `callId`, `error`                                 | 工具失败结束                                             |
+| `approval.requested` | `sessionId`, `requestId`, `tool`, `reason`, `target`, `impact` | 需要用户逐次审批                                         |
+| `approval.resolved`  | `sessionId`, `requestId`, `approved`                           | 审批已应答                                               |
+| `session.updated`    | `session`（会话摘要）                                          | 会话日志已变化，含最后 `entryCount`/`leafId`             |
+| `session.compacted`  | `sessionId`, `entryId`, `reason`                               | 已写入 `compaction` 条目；`reason` 为 `auto` 或 `manual` |
+| `kernel.status`      | `status`, `version`, `dataDir`                                 | 连接建立时与状态切换时                                   |
 
 顺序保证（可断言）：
 
@@ -217,6 +249,7 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
 4. `approval.requested` 先于同一 `requestId` 的 `approval.resolved`；同一 `requestId` 的
    `approval.requested` 只出现一次。
 5. 取消之后不再出现本次任务的事件。
+6. `session.compacted` 一定在该 `entryId` 对应的 `session.updated` 之后出现。
 
 ## 工具
 
@@ -229,8 +262,24 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
   `docs/skills.md`。技能的名称与描述同时写入系统提示，供模型选择。
 - `echo`：占位工具，返回入参文本；03 接入真实文件与命令工具后保留用于自测。
 
+工具收到的 `ToolContext` 里，`noteExplored(path)`
+由文件工具对每个读过、写过或列出的路径调用（绝对路径或相对工作区的路径）；内核据此把该路径目录链上的嵌套
+`AGENTS.md` 加入上下文，工作区外的路径被忽略。未调用不影响其他行为。
+
 03（文件与命令）、04（权限）、06（浏览器）、07（联网检索）、09（MCP）向同一注册表追加工具；外部工具与内置工具形状相同（PRD
 Implementation Decisions）。
+
+## 指令文件
+
+`AGENTS.md` 按「外层在前、内层在后」写入系统提示，每条都带文件路径：
+
+1. 全局文件 `<home>/.agents/AGENTS.md`（`home` 为运行内核的用户目录）。
+2. 工作目录的祖先目录链，从文件系统根到工作区根（含）。
+3. 工作区内嵌套的 `AGENTS.md`：文件工具经 `ToolContext.noteExplored`
+   上报探索到的路径后，其目录链上的嵌套文件从下一次模型请求起进入上下文，以紧随对话的
+   `system` 消息给出，每个文件只出现一次，跨任务保留。
+
+文件在每次请求前重新读取，因此修改在下一次请求生效；缺失或空文件不产生提示内容。
 
 ## 测试接缝
 
