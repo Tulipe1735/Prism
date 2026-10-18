@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { PrismConfig } from "./config.ts";
 import type { KernelEvent } from "./events.ts";
+import type { InstructionRoots } from "./instructions.ts";
 import type { Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
 import type { PermissionScope } from "./types.ts";
@@ -11,8 +12,10 @@ import {
   KernelError,
   type KernelSettings,
   type KernelStatusReport,
+  type SettingsPatch,
 } from "./kernel.ts";
 import { SessionStoreError } from "./session-store.ts";
+import { isPermissionScope, PERMISSION_SCOPES } from "./types.ts";
 
 /** Cap on request bodies; the workbench sends small JSON documents. */
 const MAX_BODY_BYTES = 1_000_000;
@@ -23,8 +26,10 @@ export interface KernelServerOptions {
   /** 0 (default) lets the operating system pick a free port. */
   port?: number;
   scope?: PermissionScope;
+  browserActionsNeedApproval?: boolean;
   tools?: Tool[];
   skillRoots?: SkillToolRoots;
+  instructionRoots?: InstructionRoots;
 }
 
 export interface RunningKernel {
@@ -89,9 +94,22 @@ export async function startKernel(
       sendJson(response, 200, kernel.statusReport() satisfies KernelStatusReport);
       return;
     }
-    if (segments[0] === "settings" && segments.length === 1 && method === "GET") {
-      sendJson(response, 200, kernel.settings() satisfies KernelSettings);
-      return;
+    if (segments[0] === "settings" && segments.length === 1) {
+      if (method === "GET") {
+        sendJson(response, 200, kernel.settings() satisfies KernelSettings);
+        return;
+      }
+      if (method === "PUT") {
+        const body = await readJson(request);
+        sendJson(
+          response,
+          200,
+          (await kernel.updateSettings(
+            parseSettingsPatch(body),
+          )) satisfies KernelSettings,
+        );
+        return;
+      }
     }
     if (segments[0] === "events" && segments.length === 1 && method === "GET") {
       openStream(response);
@@ -148,6 +166,10 @@ export async function startKernel(
       }
       if (segments[2] === "cancel" && segments.length === 3 && method === "POST") {
         sendJson(response, 200, { cancelled: kernel.cancelSession(sessionId) });
+        return;
+      }
+      if (segments[2] === "compact" && segments.length === 3 && method === "POST") {
+        sendJson(response, 200, await kernel.compactManually(sessionId));
         return;
       }
       if (
@@ -300,4 +322,55 @@ function requireBoolean(body: unknown, key: string): boolean {
   if (typeof value !== "boolean")
     throw new KernelError("INVALID_REQUEST", `"${key}" must be a boolean`);
   return value;
+}
+
+/**
+ * Reads the settings patch of `PUT /settings`. Only the settings 04 defines
+ * are accepted; a key the kernel cannot change is refused instead of dropped.
+ */
+function parseSettingsPatch(body: unknown): SettingsPatch {
+  requireKnownKeys(body, ["permissions", "browser"]);
+  const patch: SettingsPatch = {};
+
+  const permissions = field(body, "permissions");
+  if (permissions !== undefined) {
+    requireKnownKeys(permissions, ["scope"]);
+    const scope = field(permissions, "scope");
+    if (!isPermissionScope(scope))
+      throw new KernelError(
+        "INVALID_REQUEST",
+        `"permissions.scope" must be one of ${PERMISSION_SCOPES.join(", ")}`,
+      );
+    patch.scope = scope;
+  }
+
+  const browser = field(body, "browser");
+  if (browser !== undefined) {
+    requireKnownKeys(browser, ["actionsNeedApproval"]);
+    const flag = field(browser, "actionsNeedApproval");
+    if (typeof flag !== "boolean")
+      throw new KernelError(
+        "INVALID_REQUEST",
+        '"browser.actionsNeedApproval" must be a boolean',
+      );
+    patch.browserActionsNeedApproval = flag;
+  }
+
+  if (patch.scope === undefined && patch.browserActionsNeedApproval === undefined)
+    throw new KernelError(
+      "INVALID_REQUEST",
+      'A settings patch must set "permissions.scope" or "browser.actionsNeedApproval"',
+    );
+  return patch;
+}
+
+function requireKnownKeys(value: unknown, known: string[]): void {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new KernelError("INVALID_REQUEST", "The request body must be a JSON object");
+  for (const key of Object.keys(value))
+    if (!known.includes(key))
+      throw new KernelError(
+        "INVALID_REQUEST",
+        `Unsupported setting "${key}"; this kernel changes ${known.join(" and ")}`,
+      );
 }

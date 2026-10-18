@@ -24,8 +24,11 @@ describe("kernel config", () => {
     expect(await loadConfig({ dataDir: "/data/prism" })).toEqual({
       dataDir: "/data/prism",
       model: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
-      browser: { engine: "chromium" },
+      browser: { engine: "chromium", actionsNeedApproval: false },
       search: { provider: "deepseek" },
+      compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
+      command: { timeoutMs: 120_000 },
+      permissions: { scope: "workspace-write" },
     });
   });
 
@@ -34,8 +37,10 @@ describe("kernel config", () => {
       configPath(dataDir),
       JSON.stringify({
         model: { apiKey: "sk-from-file", model: "deepseek-reasoner" },
-        browser: { engine: "firefox" },
+        browser: { engine: "firefox", actionsNeedApproval: true },
         search: { provider: "brave", apiKey: "search-from-file" },
+        command: { timeoutMs: 5_000 },
+        permissions: { scope: "read-only" },
       }),
     );
 
@@ -51,9 +56,32 @@ describe("kernel config", () => {
         model: "deepseek-chat",
         apiKey: "sk-explicit",
       },
-      browser: { engine: "firefox" },
+      browser: { engine: "firefox", actionsNeedApproval: true },
       search: { provider: "brave", apiKey: "search-from-file" },
+      compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
+      command: { timeoutMs: 5_000 },
+      permissions: { scope: "read-only" },
     });
+  });
+
+  it("reads compaction thresholds from the config file and explicit overrides", async () => {
+    await writeFile(
+      configPath(dataDir),
+      JSON.stringify({ compaction: { keepTokens: 5_000 } }),
+    );
+
+    expect((await loadConfig({ dataDir })).compaction).toEqual({
+      triggerTokens: 100_000,
+      keepTokens: 5_000,
+    });
+    expect(
+      (
+        await loadConfig({
+          dataDir,
+          overrides: { compaction: { triggerTokens: 400 } },
+        })
+      ).compaction,
+    ).toEqual({ triggerTokens: 400, keepTokens: 5_000 });
   });
 
   it("reads the PRISM_DATA_DIR environment variable when no data directory is passed", async () => {
@@ -74,6 +102,12 @@ describe("kernel config", () => {
     await writeFile(
       configPath(dataDir),
       JSON.stringify({ search: { provider: "brave" }, extra: 1 }),
+    );
+    await expect(loadConfig({ dataDir })).rejects.toThrow(/config\.json/);
+
+    await writeFile(
+      configPath(dataDir),
+      JSON.stringify({ command: { timeoutMs: -1 } }),
     );
     await expect(loadConfig({ dataDir })).rejects.toThrow(/config\.json/);
   });

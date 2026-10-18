@@ -16,6 +16,8 @@ function category(event: KernelEvent): string {
       return "approval";
     case "session.updated":
       return "session";
+    case "session.compacted":
+      return "compaction";
     case "kernel.status":
       return "kernel";
     default: {
@@ -60,6 +62,12 @@ describe("kernel events", () => {
         },
       },
       {
+        type: "session.compacted",
+        sessionId: "s1",
+        entryId: "c1",
+        reason: "auto",
+      },
+      {
         type: "kernel.status",
         status: "ready",
         version: "0.1.6",
@@ -75,6 +83,7 @@ describe("kernel events", () => {
       "approval",
       "approval",
       "session",
+      "compaction",
       "kernel",
     ]);
     expect(events.every((event) => typeof event.type === "string")).toBe(true);

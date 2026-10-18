@@ -13,6 +13,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { expect, it } from "vitest";
 import { z } from "zod";
+import { PermissionPolicy } from "../../src/kernel/permissions.ts";
 import { McpHost } from "../../src/mcp/host.ts";
 
 const fixture = fileURLToPath(new URL("./fixtures/stdio-server.mjs", import.meta.url));
@@ -21,6 +22,10 @@ const context: ToolContext = {
   sessionId: "test-session",
   workspace: "/tmp",
   scope: "read-only",
+  permissions: new PermissionPolicy({
+    scope: "read-only",
+    browserActionsNeedApproval: false,
+  }),
   target: "wsl",
   signal: new AbortController().signal,
   requestApproval: async () => false,

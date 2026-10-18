@@ -46,7 +46,7 @@ it("reads the settings in effect without handing back the model key", async () =
       model: "scripted-model",
       hasApiKey: true,
     },
-    browser: { engine: "chromium" },
+    browser: { engine: "chromium", actionsNeedApproval: false },
     search: { provider: "deepseek" },
     permissions: { scope: "workspace-write" },
   });
