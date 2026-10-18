@@ -1,8 +1,8 @@
 import type { SearchProvider, SearchResult } from "../web/search.ts";
 import type { AddressResolver } from "../web/target.ts";
 import type { Tool } from "./tool.ts";
-import { createSearchProvider } from "../web/search.ts";
 import { webFetch } from "../web/fetch.ts";
+import { createSearchProvider } from "../web/search.ts";
 import { missingArgument, readNumber, readString } from "./tool-support.ts";
 
 /**

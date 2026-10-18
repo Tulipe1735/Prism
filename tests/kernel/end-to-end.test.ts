@@ -1,16 +1,18 @@
-import type { FakeAnswer, ModelRequest } from "./harness.ts";
+import type { Buffer } from "node:buffer";
 import type { SessionEntry } from "../../src/kernel/session.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { BROWSER_ENGINES } from "../../src/kernel/types.ts";
 import {
   api,
   connectEvents,
+  type FakeAnswer,
   type KernelHarness,
+  type ModelRequest,
   readSessionLog,
   startTestKernel,
 } from "./harness.ts";
@@ -29,6 +31,22 @@ let pageUrl = "";
 let web: Server;
 let webOrigin = "";
 const webRequests: { method: string; path: string }[] = [];
+
+/**
+ * A page with exactly one input and one button: small enough to read in a tool
+ * result, but the click really changes the page text, so the recorded
+ * observation proves the browser executed the action.
+ */
+const PAGE = `<!doctype html><title>Prism end-to-end</title>
+<label>Note <input id="note"></label>
+<button id="save">Save</button>
+<p role="status" id="status">Idle</p>
+<script>
+document.getElementById('save').addEventListener('click', () => {
+  const value = document.getElementById('note').value;
+  document.getElementById('status').textContent = 'Saved ' + value;
+});
+</script>`;
 
 const SEARCH_ANSWER = {
   results: [
@@ -88,15 +106,15 @@ beforeAll(async () => {
   webOrigin = `http://127.0.0.1:${webAddress.port}`;
 });
 
+afterEach(async () => {
+  await harness?.cleanup();
+  harness = undefined;
+});
+
 afterAll(async () => {
   await new Promise<void>((resolve) => page.close(() => resolve()));
   web.closeAllConnections();
   await new Promise<void>((resolve) => web.close(() => resolve()));
-});
-
-afterEach(async () => {
-  await harness?.cleanup();
-  harness = undefined;
 });
 
 async function start(
@@ -144,15 +162,6 @@ async function waitForTaskEnd(url: string, sessionId: string): Promise<void> {
   throw new Error(`The task in session ${sessionId} never finished`);
 }
 
-/** The content of the most recent tool result the model saw. */
-function lastToolResult(request: ModelRequest): string {
-  for (let index = request.messages.length - 1; index >= 0; index -= 1) {
-    const message = request.messages[index]!;
-    if (message.role === "tool") return message.content ?? "";
-  }
-  throw new Error("The model request carries no tool result");
-}
-
 /** The result of one earlier tool call, by its call id. */
 function resultOf<T>(request: ModelRequest, callId: string): T {
   const torn = (): never => {
@@ -167,10 +176,6 @@ function resultOf<T>(request: ModelRequest, callId: string): T {
     return torn();
   }
   return torn();
-}
-
-function parseLast<T>(request: ModelRequest): T {
-  return JSON.parse(lastToolResult(request)) as T;
 }
 
 /** A scripted round that calls one tool straight away. */
@@ -202,22 +207,6 @@ function toolResults(
       entry.type === "tool_result",
   );
 }
-
-/**
- * A page with exactly one input and one button: small enough to read in a tool
- * result, but the click really changes the page text, so the recorded
- * observation proves the browser executed the action.
- */
-const PAGE = `<!doctype html><title>Prism end-to-end</title>
-<label>Note <input id="note"></label>
-<button id="save">Save</button>
-<p role="status" id="status">Idle</p>
-<script>
-document.getElementById('save').addEventListener('click', () => {
-  const value = document.getElementById('note').value;
-  document.getElementById('status').textContent = 'Saved ' + value;
-});
-</script>`;
 
 interface ObservationPayload {
   session: string;
@@ -414,7 +403,7 @@ it("keeps serving when an MCP server or its configuration is broken", async () =
 });
 
 it("discovers the preset prism skill and loads its instructions on demand", async () => {
-  const { kernel, model, workspace, home, dataDir } = await start({
+  const { kernel, model, workspace, dataDir } = await start({
     // The skills shipped with Prism resolve like they do in a user install.
     bundledSkills: "package",
     answers: [

@@ -8,6 +8,8 @@ import type { PermissionScope } from "./types.ts";
 import { Buffer } from "node:buffer";
 import { createServer } from "node:http";
 import { join } from "node:path";
+import { loadMcpConfig } from "../mcp/config.ts";
+import { McpHost } from "../mcp/host.ts";
 import { createBrowserTools } from "./browser-tools.ts";
 import {
   Kernel,
@@ -19,8 +21,6 @@ import {
 import { SessionStoreError } from "./session-store.ts";
 import { isPermissionScope, PERMISSION_SCOPES } from "./types.ts";
 import { createWebTools, type WebFetchOverrides } from "./web-tools.ts";
-import { loadMcpConfig } from "../mcp/config.ts";
-import { McpHost } from "../mcp/host.ts";
 
 /** Cap on request bodies; the workbench sends small JSON documents. */
 const MAX_BODY_BYTES = 1_000_000;
