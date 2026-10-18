@@ -1,12 +1,7 @@
 import type { BrowserContext, Page } from "playwright";
 import type { Snapshot, SnapshotAction } from "../../shared/types.ts";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-
-const READ_STATE = readFileSync(
-  new URL("../../browser/snapshot.js", import.meta.url),
-  "utf8",
-);
+import { SNAPSHOT_SOURCE } from "./snapshot-source.ts";
 
 const RESOLVE_TARGET = `(action => {
   const e=window.__jevFast?.nodes.get(action.node);
@@ -168,7 +163,7 @@ export class BrowserSession implements BrowserPage {
   }
 
   private async observeOnce(): Promise<Observation> {
-    const info = (await this.evaluate(READ_STATE)) as Snapshot | null | undefined;
+    const info = (await this.evaluate(SNAPSHOT_SOURCE)) as Snapshot | null | undefined;
     if (info === null || info === undefined)
       throw new StalePageError("Document is navigating");
     return { ...info, fingerprint: fingerprint(info) };
