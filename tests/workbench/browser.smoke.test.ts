@@ -198,6 +198,11 @@ describe.runIf(enabled)("workbench in a real browser", () => {
         'button[data-action="set-engine"][data-engine="chromium"][aria-pressed="true"]',
       );
 
+      // Manual compaction is offered on the open session; a short log has
+      // nothing to compact, and the kernel says so without touching the log.
+      await page.click('button[data-action="compact"]');
+      await page.waitForSelector("#notice >> text=没有可压缩的内容");
+
       // Rename, search and delete act on the session list.
       await page.click('[data-action="rename-session"]');
       await page.fill(
