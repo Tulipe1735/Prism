@@ -150,8 +150,11 @@ it("refuses manual compaction while a task is running", async () => {
     compaction: { keepTokens: 25 },
     answers: [{ text: ["thinking..."], hold: true }],
   });
+  const events = await connectEvents(`${kernel.url}/events`);
   const session = await createSession(kernel.url, workspace);
   await sendMessage(kernel.url, session.id, "start");
+  // The task is running once the model has streamed its first text.
+  await events.waitFor((event) => event.type === "message.delta");
 
   const refused = await api<{ error: { code: string } }>(
     kernel.url,
@@ -161,6 +164,7 @@ it("refuses manual compaction while a task is running", async () => {
   expect(refused.status).toBe(409);
   expect(refused.body).toMatchObject({ error: { code: "TASK_RUNNING" } });
   await api(kernel.url, `/sessions/${session.id}/cancel`, { method: "POST" });
+  events.close();
 });
 
 it("reports a failed summary and continues with the full history", async () => {

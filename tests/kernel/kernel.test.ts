@@ -2,7 +2,7 @@ import type { RunningKernel } from "../../src/kernel/server.ts";
 import type { SessionSummary } from "../../src/kernel/session.ts";
 import { afterEach, expect, it } from "vitest";
 import { VERSION } from "../../src/shared/version.ts";
-import { api, connectEvents, type KernelHarness, startTestKernel } from "./harness.ts";
+import { api, connectEvents, type KernelHarness, readSessionLog, startTestKernel } from "./harness.ts";
 
 let harness: KernelHarness | undefined;
 
@@ -198,6 +198,35 @@ it("refuses to rename a session while its task runs", async () => {
   );
   expect(after.status).toBe(200);
   expect(after.body.session.title).toBe("too early");
+});
+
+it("waits for a cancelled task to finish writing before closing", async () => {
+  const { kernel, workspace, dataDir } = await start({
+    answers: [{ text: ["working..."], hold: true }],
+  });
+  const created = await api<{ session: SessionSummary }>(kernel.url, "/sessions", {
+    method: "POST",
+    body: { workspace },
+  });
+  const sessionId = created.body.session.id;
+  await api(kernel.url, `/sessions/${sessionId}/messages`, {
+    method: "POST",
+    body: { text: "keep working" },
+  });
+  await api(kernel.url, `/sessions/${sessionId}/cancel`, { method: "POST" });
+
+  // Closing must not return before the cancelled task appended its last entries,
+  // so the caller can remove the data directory right after.
+  await kernel.close();
+  const entries = await readSessionLog(dataDir, sessionId);
+  expect(
+    entries.some(
+      (entry) =>
+        entry.type === "message" &&
+        entry.role === "system" &&
+        entry.content.includes("cancelled"),
+    ),
+  ).toBe(true);
 });
 
 /** Waits until the kernel no longer counts a task as running for this session. */
