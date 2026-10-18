@@ -64,12 +64,7 @@ export async function captureEvidence(
     )) as EvidenceCapture | null;
     if (value === null || value === undefined)
       throw new StalePageError("The page could not be observed. Retry observe.");
-    value.snapshot.fingerprint = digest({
-      url: value.snapshot.url,
-      text: value.snapshot.text,
-      actions: value.snapshot.actions,
-      scroll: value.snapshot.scroll,
-    });
+    value.snapshot.fingerprint = digest(value.snapshot);
     return value;
   });
 }

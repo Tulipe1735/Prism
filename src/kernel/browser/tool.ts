@@ -2,16 +2,17 @@ import type { Representation } from "../../browser/representation.ts";
 import type { ObservedAction, PublicState } from "../../browser/state.ts";
 import type { SnapshotAction, SnapshotActionKind } from "../../shared/types.ts";
 import type { EngineHandle, EngineOptions } from "./engine.ts";
-import type {
-  EvidenceCapture,
-  TargetCapture,
-  TargetEvidence,
-} from "./evidence.ts";
+import type { EvidenceCapture, TargetCapture, TargetEvidence } from "./evidence.ts";
 import type { Receipt } from "./receipts.ts";
 import type { BrowserPage, Observation } from "./session.ts";
 import { randomUUID } from "node:crypto";
 import { openEngine } from "./engine.ts";
-import { captureEvidence, digest, readTargetEvidence, targetEvidence } from "./evidence.ts";
+import {
+  captureEvidence,
+  digest,
+  readTargetEvidence,
+  targetEvidence,
+} from "./evidence.ts";
 import { readReceipt, saveReceipt } from "./receipts.ts";
 import { openBrowserSession, StalePageError } from "./session.ts";
 
@@ -46,7 +47,8 @@ export interface BrowserToolDependencies {
 
 const defaults: BrowserToolDependencies = {
   openEngine,
-  openSession: ({ engine, url }) => openBrowserSession({ context: engine.context, url }),
+  openSession: ({ engine, url }) =>
+    openBrowserSession({ context: engine.context, url }),
   capture: captureEvidence,
   read: readTargetEvidence,
 };
@@ -120,7 +122,10 @@ export class BrowserTool {
   private readonly options: BrowserToolOptions;
   private readonly dependencies: BrowserToolDependencies;
 
-  constructor(options: BrowserToolOptions, dependencies: BrowserToolDependencies = defaults) {
+  constructor(
+    options: BrowserToolOptions,
+    dependencies: BrowserToolDependencies = defaults,
+  ) {
     this.options = options;
     this.dependencies = dependencies;
   }
@@ -143,7 +148,10 @@ export class BrowserTool {
     return { session, url: options.url };
   }
 
-  async observe(sessionId: string, scope: Representation = "local"): Promise<ObservationView> {
+  async observe(
+    sessionId: string,
+    scope: Representation = "local",
+  ): Promise<ObservationView> {
     const session = this.session(sessionId);
     session.observed = undefined;
     const capture = await this.dependencies.capture(session.page, scope);
@@ -272,7 +280,11 @@ export class BrowserTool {
           "Only fill accepts a value. Select the offered option ref for select.",
         );
       await this.assertTarget(session, observed, action);
-      const current = await this.dependencies.read(session.page, action, expected.scope);
+      const current = await this.dependencies.read(
+        session.page,
+        action,
+        expected.scope,
+      );
       const evidence = targetEvidence(
         current.current,
         expected.scope,
@@ -348,7 +360,10 @@ export class BrowserTool {
     let postObservation: ActResult["post_observation"];
     if (receipt.outcome !== "not_executed") {
       try {
-        postObservation = { status: "captured", data: await this.observe(sessionId, "local") };
+        postObservation = {
+          status: "captured",
+          data: await this.observe(sessionId, "local"),
+        };
       } catch (error) {
         session.observed = undefined;
         postObservation = { status: "failed", error: problem(error) };
@@ -456,7 +471,8 @@ function hashInput(input: ActInput): Record<string, unknown> {
 }
 
 function problem(error: unknown): { code: string; message: string } {
-  if (error instanceof BrowserToolError) return { code: error.code, message: error.message };
+  if (error instanceof BrowserToolError)
+    return { code: error.code, message: error.message };
   return {
     code: "OBSERVATION_FAILED",
     message: error instanceof Error ? error.message : "Post-action observation failed.",

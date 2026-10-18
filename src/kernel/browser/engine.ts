@@ -1,5 +1,4 @@
 import type { Browser, BrowserContext } from "playwright";
-import { existsSync } from "node:fs";
 
 import { chromium, firefox, webkit } from "playwright";
 import { ConfigError } from "../../shared/errors.ts";
@@ -25,11 +24,7 @@ export interface EngineHandle {
   close: () => Promise<void>;
 }
 
-/** Playwright manages engine builds; this reports whether a build is on disk. */
-export function isEngineInstalled(name: BrowserEngineName): boolean {
-  return existsSync(TYPES[name].executablePath());
-}
-
+/** Playwright manages engine builds; this reports the command that installs one. */
 export function engineInstallCommand(name: BrowserEngineName): string {
   return `npx playwright install ${name}`;
 }

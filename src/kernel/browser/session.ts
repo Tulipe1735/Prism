@@ -42,7 +42,11 @@ export interface BrowserPage {
   readObservation: <T>(read: () => Promise<T>) => Promise<T>;
   fresh: (snapshot: Observation, action?: SnapshotAction) => Promise<boolean>;
   samePage: (snapshot: Observation) => Promise<boolean>;
-  act: (action: SnapshotAction, snapshot: Observation, text?: string | null) => Promise<void>;
+  act: (
+    action: SnapshotAction,
+    snapshot: Observation,
+    text?: string | null,
+  ) => Promise<void>;
   close: () => Promise<void>;
 }
 
@@ -216,8 +220,7 @@ export class BrowserSession implements BrowserPage {
       return await this.page.evaluate(expression);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      if (/has been closed|Target closed|Browser has been closed|disconnected/i.test(detail))
-        throw error;
+      if (/has been closed|Target closed|has disconnected/i.test(detail)) throw error;
       throw new StalePageError(detail);
     }
   }

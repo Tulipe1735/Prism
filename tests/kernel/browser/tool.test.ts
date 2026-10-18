@@ -1,5 +1,11 @@
-import type { EngineHandle, EngineOptions } from "../../../src/kernel/browser/engine.ts";
-import type { EvidenceCapture, TargetCapture } from "../../../src/kernel/browser/evidence.ts";
+import type {
+  EngineHandle,
+  EngineOptions,
+} from "../../../src/kernel/browser/engine.ts";
+import type {
+  EvidenceCapture,
+  TargetCapture,
+} from "../../../src/kernel/browser/evidence.ts";
 import type { BrowserPage } from "../../../src/kernel/browser/session.ts";
 import type { BrowserToolDependencies } from "../../../src/kernel/browser/tool.ts";
 import type { SnapshotAction } from "../../../src/shared/types.ts";
@@ -47,6 +53,23 @@ function fixture(): EvidenceCapture {
             disabled: false,
             readonly: false,
             value: "",
+          },
+        },
+        {
+          id: "e3",
+          kind: "select",
+          value: "us",
+          label: "Region → America",
+          node: 3,
+          option_label: "America",
+          control: {
+            name: "Region",
+            role: "combobox",
+            disabled: false,
+            readonly: false,
+            value: "eu",
+            selected_options: [{ value: "eu", label: "Europe" }],
+            truncated: true,
           },
         },
       ],
@@ -118,7 +141,10 @@ async function harness(): Promise<Harness> {
     openEngine: async (_options: EngineOptions) => engine,
     openSession,
     capture: async () => structuredClone(capture),
-    read: async (_session: BrowserPage, action: SnapshotAction): Promise<TargetCapture> => ({
+    read: async (
+      _session: BrowserPage,
+      action: SnapshotAction,
+    ): Promise<TargetCapture> => ({
       contexts: structuredClone(capture.contexts),
       relations: structuredClone(capture.relations),
       current: structuredClone(
@@ -237,5 +263,115 @@ describe("browser tool observation references", () => {
       code: "TARGET_CHANGED",
     });
     expect(page.act).not.toHaveBeenCalled();
+  });
+
+  it("refuses changed evidence and truncated selection state before input", async () => {
+    const { tool, capture, page } = await harness();
+    const { session } = await tool.open({ url: "https://example.com/" });
+    const view = await tool.observe(session, "local");
+    const click = view.targets.find((item) => item.operation === "click")!;
+    capture.contexts["1"]!.context = "Changed";
+    const changed = await tool.act(session, {
+      observation: view.observation,
+      target: click.ref,
+      evidence: view.evidence,
+      operation: "click",
+      request_id: "changed-evidence",
+    });
+    expect(changed.receipt).toMatchObject({
+      outcome: "not_executed",
+      code: "EVIDENCE_CHANGED",
+    });
+    expect(page.act).not.toHaveBeenCalled();
+    const again = await tool.observe(session, "local");
+    const select = again.targets.find((item) => item.operation === "select")!;
+    expect(select.state.truncated).toBe(true);
+    const truncated = await tool.act(session, {
+      observation: again.observation,
+      target: select.ref,
+      evidence: again.evidence,
+      operation: "select",
+      request_id: "truncated",
+    });
+    expect(truncated.receipt).toMatchObject({
+      outcome: "not_executed",
+      code: "EVIDENCE_TRUNCATED",
+    });
+    expect(page.act).not.toHaveBeenCalled();
+  });
+
+  it("requires a value for fill and refuses values for other operations", async () => {
+    const { tool, page } = await harness();
+    const { session } = await tool.open({ url: "https://example.com/" });
+    const view = await tool.observe(session, "local");
+    const fill = view.targets.find((item) => item.operation === "fill")!;
+    const click = view.targets.find((item) => item.operation === "click")!;
+    const missing = await tool.act(session, {
+      observation: view.observation,
+      target: fill.ref,
+      evidence: view.evidence,
+      operation: "fill",
+      request_id: "missing-value",
+    });
+    expect(missing.receipt).toMatchObject({
+      outcome: "not_executed",
+      code: "VALUE_REQUIRED",
+    });
+    const unexpected = await tool.act(session, {
+      observation: view.observation,
+      target: click.ref,
+      evidence: view.evidence,
+      operation: "click",
+      value: "text",
+      request_id: "unexpected-value",
+    });
+    expect(unexpected.receipt).toMatchObject({
+      outcome: "not_executed",
+      code: "UNEXPECTED_VALUE",
+    });
+    expect(page.act).not.toHaveBeenCalled();
+  });
+
+  it("accepts relation evidence captured for one target as the action evidence", async () => {
+    const { tool, capture } = await harness();
+    const { session } = await tool.open({ url: "https://example.com/" });
+    const view = await tool.observe(session, "relations");
+    const target = view.targets.find((item) => item.operation === "click")!;
+    const context = await tool.context(session, {
+      observation: view.observation,
+      target: target.ref,
+    });
+    expect(context.relations!.map((entry) => entry.text)).toContain("Alpha");
+    const stale = await tool.context(session, {
+      observation: view.observation,
+      target: target.ref,
+    });
+    capture.relations["1"] = [{ tag: 1, text: "Beta", scope: "section" }];
+    const refused = await tool.act(session, {
+      observation: view.observation,
+      target: target.ref,
+      evidence: stale.evidence,
+      operation: "click",
+      request_id: "stale-relation",
+    });
+    expect(refused.receipt).toMatchObject({
+      outcome: "not_executed",
+      code: "EVIDENCE_CHANGED",
+    });
+    const again = await tool.observe(session, "relations");
+    const current = again.targets.find((item) => item.operation === "click")!;
+    const fresh = await tool.context(session, {
+      observation: again.observation,
+      target: current.ref,
+    });
+    expect(fresh.relations!.map((entry) => entry.text)).toContain("Beta");
+    const executed = await tool.act(session, {
+      observation: again.observation,
+      target: current.ref,
+      evidence: fresh.evidence,
+      operation: "click",
+      request_id: "fresh-relation",
+    });
+    expect(executed.receipt.outcome).toBe("executed");
   });
 });
