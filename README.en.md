@@ -63,7 +63,8 @@ pnpm build
 ```
 
 See [skills/prism](skills/prism/SKILL.md) for the agent skill of the existing browser
-CLI.
+CLI, and [docs/skills.md](docs/skills.md) for the kernel's skill directory convention
+and priority order.
 
 MIT License. The README follows the structure of
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).

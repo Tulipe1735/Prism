@@ -1,0 +1,35 @@
+import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
+
+/** JSON Schema for the arguments a tool accepts. */
+export interface ToolParameters {
+  type: "object";
+  properties: Record<string, unknown>;
+  required?: string[];
+  additionalProperties?: boolean;
+}
+
+export interface ToolContext {
+  sessionId: string;
+  /** Workspace the session belongs to. */
+  workspace: string;
+  /** Boundary in effect for this call; actions outside it need approval. */
+  scope: PermissionScope;
+  /** Environment file operations and commands run in. */
+  target: ExecutionTarget;
+  /** Aborts when the user cancels the running task. */
+  signal: AbortSignal;
+}
+
+export interface ToolResult {
+  /** Text the model reads as the tool output. */
+  content: string;
+  /** Set when the call failed, so the loop reports the failure instead of a result. */
+  isError?: boolean;
+}
+
+export interface Tool {
+  name: string;
+  description: string;
+  parameters: ToolParameters;
+  execute: (args: JsonValue, context: ToolContext) => Promise<ToolResult>;
+}
