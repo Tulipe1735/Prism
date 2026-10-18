@@ -70,36 +70,69 @@ export interface ContextMessage {
   summary?: true;
 }
 
+/** Thrown when a log entry references an entry that is not in the log. */
+export class SessionLogError extends Error {
+  override name = "SessionLogError";
+}
+
 /**
- * Rebuilds the conversation context for a leaf by walking `parentId` up to the
- * branch start. A `compaction` entry contributes its summary and then jumps to
- * `firstKeptEntryId`, so everything before that entry is replaced by the summary.
+ * Rebuilds the conversation context for a leaf by following `parentId` back to
+ * the branch start. The newest `compaction` on that branch replaces every entry
+ * older than its `firstKeptEntryId` with its summary.
  */
 export function rebuildContext(
   entries: SessionEntry[],
   options: { leafId?: string } = {},
 ): ContextMessage[] {
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
-  const messages: ContextMessage[] = [];
+  const chain: SessionEntry[] = [];
   let cursor = options.leafId ?? entries.at(-1)?.id ?? null;
 
   while (cursor !== null) {
     const entry = byId.get(cursor);
     if (entry === undefined)
-      throw new Error(`Session entry ${cursor} is missing from the log`);
-    if (entry.type === "compaction") {
-      messages.push({
-        role: "system",
-        content: entry.summary,
-        entryId: entry.id,
-        summary: true,
-      });
-      cursor = entry.firstKeptEntryId;
-    } else {
-      messages.push({ role: entry.role, content: entry.content, entryId: entry.id });
-      cursor = entry.parentId;
+      throw new SessionLogError(`Session entry ${cursor} is missing from the log`);
+    chain.push(entry);
+    cursor = entry.parentId;
+  }
+  chain.reverse();
+
+  const newestCompaction = chain.reduce<CompactionEntry | undefined>(
+    (newest, entry) => (entry.type === "compaction" ? entry : newest),
+    undefined,
+  );
+  let firstKeptIndex = 0;
+  if (newestCompaction !== undefined) {
+    firstKeptIndex = chain.length;
+    if (newestCompaction.firstKeptEntryId != null) {
+      firstKeptIndex = chain.findIndex(
+        (entry) => entry.id === newestCompaction.firstKeptEntryId,
+      );
+      if (firstKeptIndex === -1)
+        throw new SessionLogError(
+          `Compaction ${newestCompaction.id} keeps missing entry ${newestCompaction.firstKeptEntryId}`,
+        );
     }
   }
 
-  return messages.reverse();
+  const messages: ContextMessage[] = [];
+  if (newestCompaction !== undefined) messages.push(summaryMessage(newestCompaction));
+  for (const [index, entry] of chain.entries()) {
+    if (index < firstKeptIndex || entry.id === newestCompaction?.id) continue;
+    if (entry.type === "compaction") {
+      messages.push(summaryMessage(entry));
+    } else {
+      messages.push({ role: entry.role, content: entry.content, entryId: entry.id });
+    }
+  }
+  return messages;
+}
+
+export function summaryMessage(entry: CompactionEntry): ContextMessage {
+  return {
+    role: "system",
+    content: entry.summary,
+    entryId: entry.id,
+    summary: true,
+  };
 }
