@@ -1,4 +1,5 @@
 import {
+  type Artifact,
   type DiffLine,
   parseUnifiedDiff,
   toArtifacts,
@@ -26,6 +27,8 @@ const ROLE_LABELS: Record<string, string> = {
   assistant: "助手",
   system: "系统",
 };
+
+const PERMISSION_SCOPES = ["read-only", "workspace-write", "full-access"] as const;
 
 /** Escapes every value that reaches the DOM; session and model text is untrusted. */
 export function escapeHtml(text: string): string {
@@ -201,10 +204,22 @@ ${artifacts
   <summary>${escapeHtml(artifact.path)}<span class="counts"><span class="plus">+${
     artifact.added
   }</span> <span class="minus">−${artifact.removed}</span></span></summary>
-  ${renderDiff(artifact.diff, artifact.result)}
+  ${renderArtifactBody(artifact)}
 </details>`,
   )
   .join("\n")}`;
+}
+
+/** A diff when the result carried one, the written content otherwise. */
+function renderArtifactBody(artifact: Artifact): string {
+  if (artifact.diff !== null) return renderDiff(artifact.diff, artifact.result);
+  if (artifact.written !== null)
+    return `<p class="empty">工具没有返回 diff；下面是这次写入的内容。</p><pre>${escapeHtml(
+      artifact.written,
+    )}</pre>`;
+  return `<pre>${escapeHtml(
+    artifact.result === "" ? "（工具没有返回 diff）" : artifact.result,
+  )}</pre>`;
 }
 
 function renderDiff(diff: DiffLine[] | null, fallback: string): string {
@@ -225,12 +240,34 @@ export function renderSettings(state: UiState): string {
   <dt>模型密钥</dt><dd>${settings.model.hasApiKey ? "已设置" : "未设置"}</dd>
   <dt>浏览器引擎</dt><dd>${escapeHtml(settings.browser.engine)}</dd>
   <dt>搜索来源</dt><dd>${escapeHtml(settings.search.provider)}</dd>
-  <dt>权限范围</dt><dd>${escapeHtml(settings.permissions.scope)}</dd>
   <dt>数据目录</dt><dd>${escapeHtml(settings.dataDir)}</dd>
 </dl>
-<p class="empty">本版工作台只读设置；改动写在 ${escapeHtml(
+<h2>权限范围</h2>
+<div class="row">
+${PERMISSION_SCOPES.map((scope) => renderScopeButton(scope, settings.permissions.scope)).join("\n")}
+</div>
+<p class="empty">立即生效；正在运行的任务下一次工具调用就按新档位判定。</p>
+<h2>浏览器动作</h2>
+<div class="row">
+  <button type="button" data-action="toggle-browser-approval" aria-pressed="${
+    settings.browser.actionsNeedApproval
+  }">${
+    settings.browser.actionsNeedApproval
+      ? "每个动作先审批（点击关闭）"
+      : "自动执行（点击改为先审批）"
+  }</button>
+</div>
+<p class="empty">浏览器动作需要审批（US-30）；开启后内核为每个浏览器动作弹一次审批卡片。</p>
+<p class="empty">其余设置只读：改动写在 ${escapeHtml(
     settings.dataDir,
-  )}/config.json，或由后续 ticket 的写入端点完成。</p>`;
+  )}/config.json。</p>`;
+}
+
+function renderScopeButton(scope: string, current: string): string {
+  const active = scope === current;
+  return `<button type="button" data-action="set-scope" data-scope="${scope}" aria-pressed="${active}"${
+    active ? ' class="primary"' : ""
+  }>${escapeHtml(scope)}</button>`;
 }
 
 export function renderNotice(state: UiState): string {

@@ -202,6 +202,8 @@ export interface FileChange {
   added: number;
   removed: number;
   diff: DiffLine[] | null;
+  /** Content a writing tool was asked to write, when the result has no diff. */
+  written: string | null;
   result: string;
 }
 
@@ -226,9 +228,21 @@ export function toChanges(entries: SessionEntry[]): FileChange[] {
         added: count(diff, "add"),
         removed: count(diff, "remove"),
         diff,
+        written: diff === null ? writtenContent(step.arguments) : null,
         result: step.result ?? "",
       };
     });
+}
+
+/** The content argument of a writing tool call, when it carries one. */
+function writtenContent(argumentsText: string): string | null {
+  try {
+    const parsed = JSON.parse(argumentsText) as Record<string, unknown>;
+    const content = parsed?.content;
+    return typeof content === "string" ? content : null;
+  } catch {
+    return null;
+  }
 }
 
 /** One artifact of a session: the latest state and diff of a touched file. */
@@ -239,6 +253,7 @@ export interface Artifact {
   added: number;
   removed: number;
   diff: DiffLine[] | null;
+  written: string | null;
   result: string;
   calls: number;
 }
@@ -259,8 +274,14 @@ export function toArtifacts(entries: SessionEntry[]): Artifact[] {
             added: seen?.added ?? 0,
             removed: seen?.removed ?? 0,
             diff: seen?.diff ?? null,
+            written: change.written ?? seen?.written ?? null,
           }
-        : { added: change.added, removed: change.removed, diff: change.diff }),
+        : {
+            added: change.added,
+            removed: change.removed,
+            diff: change.diff,
+            written: change.written,
+          }),
     });
   }
   return [...byPath.values()];

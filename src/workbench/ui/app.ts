@@ -1,5 +1,6 @@
 import type { KernelEvent } from "../../kernel/events.ts";
-import { KernelApiError, KernelClient } from "./client.ts";
+import type { PermissionScope } from "../../kernel/types.ts";
+import { KernelApiError, KernelClient, type SettingsPatch } from "./client.ts";
 import { toTimeline } from "./derive.ts";
 import * as view from "./render.ts";
 import { emptyState, reduce, type UiAction, type UiState } from "./state.ts";
@@ -80,8 +81,14 @@ function dispatch(action: UiAction): void {
 
 function handleEvent(event: KernelEvent): void {
   dispatch({ type: "event", event });
-  if (event.type === "session.updated" && event.session.id === state.activeId)
-    queueReload();
+  if (state.activeId === null) return;
+  const changedId =
+    event.type === "session.updated"
+      ? event.session.id
+      : event.type === "session.compacted"
+        ? event.sessionId
+        : null;
+  if (changedId === state.activeId) queueReload();
 }
 
 /** The kernel never replays events, so the open session is read back from the log. */
@@ -169,6 +176,28 @@ async function onClick(event: MouseEvent): Promise<void> {
       return;
     case "cancel":
       await cancel();
+      return;
+    case "set-scope":
+      if (target.dataset.scope !== undefined)
+        await updateSettings({
+          permissions: { scope: target.dataset.scope as PermissionScope },
+        });
+      return;
+    case "toggle-browser-approval":
+      await updateSettings({
+        browser: {
+          actionsNeedApproval: !(state.settings?.browser.actionsNeedApproval ?? false),
+        },
+      });
+  }
+}
+
+/** Applies a settings patch and keeps the settings the kernel answers with. */
+async function updateSettings(patch: SettingsPatch): Promise<void> {
+  try {
+    dispatch({ type: "settings", settings: await client.updateSettings(patch) });
+  } catch (error: unknown) {
+    dispatch({ type: "notice", notice: describe(error) });
   }
 }
 

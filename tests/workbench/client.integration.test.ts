@@ -1,6 +1,9 @@
 import type { KernelEvent } from "../../src/kernel/events.ts";
 import type { SessionEntry } from "../../src/kernel/session.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, it } from "vitest";
 import {
   KernelApiError,
@@ -140,6 +143,95 @@ it("streams a task: deltas, tool process and session updates", async () => {
     close();
   } finally {
     await harness.cleanup();
+  }
+});
+
+it("changes the settings the kernel lets the workbench change", async () => {
+  const harness = await startTestKernel();
+  try {
+    const client = new KernelClient({ baseUrl: harness.kernel.url });
+
+    const readOnly = await client.updateSettings({
+      permissions: { scope: "read-only" },
+    });
+    expect(readOnly.permissions.scope).toBe("read-only");
+    expect(readOnly.browser.actionsNeedApproval).toBe(false);
+    expect((await client.settings()).permissions.scope).toBe("read-only");
+
+    const guarded = await client.updateSettings({
+      browser: { actionsNeedApproval: true },
+    });
+    expect(guarded).toMatchObject({
+      permissions: { scope: "read-only" },
+      browser: { actionsNeedApproval: true },
+    });
+
+    const refused = await client
+      .updateSettings({ permissions: { scope: "wide-open" } } as never)
+      .catch((error: unknown) => error);
+    expect(refused).toMatchObject({ code: "INVALID_REQUEST", status: 400 });
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+it("answers an approval the kernel asks for a write outside the workspace", async () => {
+  const base = await mkdtemp(join(tmpdir(), "prism-workbench-approval-"));
+  const workspace = join(base, "workspace");
+  const outside = join(base, "outside-the-workspace.txt");
+  const harness = await startTestKernel({
+    workspace,
+    answers: [
+      {
+        toolCalls: [
+          {
+            id: "call-outside",
+            name: "write_file",
+            arguments: JSON.stringify({ path: outside, content: "outside\n" }),
+          },
+        ],
+      },
+      { text: ["Done."] },
+    ],
+  });
+  try {
+    const client = new KernelClient({ baseUrl: harness.kernel.url });
+    const session = await client.createSession({ workspace: harness.workspace });
+    const events: KernelEvent[] = [];
+    const close = client.openEvents({ onEvent: (event) => events.push(event) });
+    await waitFor(
+      () => events.some((event) => event.type === "kernel.status"),
+      "the open event stream",
+    );
+    await client.sendMessage(session.id, "write outside the workspace");
+
+    const requested = await waitFor(
+      () => events.find((event) => event.type === "approval.requested"),
+      "the approval request",
+    );
+    expect(requested).toMatchObject({
+      sessionId: session.id,
+      tool: "write_file",
+      reason: "Writes a file outside the workspace",
+      target: outside,
+    });
+    await client.answerApproval(
+      session.id,
+      (requested as { requestId: string }).requestId,
+      true,
+    );
+
+    await waitFor(async () => {
+      const read = await client.readSession(session.id);
+      return read.entries.some(
+        (entry) => entry.type === "tool_result" && entry.content.includes("Wrote"),
+      );
+    }, "the write result");
+    expect(await readFile(outside, "utf8")).toBe("outside\n");
+    close();
+  } finally {
+    await harness.cleanup();
+    await rm(base, { recursive: true, force: true });
   }
 });
 

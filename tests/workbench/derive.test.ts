@@ -264,6 +264,34 @@ it("collects file changes with their diff and latest artifact state", () => {
   ]);
 });
 
+it("keeps the written content when a tool result carries no diff", () => {
+  const call = toolCall(
+    "call-1",
+    "write_file",
+    { path: "src/new.ts", content: "export const a = 1;\n" },
+    null,
+  );
+  const result = toolResult(
+    "call-1",
+    "Wrote 20 characters to src/new.ts.",
+    false,
+    call.id,
+  );
+
+  const [change] = toChanges([call, result]);
+  expect(change).toMatchObject({
+    path: "src/new.ts",
+    tool: "write_file",
+    state: "ok",
+    diff: null,
+    written: "export const a = 1;\n",
+  });
+  expect(toArtifacts([call, result])[0]).toMatchObject({
+    path: "src/new.ts",
+    written: "export const a = 1;\n",
+  });
+});
+
 it("reads the task state from the last log entry", () => {
   const user = message("user", "start", null);
   const call = toolCall("call-1", "echo", { text: "hi" }, user.id);
@@ -301,10 +329,10 @@ it("derives the timeline from a real kernel session log", async () => {
       method: "POST",
       body: { text: "change something" },
     });
-    const log = await waitForLeaf(
+    const log = await waitForFinalAnswer(
       harness.kernel.url,
       created.body.session.id,
-      "message",
+      "All done.",
     );
 
     const timeline = toTimeline(log.entries);
@@ -328,18 +356,81 @@ it("derives the timeline from a real kernel session log", async () => {
   }
 });
 
-/** Waits until the model stopped talking, i.e. the leaf is a finished message. */
-async function waitForLeaf(
+it("derives changes from the real file tools of the kernel", async () => {
+  const harness = await startTestKernel({
+    answers: [
+      {
+        text: ["Writing the file."],
+        toolCalls: [
+          {
+            id: "call-write",
+            name: "write_file",
+            arguments: JSON.stringify({
+              path: "src/generated.ts",
+              content: "export const generated = true;\n",
+            }),
+          },
+        ],
+      },
+      { text: ["Written."] },
+    ],
+  });
+  try {
+    const created = await api<{ session: SessionSummary }>(
+      harness.kernel.url,
+      "/sessions",
+      { method: "POST", body: { workspace: harness.workspace } },
+    );
+    await api(harness.kernel.url, `/sessions/${created.body.session.id}/messages`, {
+      method: "POST",
+      body: { text: "write src/generated.ts" },
+    });
+    const log = await waitForFinalAnswer(
+      harness.kernel.url,
+      created.body.session.id,
+      "Written.",
+    );
+
+    const changes = toChanges(log.entries);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      path: "src/generated.ts",
+      tool: "write_file",
+      state: "ok",
+      diff: null,
+      written: "export const generated = true;\n",
+    });
+    expect(changes[0]?.result).toContain("Wrote 31 characters");
+    expect(toArtifacts(log.entries)[0]).toMatchObject({
+      path: "src/generated.ts",
+      calls: 1,
+    });
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+/**
+ * Waits until the task ended. The loop writes the assistant answer and its tool
+ * calls in separate appends, so only the last text of the script says the turn
+ * is over; the leaf being a message can also be a mid-turn state.
+ */
+async function waitForFinalAnswer(
   url: string,
   sessionId: string,
-  kind: "message",
+  expected: string,
 ): Promise<{ entries: SessionEntry[] }> {
-  for (let attempt = 0; attempt < 200; attempt += 1) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     const log = await api<{ entries: SessionEntry[] }>(url, `/sessions/${sessionId}`);
     const leaf = log.body.entries.at(-1);
-    if (leaf !== undefined && leaf.type === kind && !isTaskRunning(log.body.entries))
+    if (
+      leaf !== undefined &&
+      leaf.type === "message" &&
+      leaf.role === "assistant" &&
+      leaf.content === expected
+    )
       return log.body;
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  throw new Error("The scripted task never reached its last message");
+  throw new Error(`The scripted task never ended with "${expected}"`);
 }

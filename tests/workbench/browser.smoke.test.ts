@@ -161,12 +161,23 @@ describe.runIf(enabled)("workbench in a real browser", () => {
         await page.locator("#artifacts .diff .remove").first().textContent(),
       ).toContain("-  return 1;");
 
-      // Settings are the effective kernel settings, read-only.
+      // Settings are the effective kernel settings; the scope switch writes through.
       await page.click('[data-view="settings"]');
       const settings = await page.locator("#settings").textContent();
       expect(settings).toContain("scripted-model");
-      expect(settings).toContain("workspace-write");
       expect(settings).toContain(harness.dataDir);
+      await page.click('button[data-action="set-scope"][data-scope="read-only"]');
+      await page.waitForSelector(
+        'button[data-action="set-scope"][data-scope="read-only"][aria-pressed="true"]',
+      );
+      expect(harness.kernel.kernel.settings().permissions.scope).toBe("read-only");
+      await page.click('button[data-action="set-scope"][data-scope="workspace-write"]');
+      await page.waitForSelector(
+        'button[data-action="set-scope"][data-scope="workspace-write"][aria-pressed="true"]',
+      );
+      expect(harness.kernel.kernel.settings().permissions.scope).toBe(
+        "workspace-write",
+      );
 
       // Rename, search and delete act on the session list.
       await page.click('[data-action="rename-session"]');

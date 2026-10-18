@@ -219,6 +219,9 @@ function reduceEvent(state: UiState, event: KernelEvent): UiState {
           (approval) => approval.requestId !== event.requestId,
         ),
       };
+    case "session.compacted":
+      // The compaction entry itself arrives with the next log reload.
+      return state;
   }
 }
 

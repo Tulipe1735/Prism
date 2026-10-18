@@ -1,6 +1,7 @@
 import type { KernelEvent } from "../../kernel/events.ts";
 import type { KernelSettings, KernelStatusReport } from "../../kernel/kernel.ts";
 import type { SessionEntry, SessionSummary } from "../../kernel/session.ts";
+import type { PermissionScope } from "../../kernel/types.ts";
 
 /** Milliseconds before the client reopens the event stream (matches the kernel's retry hint). */
 const RETRY_MS = 2_000;
@@ -29,6 +30,15 @@ export interface SessionLogPayload {
   entries: SessionEntry[];
 }
 
+/**
+ * The settings `PUT /settings` accepts; the kernel refuses any other key, so
+ * the workbench can only change what 04 defined (scope, browser approvals).
+ */
+export interface SettingsPatch {
+  permissions?: { scope: PermissionScope };
+  browser?: { actionsNeedApproval: boolean };
+}
+
 export interface EventStreamHandlers {
   onEvent: (event: KernelEvent) => void;
   onState?: (state: "open" | "closed") => void;
@@ -55,6 +65,11 @@ export class KernelClient {
 
   settings(): Promise<KernelSettings> {
     return this.request<KernelSettings>("/settings");
+  }
+
+  /** Applies the two settings 04 opened to the workbench; the answer is the new state. */
+  updateSettings(patch: SettingsPatch): Promise<KernelSettings> {
+    return this.request<KernelSettings>("/settings", { method: "PUT", body: patch });
   }
 
   async listSessions(workspace?: string): Promise<SessionSummary[]> {

@@ -195,7 +195,7 @@ it("renders touched files as artifacts with their diff", () => {
   expect(renderArtifacts(emptyState())).toContain("还没有文件改动");
 });
 
-it("renders the effective settings read-only", () => {
+it("renders the effective settings and the two switches the kernel allows", () => {
   const state = reduce(emptyState(), {
     type: "settings",
     settings: {
@@ -205,7 +205,7 @@ it("renders the effective settings read-only", () => {
         model: "deepseek-chat",
         hasApiKey: true,
       },
-      browser: { engine: "chromium" },
+      browser: { engine: "chromium", actionsNeedApproval: false },
       search: { provider: "deepseek" },
       permissions: { scope: "workspace-write" },
     },
@@ -216,9 +216,18 @@ it("renders the effective settings read-only", () => {
   expect(html).toContain("deepseek-chat");
   expect(html).toContain("已设置");
   expect(html).toContain("chromium");
-  expect(html).toContain("workspace-write");
   expect(html).toContain("/home/demo/.prism/config.json");
   expect(html).not.toContain("<input");
+
+  // The three scopes are switchable and the current one is marked (US-14).
+  for (const scope of ["read-only", "workspace-write", "full-access"]) {
+    expect(html).toContain(`data-action="set-scope" data-scope="${scope}"`);
+  }
+  expect(html).toMatch(/data-scope="workspace-write"[^>]*aria-pressed="true"/);
+  expect(html).toMatch(/data-scope="read-only"[^>]*aria-pressed="false"/);
+  // Browser actions may ask for approval (US-30).
+  expect(html).toContain('data-action="toggle-browser-approval"');
+  expect(html).toContain("浏览器动作需要审批");
   expect(renderSettings(emptyState())).toContain("尚未读取");
 });
 
