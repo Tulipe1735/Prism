@@ -310,7 +310,7 @@ export class AssistantStore {
   claimTask(id: string): boolean {
     return this.transaction(() => {
       const current = this.requireTask(id);
-      if (current.status !== "queued") return false;
+      if (current.status !== "queued" || this.expired(current)) return false;
       this.putTask({
         ...current,
         status: "running",
@@ -452,11 +452,24 @@ export class AssistantStore {
   enqueueLocal(taskId: string, command: Record<string, unknown>): LocalJob {
     return this.transaction(() => {
       this.requireTask(taskId);
-      const commandHash = createHash("sha256").update(canonical(command)).digest("hex");
+      const prism = command.prism as Record<string, unknown> | undefined;
+      const action = prism?.command === "act";
+      const commandHash = action
+        ? createHash("sha256")
+            .update(canonical({ session: prism.session, requestId: prism.request_id }))
+            .digest("hex")
+        : randomUUID();
       const existing = this.db
         .prepare("SELECT data FROM local_jobs WHERE task_id=? AND command_hash=?")
         .get(taskId, commandHash);
-      if (existing) return JSON.parse(String(existing.data)) as LocalJob;
+      if (existing) {
+        const job = JSON.parse(String(existing.data)) as LocalJob;
+        if (canonical(job.command.prism) !== canonical(prism))
+          throw new Error(
+            "An action request ID cannot be reused with changed content.",
+          );
+        return job;
+      }
       const timestamp = this.now().toISOString();
       const job: LocalJob = {
         id: `local_${randomUUID()}`,
@@ -485,11 +498,9 @@ export class AssistantStore {
       const job = this.getLocalJob(id);
       if (!job || job.status !== "pending")
         throw new Error("Only a pending local job can be approved.");
-      if (
-        ["cancelled", "completed", "partial", "failed"].includes(
-          this.requireTask(job.taskId).status,
-        )
-      )
+      const task = this.requireTask(job.taskId);
+      if (this.expired(task)) throw new Error("The deep task deadline has expired.");
+      if (["cancelled", "completed", "partial", "failed"].includes(task.status))
         throw new Error("A terminal task cannot approve local operations.");
       const approved = {
         ...job,
@@ -497,6 +508,11 @@ export class AssistantStore {
         updatedAt: this.nextTimestamp(job.updatedAt),
       };
       this.putLocal(approved);
+      this.putTask({
+        ...task,
+        status: "waiting-device",
+        updatedAt: this.nextTimestamp(task.updatedAt),
+      });
       return approved;
     });
   }
@@ -511,9 +527,11 @@ export class AssistantStore {
       for (const row of pending) {
         const job = JSON.parse(String(row.data)) as LocalJob;
         if (job.command.approved === false) continue;
-        if (this.getTask(job.taskId)?.status !== "waiting-device") continue;
+        const task = this.getTask(job.taskId);
+        if (!task || task.status !== "waiting-device" || this.expired(task)) continue;
         const claimed: LocalJob = {
           ...job,
+          deadlineAt: task.effort === "deep" ? task.deadlineAt : undefined,
           status: "claimed",
           workerId,
           updatedAt: this.nextTimestamp(job.updatedAt),
@@ -549,6 +567,14 @@ export class AssistantStore {
     this.db
       .prepare("UPDATE local_jobs SET status=?, data=? WHERE id=?")
       .run(job.status, JSON.stringify(job), job.id);
+  }
+
+  private expired(task: TaskRecord): boolean {
+    return (
+      task.effort === "deep" &&
+      task.deadlineAt !== undefined &&
+      !(Date.parse(task.deadlineAt) > this.now().getTime())
+    );
   }
 
   private putDelivery(delivery: Delivery): void {

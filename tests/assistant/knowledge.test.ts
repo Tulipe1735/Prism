@@ -259,6 +259,23 @@ it("本地关键提交在准确内容获批前不交给设备，任务和回执�
   expect(restarted.claimLocal("laptop")).toBeUndefined();
 });
 
+it("过期深入任务不能领取模型循环、本地操作或新的用户批准", () => {
+  let time = new Date("2026-10-18T02:00:00Z");
+  const store = open(directory(), { now: () => time });
+  const task = store.createTask({ message: "核对课程证据", effort: "deep" });
+  store.updateTask(task.id, { deadlineAt: "2026-10-18T02:20:00Z" });
+  const job = store.enqueueLocal(task.id, {
+    approved: false,
+    prism: { command: "act", request_id: "deadline-request" },
+  });
+  store.updateTask(task.id, { status: "waiting-device" });
+  time = new Date("2026-10-18T02:20:01Z");
+  expect(() => store.approveLocal(job.id)).toThrow(/deadline|expired/i);
+  expect(store.claimLocal("late-pc")).toBeUndefined();
+  store.updateTask(task.id, { status: "queued" });
+  expect(store.claimTask(task.id)).toBe(false);
+});
+
 it("手动导入 Markdown 保留原文件引用，重复导入只更新同一份资料副本", async () => {
   const store = open();
   const library = new KnowledgeLibrary(store);

@@ -49,6 +49,12 @@ export async function executePrism(
       argv.push("--observation", command.observation, "--target", command.target);
     if (command.command === "receipt") argv.push("--request-id", command.request_id);
   } else argv.push("--stdin");
+  const remaining = job.deadlineAt ? Date.parse(job.deadlineAt) - Date.now() : 60_000;
+  if (!(remaining > 0))
+    return {
+      status: "failed",
+      result: { error: "深入任务已达到时间上限，本地命令未执行。" },
+    };
   return new Promise((done) => {
     const child = spawn(process.execPath, argv, {
       stdio: ["pipe", "pipe", "pipe"],
@@ -56,7 +62,7 @@ export async function executePrism(
     });
     let output = "";
     let oversized = false;
-    const timeout = setTimeout(() => child.kill(), 60_000);
+    const timeout = setTimeout(() => child.kill(), Math.min(60_000, remaining));
     child.stdout.on("data", (value: Buffer) => {
       output += value.toString("utf8");
       if (output.length > 2_000_000) {

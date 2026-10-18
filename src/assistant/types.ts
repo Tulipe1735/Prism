@@ -99,6 +99,8 @@ export interface TaskRecord {
 export interface Delivery {
   key: string;
   body: string;
+  sourceDocumentIds?: string[];
+  canonicalIds?: string[];
   status: "pending" | "sent" | "unknown" | "failed" | "silent";
   createdAt: string;
   updatedAt: string;
@@ -167,6 +169,7 @@ export interface LocalJob {
   status: "pending" | "claimed" | "completed" | "unknown" | "failed";
   workerId?: string;
   result?: unknown;
+  deadlineAt?: string;
   createdAt: string;
   updatedAt: string;
 }
