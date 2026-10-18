@@ -216,7 +216,12 @@ it("does not run the action when the user refuses and says so to the model", asy
   expect((result as { content: string }).content).toContain("refused");
 
   // The model reads the refusal as the tool result and can change its approach.
-  const fed = model.requests[1]?.messages.at(-1);
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 4,
+  );
+  const fed = model.requests[1]?.messages.find(
+    (message) => message.tool_call_id === "call_1",
+  );
   expect(fed?.role).toBe("tool");
   expect(fed?.content).toContain("refused");
   events.close();

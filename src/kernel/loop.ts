@@ -1,14 +1,17 @@
 import type { SkillSummary } from "../skills/loader.ts";
 
+import type { InstructionFile } from "./instructions.ts";
 import type { Kernel } from "./kernel.ts";
 import type { ChatMessage } from "./model.ts";
 import type { ToolContext, ToolResult } from "./tool.ts";
 import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { scanSkills } from "../skills/loader.ts";
-import { streamChat } from "./model.ts";
+import { estimateContextTokens } from "./compaction.ts";
+import { instructionNote, instructionPrompt } from "./instructions.ts";
+import { streamChat, toModelMessages } from "./model.ts";
 import { describeScope } from "./permissions.ts";
-import { type ContextMessage, rebuildContext } from "./session.ts";
+import { rebuildContext } from "./session.ts";
 
 /** Tool output longer than this is cut before it reaches the model and the log. */
 export const TOOL_RESULT_LIMIT = 8_000;
@@ -38,18 +41,58 @@ export async function runTask(run: TaskRun): Promise<void> {
     const log = await kernel.store.read(sessionId);
     const workspace = log.header.workspace;
     const skills = (await scanSkills({ workspace, ...kernel.skillRoots })).skills;
-    const messages: ChatMessage[] = [
-      {
-        role: "system",
-        content: buildSystemPrompt({ workspace, scope: run.scope, skills }),
-      },
-      ...toModelMessages(rebuildContext(log.entries)),
-    ];
+    /** Once a summary fails the run keeps its full history instead of retrying. */
+    let compactionFailed = false;
+
+    /** The request the loop sends next, rebuilt from the session log. */
+    const requestMessages = async (): Promise<ChatMessage[]> => {
+      const files = await kernel.instructions.activeFor(workspace);
+      return [
+        {
+          role: "system",
+          content: buildSystemPrompt({
+            workspace,
+            scope: run.scope,
+            skills,
+            instructions: files,
+          }),
+        },
+        ...toModelMessages(
+          rebuildContext((await kernel.store.read(sessionId)).entries),
+        ),
+        ...files
+          .filter((file) => file.scope === "nested")
+          .map((file) => ({ role: "system" as const, content: instructionNote(file) })),
+      ];
+    };
 
     for (let round = 0; round < MAX_MODEL_ROUNDS; round += 1) {
       if (signal.aborted) {
         await finish(run, "The user cancelled the task.");
         return;
+      }
+      let messages = await requestMessages();
+      if (
+        !compactionFailed &&
+        estimateContextTokens(messages) > kernel.config.compaction.triggerTokens
+      ) {
+        try {
+          const outcome = await kernel.compactSession(sessionId, {
+            reason: "auto",
+            signal,
+          });
+          if (outcome.compacted) messages = await requestMessages();
+        } catch (error) {
+          if (signal.aborted) throw error;
+          compactionFailed = true;
+          await kernel.store.append(sessionId, {
+            type: "message",
+            role: "system",
+            content: `Automatic compaction failed: ${error instanceof Error ? error.message : String(error)}. The task continues with the full history.`,
+          });
+          await kernel.notifySession(sessionId);
+          messages = await requestMessages();
+        }
       }
       const entryId = randomUUID();
       let text = "";
@@ -104,11 +147,6 @@ export async function runTask(run: TaskRun): Promise<void> {
           name: call.name,
           arguments: call.arguments,
         });
-      messages.push({
-        role: "assistant",
-        content: text,
-        ...(calls.length === 0 ? {} : { toolCalls: calls }),
-      });
 
       if (calls.length === 0) {
         await kernel.notifySession(sessionId);
@@ -153,7 +191,6 @@ export async function runTask(run: TaskRun): Promise<void> {
               result: content,
             });
         }
-        messages.push({ role: "tool", content, toolCallId: call.id });
       }
       await kernel.notifySession(sessionId);
 
@@ -196,6 +233,7 @@ async function executeTool(
     signal: run.signal,
     requestApproval: (request) =>
       kernel.requestApproval(sessionId, { tool: tool.name, ...request }),
+    noteExplored: (path) => kernel.instructions.noteExplored(run.workspace, path),
   };
   try {
     // The permission scope is enforced here, before the tool runs: a call
@@ -239,20 +277,12 @@ function truncate(content: string): string {
     : content.slice(0, TOOL_RESULT_LIMIT) + TRUNCATION_NOTICE;
 }
 
-export function toModelMessages(messages: ContextMessage[]): ChatMessage[] {
-  return messages.map((message) => ({
-    role: message.role,
-    content: message.content,
-    ...(message.toolCalls === undefined ? {} : { toolCalls: message.toolCalls }),
-    ...(message.toolCallId === undefined ? {} : { toolCallId: message.toolCallId }),
-  }));
-}
-
-/** Workspace, permission scope and available skills, stated once per task. */
+/** Workspace, permission scope, instructions and skills, stated once per task. */
 export function buildSystemPrompt(input: {
   workspace: string;
   scope: PermissionScope;
   skills: SkillSummary[];
+  instructions?: InstructionFile[];
 }): string {
   const lines = [
     "You are Prism, a coding agent working in the user's own repository.",
@@ -260,6 +290,8 @@ export function buildSystemPrompt(input: {
     `Permission scope: ${input.scope} — ${describeScope(input.scope)}. If an action is refused, change your approach or report honestly instead of asking again.`,
     "Use the tools to inspect and change the workspace; answer in the user's language and keep tool output out of your prose unless asked.",
   ];
+  const instructions = instructionPrompt(input.instructions ?? []);
+  if (instructions !== undefined) lines.push(instructions);
   if (input.skills.length > 0) {
     lines.push(
       'Skills available for this workspace; call the "skill" tool with a name to read its instructions before following them:',

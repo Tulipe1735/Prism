@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { PrismConfig } from "./config.ts";
 import type { KernelEvent } from "./events.ts";
+import type { InstructionRoots } from "./instructions.ts";
 import type { Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
 import type { PermissionScope } from "./types.ts";
@@ -28,6 +29,7 @@ export interface KernelServerOptions {
   browserActionsNeedApproval?: boolean;
   tools?: Tool[];
   skillRoots?: SkillToolRoots;
+  instructionRoots?: InstructionRoots;
 }
 
 export interface RunningKernel {
@@ -157,6 +159,10 @@ export async function startKernel(
       }
       if (segments[2] === "cancel" && segments.length === 3 && method === "POST") {
         sendJson(response, 200, { cancelled: kernel.cancelSession(sessionId) });
+        return;
+      }
+      if (segments[2] === "compact" && segments.length === 3 && method === "POST") {
+        sendJson(response, 200, await kernel.compactManually(sessionId));
         return;
       }
       if (

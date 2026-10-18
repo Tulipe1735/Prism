@@ -68,10 +68,12 @@ export interface ToolPath {
 /**
  * Resolves a path a tool was asked for. The kernel decides whether touching it
  * is allowed (04, `Tool.effects`) before the tool runs, so this only resolves
- * the path and picks the name to report.
+ * the path and picks the name to report. The path is reported as explored, so
+ * nested `AGENTS.md` files on the way load.
  */
 export function resolveToolPath(context: ToolContext, requested: string): ToolPath {
   const { path, inside } = resolveWorkspacePath(context.workspace, requested);
+  context.noteExplored?.(path);
   const rel = relative(resolve(context.workspace), path);
   return { path, display: inside ? (rel === "" ? "." : rel) : path };
 }
