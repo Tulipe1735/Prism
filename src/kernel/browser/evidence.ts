@@ -1,3 +1,10 @@
+/**
+ * The kernel's evidence capture: snapshot, target context, relations and public
+ * state in one synchronous page sample, read through the Playwright page of
+ * `./session.ts`. `src/browser/evidence.ts` is the browser CLI's port of the
+ * same semantics over CDP (ADR-0006); the two differ where the drivers differ,
+ * so they are not merged.
+ */
 import type {
   ActionRelations,
   RelationEntry,
@@ -7,9 +14,9 @@ import type {
 import type { ControlState, ObservedAction, PublicState } from "../../browser/state.ts";
 import type { SnapshotAction } from "../../shared/types.ts";
 import type { BrowserPage, Observation } from "./session.ts";
-import { createHash } from "node:crypto";
 import { extractInPage, extractRelationsInPage } from "../../browser/representation.ts";
 import { createStateReaderInPage } from "../../browser/state.ts";
+import { digest } from "../../shared/digest.ts";
 import { StalePageError } from "./session.ts";
 import { SNAPSHOT_SOURCE } from "./snapshot-source.ts";
 
@@ -119,8 +126,4 @@ export function targetEvidence(
         }
       : {}),
   };
-}
-
-export function digest(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }

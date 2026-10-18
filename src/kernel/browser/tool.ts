@@ -6,13 +6,9 @@ import type { EvidenceCapture, TargetCapture, TargetEvidence } from "./evidence.
 import type { Receipt } from "./receipts.ts";
 import type { BrowserPage, Observation } from "./session.ts";
 import { randomUUID } from "node:crypto";
+import { digest } from "../../shared/digest.ts";
 import { openEngine } from "./engine.ts";
-import {
-  captureEvidence,
-  digest,
-  readTargetEvidence,
-  targetEvidence,
-} from "./evidence.ts";
+import { captureEvidence, readTargetEvidence, targetEvidence } from "./evidence.ts";
 import { readReceipt, saveReceipt } from "./receipts.ts";
 import { openBrowserSession, StalePageError } from "./session.ts";
 

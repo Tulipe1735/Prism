@@ -1,3 +1,14 @@
+/**
+ * The kernel's browser session: one page under Playwright control.
+ * Observation, freshness and input semantics live here; receipts and target
+ * references live in the tool layer.
+ *
+ * `src/browser/session.ts` is the browser CLI's port of the same semantics
+ * (ADR-0006): it drives a page over the Chrome DevTools Protocol on a browser
+ * the user started, while this one drives a Playwright engine the kernel opens.
+ * The two are kept apart on purpose; share only what is engine-independent
+ * (`src/shared`, `src/browser/representation.ts`, `src/browser/state.ts`).
+ */
 import type { BrowserContext, Page } from "playwright";
 import type { Snapshot, SnapshotAction } from "../../shared/types.ts";
 import { createHash } from "node:crypto";

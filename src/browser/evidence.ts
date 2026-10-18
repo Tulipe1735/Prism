@@ -1,3 +1,8 @@
+/**
+ * The browser CLI's evidence capture over CDP. `src/kernel/browser/evidence.ts`
+ * is the kernel's port of the same semantics on top of Playwright (ADR-0006);
+ * the two differ where the drivers differ, so they are not merged.
+ */
 import type { SnapshotAction } from "../shared/types.ts";
 import type {
   ActionRelations,
@@ -7,8 +12,8 @@ import type {
 } from "./representation.ts";
 import type { BrowserSession, Observation } from "./session.ts";
 import type { ControlState, ObservedAction, PublicState } from "./state.ts";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { digest } from "../shared/digest.ts";
 import { extractInPage, extractRelationsInPage } from "./representation.ts";
 import { StalePageError } from "./session.ts";
 import { createStateReaderInPage } from "./state.ts";
@@ -124,7 +129,4 @@ export function targetEvidence(
         }
       : {}),
   };
-}
-export function digest(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
