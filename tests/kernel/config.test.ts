@@ -27,6 +27,7 @@ describe("kernel config", () => {
       browser: { engine: "chromium" },
       search: { provider: "deepseek" },
       compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
+      command: { timeoutMs: 120_000 },
     });
   });
 
@@ -37,6 +38,7 @@ describe("kernel config", () => {
         model: { apiKey: "sk-from-file", model: "deepseek-reasoner" },
         browser: { engine: "firefox" },
         search: { provider: "brave", apiKey: "search-from-file" },
+        command: { timeoutMs: 5_000 },
       }),
     );
 
@@ -55,6 +57,7 @@ describe("kernel config", () => {
       browser: { engine: "firefox" },
       search: { provider: "brave", apiKey: "search-from-file" },
       compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
+      command: { timeoutMs: 5_000 },
     });
   });
 
@@ -96,6 +99,12 @@ describe("kernel config", () => {
     await writeFile(
       configPath(dataDir),
       JSON.stringify({ search: { provider: "brave" }, extra: 1 }),
+    );
+    await expect(loadConfig({ dataDir })).rejects.toThrow(/config\.json/);
+
+    await writeFile(
+      configPath(dataDir),
+      JSON.stringify({ command: { timeoutMs: -1 } }),
     );
     await expect(loadConfig({ dataDir })).rejects.toThrow(/config\.json/);
   });

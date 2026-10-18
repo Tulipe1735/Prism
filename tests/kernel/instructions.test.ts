@@ -1,5 +1,4 @@
 import type { SessionSummary } from "../../src/kernel/session.ts";
-import type { Tool } from "../../src/kernel/tool.ts";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { afterEach, expect, it } from "vitest";
@@ -86,29 +85,16 @@ it("loads AGENTS.md from the global root, the ancestors and the workspace", asyn
   events.close();
 });
 
-it("loads a nested AGENTS.md once a tool explores its directory", async () => {
-  /** Stand-in for the file tools of ticket 03: reports the path it explored. */
-  const exploreTool: Tool = {
-    name: "explore",
-    description: "Test stand-in for the workspace file tools.",
-    parameters: {
-      type: "object",
-      properties: { path: { type: "string", description: "Explored path." } },
-      required: ["path"],
-      additionalProperties: false,
-    },
-    execute: async (args, context) => {
-      const path = (args as { path?: string }).path ?? "";
-      context.noteExplored?.(path);
-      return { content: `explored ${path}` };
-    },
-  };
+it("loads a nested AGENTS.md once the file tools explore its directory", async () => {
   const { kernel, model, workspace } = await start({
-    tools: [exploreTool],
     answers: [
       {
         toolCalls: [
-          { id: "call_1", name: "explore", arguments: '{"path":"packages/app"}' },
+          {
+            id: "call_1",
+            name: "read_file",
+            arguments: '{"path":"packages/app/notes.md"}',
+          },
         ],
       },
       { text: ["seen"] },
@@ -118,10 +104,11 @@ it("loads a nested AGENTS.md once a tool explores its directory", async () => {
   await mkdir(join(workspace, "packages", "app"), { recursive: true });
   await writeFile(join(workspace, "packages", "AGENTS.md"), "PACKAGES-RULE\n");
   await writeFile(join(workspace, "packages", "app", "AGENTS.md"), "APP-RULE\n");
+  await writeFile(join(workspace, "packages", "app", "notes.md"), "notes\n");
 
   const events = await connectEvents(`${kernel.url}/events`);
   const session = await createSession(kernel.url, workspace);
-  await sendMessage(kernel.url, session.id, "explore the app package");
+  await sendMessage(kernel.url, session.id, "read the app notes");
   await events.waitFor(
     (event) => event.type === "session.updated" && event.session.entryCount === 4,
   );

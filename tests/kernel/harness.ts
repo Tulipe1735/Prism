@@ -1,6 +1,6 @@
 import type { Buffer } from "node:buffer";
 import type { Server } from "node:http";
-import type { CompactionConfig } from "../../src/kernel/config.ts";
+import type { CommandConfig, CompactionConfig } from "../../src/kernel/config.ts";
 import type { KernelEvent } from "../../src/kernel/events.ts";
 import type { SessionEntry } from "../../src/kernel/session.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
@@ -289,6 +289,8 @@ export async function startTestKernel(
     workspace?: string;
     /** Overrides for `compaction` in the kernel config. */
     compaction?: Partial<CompactionConfig>;
+    /** Overrides for `command` in the kernel config. */
+    command?: Partial<CommandConfig>;
   } = {},
 ): Promise<KernelHarness> {
   const base = await mkdtemp(join(tmpdir(), "prism-kernel-"));
@@ -307,6 +309,7 @@ export async function startTestKernel(
     overrides: {
       model: { baseUrl: model.baseUrl, model: "scripted-model", apiKey: "test-key" },
       ...(options.compaction === undefined ? {} : { compaction: options.compaction }),
+      ...(options.command === undefined ? {} : { command: options.command }),
     },
   });
   const kernel = await startKernel({

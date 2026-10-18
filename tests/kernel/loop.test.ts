@@ -90,7 +90,9 @@ it("streams the model reply as deltas and persists it in the session log", async
   expect(request?.model).toBe("scripted-model");
   expect(request?.messages[0]?.role).toBe("system");
   expect(request?.messages[0]?.content).toContain(workspace);
-  expect(request?.tools?.map((tool) => tool.function.name)).toEqual(["echo", "skill"]);
+  expect(request?.tools?.map((tool) => tool.function.name)).toEqual(
+    expect.arrayContaining(["echo", "skill"]),
+  );
   events.close();
 });
 

@@ -30,6 +30,11 @@ export interface CompactionConfig {
   keepTokens: number;
 }
 
+export interface CommandConfig {
+  /** Wall-clock limit for one command; the tool may override it per call. */
+  timeoutMs: number;
+}
+
 export interface PrismConfig {
   /** Directory holding sessions, receipts and the config file itself. */
   dataDir: string;
@@ -37,6 +42,7 @@ export interface PrismConfig {
   browser: BrowserConfig;
   search: SearchConfig;
   compaction: CompactionConfig;
+  command: CommandConfig;
 }
 
 export interface PrismConfigOverrides {
@@ -44,6 +50,7 @@ export interface PrismConfigOverrides {
   browser?: Partial<BrowserConfig>;
   search?: Partial<SearchConfig>;
   compaction?: Partial<CompactionConfig>;
+  command?: Partial<CommandConfig>;
 }
 
 const DEFAULTS = {
@@ -51,6 +58,7 @@ const DEFAULTS = {
   browser: { engine: "chromium" },
   search: { provider: "deepseek" },
   compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
+  command: { timeoutMs: 120_000 },
 } as const;
 
 const configFileSchema = z
@@ -79,6 +87,11 @@ const configFileSchema = z
         triggerTokens: z.number().int().positive(),
         keepTokens: z.number().int().positive(),
       })
+      .partial()
+      .strict()
+      .optional(),
+    command: z
+      .object({ timeoutMs: z.number().int().positive() })
       .partial()
       .strict()
       .optional(),
@@ -115,6 +128,7 @@ export async function loadConfig(
       ...file.compaction,
       ...options.overrides?.compaction,
     },
+    command: { ...DEFAULTS.command, ...file.command, ...options.overrides?.command },
   };
 }
 

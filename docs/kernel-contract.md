@@ -263,8 +263,9 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
 - `echo`：占位工具，返回入参文本；03 接入真实文件与命令工具后保留用于自测。
 
 工具收到的 `ToolContext` 里，`noteExplored(path)`
-由文件工具对每个读过、写过或列出的路径调用（绝对路径或相对工作区的路径）；内核据此把该路径目录链上的嵌套
-`AGENTS.md` 加入上下文，工作区外的路径被忽略。未调用不影响其他行为。
+由文件与命令工具在解析每个要读、写、列出或作为工作目录的路径时调用（集中在
+`src/kernel/tool-support.ts` 的 `gatePath`）；内核据此把该路径目录链上的嵌套 `AGENTS.md`
+加入上下文，工作区外的路径被忽略。未调用不影响其他行为。
 
 03（文件与命令）、04（权限）、06（浏览器）、07（联网检索）、09（MCP）向同一注册表追加工具；外部工具与内置工具形状相同（PRD
 Implementation Decisions）。
