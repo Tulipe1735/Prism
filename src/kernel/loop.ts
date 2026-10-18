@@ -7,6 +7,7 @@ import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { scanSkills } from "../skills/loader.ts";
 import { streamChat } from "./model.ts";
+import { describeScope } from "./permissions.ts";
 import { type ContextMessage, rebuildContext } from "./session.ts";
 
 /** Tool output longer than this is cut before it reaches the model and the log. */
@@ -256,7 +257,7 @@ export function buildSystemPrompt(input: {
   const lines = [
     "You are Prism, a coding agent working in the user's own repository.",
     `Workspace: ${input.workspace}. Keep every file operation inside it.`,
-    `Permission scope: ${input.scope}. Actions outside the scope need one-time user approval; if approval is refused, change your approach or report honestly instead of asking again.`,
+    `Permission scope: ${input.scope} — ${describeScope(input.scope)}. If an action is refused, change your approach or report honestly instead of asking again.`,
     "Use the tools to inspect and change the workspace; answer in the user's language and keep tool output out of your prose unless asked.",
   ];
   if (input.skills.length > 0) {

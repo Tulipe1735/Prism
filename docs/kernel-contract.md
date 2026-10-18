@@ -60,6 +60,7 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | ------ | ------------------------------------ | ----------------------- |
 | GET    | `/status`                            | 内核状态                |
 | GET    | `/settings`                          | 读取设置                |
+| PUT    | `/settings`                          | 修改设置（04）          |
 | GET    | `/sessions?workspace=<path>`         | 会话列表                |
 | POST   | `/sessions`                          | 新建会话                |
 | GET    | `/sessions/:id`                      | 继续会话（摘要 + 条目） |
@@ -90,15 +91,35 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
     "model": "deepseek-chat",
     "hasApiKey": true
   },
-  "browser": { "engine": "chromium" },
+  "browser": { "engine": "chromium", "actionsNeedApproval": false },
   "search": { "provider": "deepseek" },
   "permissions": { "scope": "workspace-write" }
 }
 ```
 
 - `permissions.scope` 取 `read-only` | `workspace-write` | `full-access`，默认
-  `workspace-write`（ADR-0005）。
-- 设置的**修改**端点由 04（权限范围）与后续 ticket 定义；工作台在本轮只读。
+  `workspace-write`（ADR-0005）；可用 `PUT /settings` 切换。
+- `browser.actionsNeedApproval` 取布尔值，默认 `false`（US-30）：为 `true`
+  时每个浏览器动作都要一次审批。工作台入口由 08 消费本契约出卡片。
+
+### PUT /settings
+
+修改设置。请求体只允许出现要改的字段；未列出的键返回 400 `INVALID_REQUEST`
+（而不是静默忽略）：
+
+```json
+{ "permissions": { "scope": "read-only" } }
+```
+
+```json
+{ "browser": { "actionsNeedApproval": true } }
+```
+
+→ 200，应答体与 `GET /settings` 相同，即修改后生效的全部设置。内核同时把修改合并进
+`<dataDir>/config.json`，下次启动沿用（未写过的字段保持原值）。
+
+- 范围切换立即生效：正在运行的任务，其下一次工具调用就按新档位判定。
+- 本轮不新增事件：修改方以本应答更新界面；其他客户端在需要时读 `GET /settings`。
 
 ### 会话
 
@@ -171,6 +192,29 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 - 请求的产生方是 04（权限范围与审批）：工具执行前经内核注册待审批请求，再触发
   `approval.requested`。02 提供端点与登记/应答机制。
 
+### 权限执行
+
+范围在**工具执行前**由内核判定，不在工具内部各自实现（`src/kernel/permissions.ts`）。工具用
+`Tool.effects` 声明一次调用会做什么，内核逐项判定后才调用
+`execute`：任何一项被拒绝，工具根本不运行，`tool_result` 是一条 `isError: true` 的说明。
+
+| 动作           | `read-only` | `workspace-write` | `full-access` |
+| -------------- | ----------- | ----------------- | ------------- |
+| 读文件         | 允许        | 允许              | 允许          |
+| 写工作区内文件 | 拒绝        | 允许              | 允许          |
+| 写工作区外文件 | 拒绝        | **审批**          | 允许          |
+| 命令           | 拒绝        | 允许              | 允许          |
+| 浏览器动作     | 允许\*      | 允许\*            | 允许\*        |
+
+- 只读档是硬上限：它直接拒绝，不发审批请求（US-14 由用户切换档位，不由模型请求越权）。
+- 路径按解析后的字符串比较，不跟随符号链接，也没有 OS 级沙箱（ADR-0005）。工作区外写的审批只对本次调用生效，不复用（US-16）。
+- \* 浏览器动作不受三档范围约束（范围只管文件效果）：默认自动执行，仅在
+  `browser.actionsNeedApproval` 为 `true` 时逐个审批。该开关与档位正交。
+- MCP 工具（09）不纳入三档范围：它们的 `Tool.effects` 为空，内核不判定。理由与边界见
+  `docs/permissions.md`。
+
+`Tool.effects` 返回 0..n 个动作；同一次调用中重复的动作只判定一次、只请求一次审批。
+
 ### 关闭
 
 `POST /shutdown` → 202 `{ "stopping": true }`。内核发出 `kernel.status: stopping`
@@ -231,6 +275,14 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"echo","arg
 
 03（文件与命令）、04（权限）、06（浏览器）、07（联网检索）、09（MCP）向同一注册表追加工具；外部工具与内置工具形状相同（PRD
 Implementation Decisions）。
+
+工具执行前，内核用 `Tool.effects`（可选）判定权限：
+
+- 会写文件、跑命令、驱动浏览器的工具必须声明这些动作（`{ kind: "file-write", path }`
+  等）；路径按上下文里的工作区解析后交给内核。
+- 不声明 `effects` 的工具不进三档范围判定：`echo`、`skill` 与 MCP 工具（09）属此类。
+- 判定顺序：`tool.started` 事件先出，判定不通过时该次调用以 `tool.failed`
+  结束，模型读到一条 `isError: true` 的拒绝说明（含拒绝原因与「不要重试」的指引）。
 
 ## 测试接缝
 

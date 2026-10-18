@@ -132,6 +132,18 @@ function buildApprovalReason(request: ApprovalRequest): string {
   return `${request.reason} (${request.target}).`;
 }
 
+/** One line for the system prompt, so the model plans inside the current scope. */
+export function describeScope(scope: PermissionScope): string {
+  switch (scope) {
+    case "read-only":
+      return "read-only: file writes and commands are refused, and approval cannot lift them; only the user can widen the scope";
+    case "workspace-write":
+      return "workspace-write: writes inside the workspace need no approval, every write outside it asks the user once";
+    case "full-access":
+      return "full-access: writes anywhere and commands run without approval";
+  }
+}
+
 /** True when `path` is the workspace itself or sits below it. */
 function isInsideWorkspace(workspace: string, path: string): boolean {
   const inner = relative(resolve(workspace), path);

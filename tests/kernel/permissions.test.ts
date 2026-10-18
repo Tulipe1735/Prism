@@ -325,7 +325,7 @@ it("takes no effects off the table in the full-access scope", async () => {
 });
 
 it("refuses writes and commands in the read-only scope without asking", async () => {
-  const { kernel, workspace } = await start({
+  const { kernel, model, workspace } = await start({
     answers: [
       {
         toolCalls: [
@@ -376,6 +376,8 @@ it("refuses writes and commands in the read-only scope without asking", async ()
   expect(events.events.some((event) => event.type === "approval.requested")).toBe(
     false,
   );
+  // The model knows which scope it works under before it plans.
+  expect(model.requests[0]?.messages[0]?.content).toContain("read-only");
   events.close();
 });
 
