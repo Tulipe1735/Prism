@@ -268,7 +268,9 @@ export async function readSessionLog(
   const root = join(dataDir, "sessions");
   for (const directory of await readdir(root)) {
     try {
-      const lines = (await readFile(join(root, directory, `${sessionId}.jsonl`), "utf8"))
+      const lines = (
+        await readFile(join(root, directory, `${sessionId}.jsonl`), "utf8")
+      )
         .split("\n")
         .filter((line) => line !== "");
       return lines.slice(1).map((line) => JSON.parse(line) as SessionEntry);

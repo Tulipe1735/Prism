@@ -1,4 +1,5 @@
 import type { SessionSummary } from "../../src/kernel/session.ts";
+import type { Tool } from "../../src/kernel/tool.ts";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { afterEach, expect, it } from "vitest";
@@ -27,7 +28,11 @@ async function createSession(url: string, workspace: string): Promise<SessionSum
   return response.body.session;
 }
 
-async function sendMessage(url: string, sessionId: string, text: string): Promise<void> {
+async function sendMessage(
+  url: string,
+  sessionId: string,
+  text: string,
+): Promise<void> {
   const response = await api(url, `/sessions/${sessionId}/messages`, {
     method: "POST",
     body: { text },
@@ -36,7 +41,9 @@ async function sendMessage(url: string, sessionId: string, text: string): Promis
 }
 
 it("loads AGENTS.md from the global root, the ancestors and the workspace", async () => {
-  const { kernel, model, workspace, home } = await start({ answers: [{ text: ["ok"] }, { text: ["ok"] }] });
+  const { kernel, model, workspace, home } = await start({
+    answers: [{ text: ["ok"] }, { text: ["ok"] }],
+  });
   const global = join(home, ".agents", "AGENTS.md");
   await mkdir(dirname(global), { recursive: true });
   await writeFile(global, "GLOBAL-RULE: answer in the user's language.\n");
@@ -44,7 +51,10 @@ it("loads AGENTS.md from the global root, the ancestors and the workspace", asyn
     join(dirname(workspace), "AGENTS.md"),
     "ANCESTOR-RULE: keep commits small.\n",
   );
-  await writeFile(join(workspace, "AGENTS.md"), "WORKSPACE-RULE: run pnpm typecheck.\n");
+  await writeFile(
+    join(workspace, "AGENTS.md"),
+    "WORKSPACE-RULE: run pnpm typecheck.\n",
+  );
 
   const events = await connectEvents(`${kernel.url}/events`);
   const session = await createSession(kernel.url, workspace);
@@ -59,7 +69,9 @@ it("loads AGENTS.md from the global root, the ancestors and the workspace", asyn
   expect(prompt).toContain("WORKSPACE-RULE");
   // Outermost first, so the closest file wins; every file names its own path.
   expect(prompt.indexOf("GLOBAL-RULE")).toBeLessThan(prompt.indexOf("ANCESTOR-RULE"));
-  expect(prompt.indexOf("ANCESTOR-RULE")).toBeLessThan(prompt.indexOf("WORKSPACE-RULE"));
+  expect(prompt.indexOf("ANCESTOR-RULE")).toBeLessThan(
+    prompt.indexOf("WORKSPACE-RULE"),
+  );
   expect(prompt).toContain(global);
 
   // Changes take effect in the next request, with no restart.
@@ -71,5 +83,71 @@ it("loads AGENTS.md from the global root, the ancestors and the workspace", asyn
   const next = model.requests[1]?.messages[0]?.content ?? "";
   expect(next).toContain("WORKSPACE-RULE-V2");
   expect(next).not.toContain("WORKSPACE-RULE:");
+  events.close();
+});
+
+it("loads a nested AGENTS.md once a tool explores its directory", async () => {
+  /** Stand-in for the file tools of ticket 03: reports the path it explored. */
+  const exploreTool: Tool = {
+    name: "explore",
+    description: "Test stand-in for the workspace file tools.",
+    parameters: {
+      type: "object",
+      properties: { path: { type: "string", description: "Explored path." } },
+      required: ["path"],
+      additionalProperties: false,
+    },
+    execute: async (args, context) => {
+      const path = (args as { path?: string }).path ?? "";
+      context.noteExplored?.(path);
+      return { content: `explored ${path}` };
+    },
+  };
+  const { kernel, model, workspace } = await start({
+    tools: [exploreTool],
+    answers: [
+      {
+        toolCalls: [
+          { id: "call_1", name: "explore", arguments: '{"path":"packages/app"}' },
+        ],
+      },
+      { text: ["seen"] },
+      { text: ["still here"] },
+    ],
+  });
+  await mkdir(join(workspace, "packages", "app"), { recursive: true });
+  await writeFile(join(workspace, "packages", "AGENTS.md"), "PACKAGES-RULE\n");
+  await writeFile(join(workspace, "packages", "app", "AGENTS.md"), "APP-RULE\n");
+
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+  await sendMessage(kernel.url, session.id, "explore the app package");
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 4,
+  );
+
+  // The round that ran the tool cannot know the nested files yet.
+  expect(
+    model.requests[0]?.messages.map((message) => message.content).join("\n"),
+  ).not.toContain("PACKAGES-RULE");
+  // The round after the tool explored the directory carries both nested files.
+  const notes = (model.requests[1]?.messages ?? []).filter(
+    (message) => message.role === "system" && (message.content ?? "").includes("-RULE"),
+  );
+  expect(notes.map((note) => note.content).join("\n")).toContain("PACKAGES-RULE");
+  expect(notes.map((note) => note.content).join("\n")).toContain("APP-RULE");
+  expect(notes).toHaveLength(2);
+
+  // Later tasks keep them, with no duplicate notes.
+  await sendMessage(kernel.url, session.id, "keep going");
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 6,
+  );
+  const later = model.requests[2]?.messages ?? [];
+  const kept = later.filter(
+    (message) => message.role === "system" && (message.content ?? "").includes("-RULE"),
+  );
+  expect(kept).toHaveLength(2);
+  expect(kept.map((note) => note.content).join("\n")).toContain("APP-RULE");
   events.close();
 });

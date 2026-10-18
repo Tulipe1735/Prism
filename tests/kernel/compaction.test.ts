@@ -1,4 +1,8 @@
-import type { CompactionEntry, SessionEntry, SessionSummary } from "../../src/kernel/session.ts";
+import type {
+  CompactionEntry,
+  SessionEntry,
+  SessionSummary,
+} from "../../src/kernel/session.ts";
 import { afterEach, expect, it } from "vitest";
 import {
   api,
@@ -31,7 +35,11 @@ async function createSession(url: string, workspace: string): Promise<SessionSum
   return response.body.session;
 }
 
-async function sendMessage(url: string, sessionId: string, text: string): Promise<void> {
+async function sendMessage(
+  url: string,
+  sessionId: string,
+  text: string,
+): Promise<void> {
   const response = await api(url, `/sessions/${sessionId}/messages`, {
     method: "POST",
     body: { text },
@@ -40,7 +48,9 @@ async function sendMessage(url: string, sessionId: string, text: string): Promis
 }
 
 function compactionEntries(entries: SessionEntry[]): CompactionEntry[] {
-  return entries.filter((entry): entry is CompactionEntry => entry.type === "compaction");
+  return entries.filter(
+    (entry): entry is CompactionEntry => entry.type === "compaction",
+  );
 }
 
 it("compacts a session on request and keeps the original entries", async () => {
@@ -56,9 +66,13 @@ it("compacts a session on request and keeps the original entries", async () => {
   const session = await createSession(kernel.url, workspace);
   // Long user turns, so the tiny kept window holds only the newest message.
   await sendMessage(kernel.url, session.id, "hello ".repeat(40));
-  await events.waitFor((event) => event.type === "session.updated" && event.session.entryCount === 2);
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 2,
+  );
   await sendMessage(kernel.url, session.id, "again ".repeat(40));
-  await events.waitFor((event) => event.type === "session.updated" && event.session.entryCount === 4);
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 4,
+  );
 
   const before = await readSessionLog(dataDir, session.id);
   expect(before.map((entry) => entry.type)).toEqual([
@@ -104,8 +118,12 @@ it("compacts a session on request and keeps the original entries", async () => {
     kernel.url,
     `/sessions/${session.id}`,
   );
-  expect(served.body.entries.map((entry) => entry.id)).toEqual(after.map((entry) => entry.id));
-  expect(before.every((entry) => after.some((kept) => kept.id === entry.id))).toBe(true);
+  expect(served.body.entries.map((entry) => entry.id)).toEqual(
+    after.map((entry) => entry.id),
+  );
+  expect(before.every((entry) => after.some((kept) => kept.id === entry.id))).toBe(
+    true,
+  );
 
   // A second request has nothing left to compact.
   const again = await api<{ compacted: boolean }>(
@@ -203,7 +221,9 @@ it("compacts automatically near the context limit and carries the session on", a
   // One internal summary call without tools, then the next task round.
   expect(model.requests).toHaveLength(3);
   const summaryRequest = model.requests[1];
-  const summarized = summaryRequest?.messages.map((message) => message.content).join("\n");
+  const summarized = summaryRequest?.messages
+    .map((message) => message.content)
+    .join("\n");
   expect(summaryRequest?.tools).toBeUndefined();
   expect(summaryRequest?.messages[0]?.content).toMatch(/summari[sz]e/i);
   // The replaced turn is summarized; the newest history stays verbatim.
@@ -213,7 +233,8 @@ it("compacts automatically near the context limit and carries the session on", a
   const round = model.requests[2];
   expect(round?.messages.map((message) => message.content).join("\n")).toContain(long);
   const summaries = round?.messages.filter(
-    (message) => message.role === "system" && message.content.includes("SUMMARY-MARKER"),
+    (message) =>
+      message.role === "system" && (message.content ?? "").includes("SUMMARY-MARKER"),
   );
   expect(summaries).toHaveLength(1);
 

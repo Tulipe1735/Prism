@@ -1,7 +1,7 @@
 import type { SkillSummary } from "../skills/loader.ts";
 
-import type { Kernel } from "./kernel.ts";
 import type { InstructionFile } from "./instructions.ts";
+import type { Kernel } from "./kernel.ts";
 import type { ChatMessage } from "./model.ts";
 import type { ToolResult } from "./tool.ts";
 import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
@@ -56,7 +56,9 @@ export async function runTask(run: TaskRun): Promise<void> {
             instructions: files,
           }),
         },
-        ...toModelMessages(rebuildContext((await kernel.store.read(sessionId)).entries)),
+        ...toModelMessages(
+          rebuildContext((await kernel.store.read(sessionId)).entries),
+        ),
         ...files
           .filter((file) => file.scope === "nested")
           .map((file) => ({ role: "system" as const, content: instructionNote(file) })),
@@ -229,6 +231,7 @@ async function executeTool(
       signal: run.signal,
       requestApproval: (request) =>
         kernel.requestApproval(sessionId, { tool: tool.name, ...request }),
+      noteExplored: (path) => kernel.instructions.noteExplored(run.workspace, path),
     });
   } catch (error) {
     return {

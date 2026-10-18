@@ -1,6 +1,6 @@
-import type { PrismConfig } from "./config.ts";
-
 import type { CompactionOutcome, CompactionReason } from "./compaction.ts";
+
+import type { PrismConfig } from "./config.ts";
 import type { KernelEvent, KernelStatus } from "./events.ts";
 import type { InstructionRoots } from "./instructions.ts";
 import type { SessionEntry, SessionSummary } from "./session.ts";
