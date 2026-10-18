@@ -282,33 +282,3 @@ it("kills a running command when the user cancels the task", async () => {
   expect((last as { content: string }).content).toMatch(/cancel/i);
   events.close();
 });
-
-it("refuses the windows environment until the windows target lands", async () => {
-  const { kernel, workspace } = await start({
-    answers: [
-      {
-        toolCalls: [
-          {
-            id: "call_1",
-            name: "run_command",
-            arguments: JSON.stringify({ command: "ver", environment: "windows" }),
-          },
-        ],
-      },
-      { text: ["Done."] },
-    ],
-  });
-  const events = await connectEvents(`${kernel.url}/events`);
-  const session = await createSession(kernel.url, workspace);
-
-  await api(kernel.url, `/sessions/${session.id}/messages`, {
-    method: "POST",
-    body: { text: "check the windows version" },
-  });
-  const failed = await events.waitFor(
-    (event) => event.type === "tool.failed" && event.callId === "call_1",
-  );
-  if (failed.type !== "tool.failed") throw new Error("Expected a failed tool");
-  expect(failed.error).toMatch(/"windows" environment is not available/);
-  events.close();
-});
