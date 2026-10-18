@@ -63,7 +63,7 @@ it("reads a workspace file the model asks for", async () => {
   events.close();
 });
 
-it("writes a file the model asks for, creating parent directories", async () => {
+it("writes a file the model asks for, creating and replacing files", async () => {
   const { kernel, workspace } = await start({
     answers: [
       {
@@ -73,11 +73,18 @@ it("writes a file the model asks for, creating parent directories", async () => 
             name: "write_file",
             arguments: '{"path":"notes/idea.txt","content":"written by the model"}',
           },
+          {
+            id: "call_2",
+            name: "write_file",
+            arguments: '{"path":"notes/nested/more.txt","content":"nested"}',
+          },
         ],
       },
       { text: ["Done."] },
     ],
   });
+  await mkdir(join(workspace, "notes"), { recursive: true });
+  await writeFile(join(workspace, "notes", "idea.txt"), "old content");
   const events = await connectEvents(`${kernel.url}/events`);
   const session = await createSession(kernel.url, workspace);
 
@@ -85,16 +92,19 @@ it("writes a file the model asks for, creating parent directories", async () => 
     method: "POST",
     body: { text: "save an idea" },
   });
-  const completed = await events.waitFor(
+  const first = await events.waitFor(
     (event) => event.type === "tool.completed" && event.callId === "call_1",
   );
-  if (completed.type !== "tool.completed") throw new Error("Expected a completed tool");
-  expect(completed.result).toContain("notes/idea.txt");
+  if (first.type !== "tool.completed") throw new Error("Expected a completed tool");
+  expect(first.result).toContain("notes/idea.txt");
   await events.waitFor(
-    (event) => event.type === "session.updated" && event.session.entryCount === 4,
+    (event) => event.type === "tool.completed" && event.callId === "call_2",
   );
   expect(await readFile(join(workspace, "notes", "idea.txt"), "utf8")).toBe(
     "written by the model",
+  );
+  expect(await readFile(join(workspace, "notes", "nested", "more.txt"), "utf8")).toBe(
+    "nested",
   );
   events.close();
 });
