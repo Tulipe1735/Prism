@@ -263,6 +263,7 @@ export async function startTestKernel(
     answers?: FakeAnswer[];
     tools?: Tool[];
     scope?: PermissionScope;
+    browserActionsNeedApproval?: boolean;
     workspace?: string;
   } = {},
 ): Promise<KernelHarness> {
@@ -286,6 +287,9 @@ export async function startTestKernel(
   const kernel = await startKernel({
     config,
     ...(options.scope === undefined ? {} : { scope: options.scope }),
+    ...(options.browserActionsNeedApproval === undefined
+      ? {}
+      : { browserActionsNeedApproval: options.browserActionsNeedApproval }),
     ...(options.tools === undefined ? {} : { tools: options.tools }),
     skillRoots: { home, bundled },
   });

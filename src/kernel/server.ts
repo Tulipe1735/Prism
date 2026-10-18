@@ -23,6 +23,7 @@ export interface KernelServerOptions {
   /** 0 (default) lets the operating system pick a free port. */
   port?: number;
   scope?: PermissionScope;
+  browserActionsNeedApproval?: boolean;
   tools?: Tool[];
   skillRoots?: SkillToolRoots;
 }

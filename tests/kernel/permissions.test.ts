@@ -72,6 +72,40 @@ const writeFileTool: Tool = {
   },
 };
 
+/** Stands in for the command tool 03 adds: it declares the command it runs. */
+const runCommandTool: Tool = {
+  name: "run_command",
+  description: "Test stand-in for the command tool.",
+  parameters: {
+    type: "object",
+    properties: { command: { type: "string" } },
+    required: ["command"],
+    additionalProperties: false,
+  },
+  effects: (args) => [{ kind: "command", command: stringField(args, "command") }],
+  execute: async (args) => ({ content: `ran: ${stringField(args, "command")}` }),
+};
+
+/** Stands in for the browser tool 06 adds: it declares the page action. */
+const browserActTool: Tool = {
+  name: "browser_act",
+  description: "Test stand-in for the browser action tool.",
+  parameters: {
+    type: "object",
+    properties: { action: { type: "string" } },
+    required: ["action"],
+    additionalProperties: false,
+  },
+  effects: (args) => [
+    {
+      kind: "browser-action",
+      action: stringField(args, "action"),
+      target: "https://example.com/",
+    },
+  ],
+  execute: async (args) => ({ content: `clicked: ${stringField(args, "action")}` }),
+};
+
 it("asks once for a write outside the workspace and asks again for the next one", async () => {
   const write = { path: "../outside/note.txt", text: "hello" };
   const { kernel, workspace } = await start({
@@ -236,6 +270,150 @@ it("writes inside the workspace without asking", async () => {
   );
 
   expect(await readFile(inside, "utf8")).toBe("hello");
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
+  events.close();
+});
+
+it("takes no effects off the table in the full-access scope", async () => {
+  const write = { path: "../outside/note.txt", text: "hello" };
+  const { kernel, workspace } = await start({
+    answers: [
+      {
+        toolCalls: [
+          { id: "call_1", name: "write_file", arguments: JSON.stringify(write) },
+        ],
+      },
+      { toolCalls: [{ id: "call_2", name: "run_command", arguments: '{"command":"ls"}' }] },
+      { text: ["Done."] },
+    ],
+    scope: "full-access",
+    tools: [writeFileTool, runCommandTool],
+  });
+  const outside = resolve(workspace, "..", "outside", "note.txt");
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "write the note and list files" },
+  });
+  await events.waitFor(
+    (event) => event.type === "tool.completed" && event.callId === "call_2",
+  );
+
+  expect(await readFile(outside, "utf8")).toBe("hello");
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
+  events.close();
+});
+
+it("refuses writes and commands in the read-only scope without asking", async () => {
+  const { kernel, workspace } = await start({
+    answers: [
+      {
+        toolCalls: [
+          {
+            id: "call_1",
+            name: "write_file",
+            arguments: JSON.stringify({ path: "src/note.txt", text: "hello" }),
+          },
+          {
+            id: "call_2",
+            name: "write_file",
+            arguments: JSON.stringify({ path: "../outside/note.txt", text: "hello" }),
+          },
+          { id: "call_3", name: "run_command", arguments: '{"command":"touch x"}' },
+        ],
+      },
+      { text: ["Understood."] },
+    ],
+    scope: "read-only",
+    tools: [writeFileTool, runCommandTool],
+  });
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "write the note" },
+  });
+  const failed = await events.waitFor(
+    (event) => event.type === "tool.failed" && event.callId === "call_3",
+  );
+  if (failed.type !== "tool.failed") throw new Error("Expected a failed tool");
+
+  const errors = events.events
+    .filter((event) => event.type === "tool.failed")
+    .map((event) => (event as { error: string }).error);
+  expect(errors).toHaveLength(3);
+  for (const error of errors) {
+    expect(error).toContain("read-only");
+    expect(error).toContain("not executed");
+  }
+
+  await expect(readFile(join(workspace, "src", "note.txt"), "utf8")).rejects.toThrow();
+  await expect(
+    readFile(resolve(workspace, "..", "outside", "note.txt"), "utf8"),
+  ).rejects.toThrow();
+  // The read-only scope is a hard boundary: it never asks, it refuses.
+  expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
+  events.close();
+});
+
+it("leaves browser actions alone by default and asks when the setting is on", async () => {
+  const { kernel, workspace } = await start({
+    answers: [
+      { toolCalls: [{ id: "call_1", name: "browser_act", arguments: '{"action":"click"}' }] },
+      { text: ["Done."] },
+    ],
+    browserActionsNeedApproval: true,
+    tools: [browserActTool],
+  });
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "click the button" },
+  });
+  const requested = await events.waitFor(
+    (event) => event.type === "approval.requested",
+  );
+  if (requested.type !== "approval.requested")
+    throw new Error("Expected an approval request");
+  expect(requested).toMatchObject({ tool: "browser_act" });
+  expect(requested.reason).toContain("approval");
+  expect(requested.target).toContain("https://example.com/");
+  expect(requested.impact).toContain("click");
+  await expect(
+    api(kernel.url, `/sessions/${session.id}/approvals/${requested.requestId}`, {
+      method: "POST",
+      body: { approved: true },
+    }),
+  ).resolves.toMatchObject({ status: 200 });
+  await events.waitFor(
+    (event) => event.type === "tool.completed" && event.callId === "call_1",
+  );
+  events.close();
+});
+
+it("runs browser actions without approval when the setting is off", async () => {
+  const { kernel, workspace } = await start({
+    answers: [
+      { toolCalls: [{ id: "call_1", name: "browser_act", arguments: '{"action":"click"}' }] },
+      { text: ["Done."] },
+    ],
+    tools: [browserActTool],
+  });
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "click the button" },
+  });
+  await events.waitFor(
+    (event) => event.type === "tool.completed" && event.callId === "call_1",
+  );
   expect(events.events.some((event) => event.type === "approval.requested")).toBe(false);
   events.close();
 });

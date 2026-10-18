@@ -10,11 +10,11 @@ export interface ApprovalRequest {
 }
 
 /**
- * What one tool call touches. The policy judges actions rather than tool names,
- * so a new tool is covered by declaring what its calls do.
+ * What one tool call does that the policy judges. Reading is never refused in
+ * v1, so no read action exists; the policy judges actions rather than tool
+ * names, so a new tool is covered by declaring what its calls touch.
  */
 export type PermissionAction =
-  | { kind: "file-read"; path: string }
   | { kind: "file-write"; path: string }
   | { kind: "command"; command: string }
   | { kind: "browser-action"; action: string; target: string };
@@ -53,6 +53,21 @@ export class PermissionPolicy {
     switch (action.kind) {
       case "file-write":
         return this.decideFileWrite(resolve(workspace, action.path), workspace);
+      case "command":
+        return this.scope === "read-only"
+          ? { outcome: "deny", reason: "the read-only scope never runs commands" }
+          : { outcome: "allow" };
+      case "browser-action":
+        return this.browserActionsNeedApproval
+          ? {
+              outcome: "approval",
+              request: {
+                reason: "Browser actions need approval in the settings",
+                target: action.target,
+                impact: `Runs the browser action "${action.action}" on ${action.target}.`,
+              },
+            }
+          : { outcome: "allow" };
       default:
         return { outcome: "allow" };
     }
@@ -94,6 +109,11 @@ export class PermissionPolicy {
   }
 
   private decideFileWrite(path: string, workspace: string): PermissionDecision {
+    if (this.scope === "read-only")
+      return {
+        outcome: "deny",
+        reason: `the read-only scope never writes files (${path})`,
+      };
     if (this.scope === "workspace-write" && !isInsideWorkspace(workspace, path)) {
       return {
         outcome: "approval",
