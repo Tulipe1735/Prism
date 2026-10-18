@@ -21,7 +21,6 @@ export interface BrowserToolsOptions {
   engine?: BrowserEngine;
   /** Chromium only: take over a running Chrome/Edge over CDP. */
   endpoint?: string;
-  headless?: boolean;
 }
 
 export interface BrowserTools {
