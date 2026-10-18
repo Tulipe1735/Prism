@@ -1,0 +1,13 @@
+.git
+.scratch
+.agents
+.codex
+.aws
+.env*
+.prism*
+node_modules
+dist
+evals
+tests
+docs
+*.log

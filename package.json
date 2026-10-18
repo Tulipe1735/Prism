@@ -1,7 +1,7 @@
 {
   "name": "@tulipe1735/prism",
   "version": "0.1.6",
-  "description": "Browser-use CLI for external agents with observation-bound targets and execution receipts.",
+  "description": "Personal research agent with a self-written task loop, sourced briefs, shared memory, and local browser execution.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -9,7 +9,8 @@
   },
   "type": "module",
   "bin": {
-    "prism": "dist/cli.js"
+    "prism": "dist/cli.js",
+    "prism-agent": "dist/agent.js"
   },
   "files": [
     "dist",
@@ -18,7 +19,7 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "tsup src/interfaces/cli.ts src/interfaces/daemon.ts --format esm --clean --sourcemap --no-splitting && node -e \"require('node:fs').copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
+    "build": "tsup --config tsup.config.ts --format esm --clean --sourcemap --no-splitting && node -e \"require('node:fs').copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
     "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/interfaces/cli.ts",
     "eval": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/cli.ts",
     "eval:report": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/report-cli.ts",
@@ -27,15 +28,22 @@
     "lint": "eslint .",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
     "start": "node dist/cli.js",
-    "test": "vitest run",
+    "test": "vitest run --exclude '.scratch/**'",
     "typecheck": "tsc --noEmit",
-    "eval:cohort": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/cohort.ts"
+    "eval:cohort": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/cohort.ts",
+    "agent": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/assistant/cli.ts",
+    "eval:assistant": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/assistant/run.ts"
   },
   "engines": {
     "node": ">=22.19.0"
   },
   "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.76.0",
+    "cheerio": "^1.2.0",
     "chrome-remote-interface": "0.34.0",
+    "fast-xml-parser": "^5.11.2",
+    "mammoth": "^1.13.0",
+    "pdf-parse": "^2.4.5",
     "zod": "^4.6.5"
   },
   "devDependencies": {
