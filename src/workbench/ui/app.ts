@@ -1,5 +1,5 @@
 import type { KernelEvent } from "../../kernel/events.ts";
-import type { PermissionScope } from "../../kernel/types.ts";
+import type { BrowserEngine, PermissionScope } from "../../kernel/types.ts";
 import { KernelApiError, KernelClient, type SettingsPatch } from "./client.ts";
 import { toTimeline } from "./derive.ts";
 import * as view from "./render.ts";
@@ -183,6 +183,12 @@ async function onClick(event: MouseEvent): Promise<void> {
           permissions: { scope: target.dataset.scope as PermissionScope },
         });
       return;
+    case "set-engine":
+      if (target.dataset.engine !== undefined)
+        await updateSettings({
+          browser: { engine: target.dataset.engine as BrowserEngine },
+        });
+      return;
     case "toggle-browser-approval":
       await updateSettings({
         browser: {
@@ -190,6 +196,28 @@ async function onClick(event: MouseEvent): Promise<void> {
         },
       });
   }
+}
+
+/** Reads the fields of one settings form and applies them as a patch. */
+async function submitSettings(form: HTMLFormElement): Promise<void> {
+  const value = (name: string): string =>
+    form.querySelector<HTMLInputElement>(`input[name="${name}"]`)?.value.trim() ?? "";
+  if (form.dataset.section === "model")
+    await updateSettings({
+      model: {
+        baseUrl: value("baseUrl"),
+        model: value("model"),
+        // An empty key field leaves the stored key as it is.
+        ...(value("apiKey") === "" ? {} : { apiKey: value("apiKey") }),
+      },
+    });
+  else if (form.dataset.section === "search")
+    await updateSettings({
+      search: {
+        provider: value("provider"),
+        ...(value("baseUrl") === "" ? {} : { baseUrl: value("baseUrl") }),
+      },
+    });
 }
 
 /** Applies a settings patch and keeps the settings the kernel answers with. */
@@ -213,6 +241,11 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
     const title =
       form.querySelector<HTMLInputElement>('input[name="title"]')?.value ?? "";
     await rename(form.dataset.session, title);
+    return;
+  }
+  if (form?.dataset.action === "settings-form" && form instanceof HTMLFormElement) {
+    event.preventDefault();
+    await submitSettings(form);
   }
 }
 

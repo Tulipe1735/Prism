@@ -25,8 +25,11 @@ export class BrowserToolError extends Error {
 export interface BrowserToolOptions {
   /** Receipts live under <directory>/receipts and outlive the tool process. */
   directory: string;
-  engine?: EngineOptions["engine"];
-  endpoint?: EngineOptions["endpoint"];
+  /**
+   * The engine and takeover endpoint in effect, read before every open so a
+   * settings change applies to the next browser session.
+   */
+  engine: () => EngineOptions;
 }
 
 export interface BrowserToolDependencies {
@@ -126,10 +129,7 @@ export class BrowserTool {
   }
 
   async open(options: { url: string }): Promise<{ session: string; url: string }> {
-    const engine = await this.dependencies.openEngine({
-      engine: this.options.engine,
-      endpoint: this.options.endpoint,
-    });
+    const engine = await this.dependencies.openEngine(this.options.engine());
     let page: BrowserPage;
     try {
       page = await this.dependencies.openSession({ engine, url: options.url });

@@ -86,7 +86,10 @@ for (const engineName of BROWSER_ENGINES) {
         capture: captureEvidence,
         read: readTargetEvidence,
       };
-      tool = new BrowserTool({ directory: await directory() }, dependencies);
+      tool = new BrowserTool(
+        { directory: await directory(), engine: () => ({ engine: engineName }) },
+        dependencies,
+      );
     });
 
     afterAll(async () => {
@@ -299,7 +302,7 @@ describe("chromium takeover", () => {
       );
     const engines: EngineHandle[] = [];
     const tool = new BrowserTool(
-      { directory: await directory(), endpoint },
+      { directory: await directory(), engine: () => ({ endpoint }) },
       {
         openEngine: async (options) => {
           const handle = await openEngine(options);

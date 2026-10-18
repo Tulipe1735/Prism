@@ -1,13 +1,18 @@
 import type { CompactionOutcome, CompactionReason } from "./compaction.ts";
 
-import type { PrismConfig } from "./config.ts";
+import type {
+  BrowserConfig,
+  ModelConfig,
+  PrismConfig,
+  SearchConfig,
+} from "./config.ts";
 import type { KernelEvent, KernelStatus } from "./events.ts";
 import type { InstructionRoots } from "./instructions.ts";
 import type { ApprovalRequest } from "./permissions.ts";
 import type { SessionEntry, SessionSummary } from "./session.ts";
 import type { Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
-import type { ExecutionTarget, PermissionScope } from "./types.ts";
+import type { BrowserEngine, ExecutionTarget, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { VERSION } from "../shared/version.ts";
 import { createCommandTool } from "./command-tool.ts";
@@ -51,15 +56,17 @@ export interface KernelOptions {
 export interface KernelSettings {
   dataDir: string;
   model: { baseUrl: string; model: string; hasApiKey: boolean };
-  browser: { engine: string; actionsNeedApproval: boolean };
-  search: { provider: string };
+  browser: { engine: BrowserEngine; actionsNeedApproval: boolean };
+  search: { provider: string; baseUrl?: string };
   permissions: { scope: PermissionScope };
 }
 
 /** Settings the workbench may change while the kernel runs. */
 export interface SettingsPatch {
-  scope?: PermissionScope;
-  browserActionsNeedApproval?: boolean;
+  model?: Partial<ModelConfig>;
+  browser?: Partial<Pick<BrowserConfig, "engine" | "actionsNeedApproval">>;
+  search?: Partial<Pick<SearchConfig, "provider" | "baseUrl">>;
+  permissions?: { scope?: PermissionScope };
 }
 
 export interface KernelStatusReport {
@@ -138,6 +145,7 @@ export class Kernel {
 
   settings(): KernelSettings {
     const { baseUrl, model, apiKey } = this.config.model;
+    const { provider, baseUrl: searchBaseUrl } = this.config.search;
     return {
       dataDir: this.config.dataDir,
       model: { baseUrl, model, hasApiKey: apiKey !== undefined && apiKey !== "" },
@@ -145,30 +153,38 @@ export class Kernel {
         engine: this.config.browser.engine,
         actionsNeedApproval: this.permissions.browserActionsNeedApproval,
       },
-      search: { provider: this.config.search.provider },
+      search: {
+        provider,
+        ...(searchBaseUrl === undefined ? {} : { baseUrl: searchBaseUrl }),
+      },
       permissions: { scope: this.permissions.scope },
     };
   }
 
   /**
    * Applies the settings the workbench changed, keeps them for the next kernel
-   * start and reports the settings now in effect (04, `PUT /settings`).
+   * start and reports the settings now in effect. The model, the browser engine
+   * and the search source are read from `config` on every use, so a change
+   * applies to the next model request, browser session or search.
    */
   async updateSettings(patch: SettingsPatch): Promise<KernelSettings> {
-    if (patch.scope !== undefined) {
-      this.permissions.scope = patch.scope;
-      this.config.permissions.scope = patch.scope;
+    const scope = patch.permissions?.scope;
+    if (scope !== undefined) {
+      this.permissions.scope = scope;
+      this.config.permissions.scope = scope;
     }
-    if (patch.browserActionsNeedApproval !== undefined) {
-      this.permissions.browserActionsNeedApproval = patch.browserActionsNeedApproval;
-      this.config.browser.actionsNeedApproval = patch.browserActionsNeedApproval;
+    const actionsNeedApproval = patch.browser?.actionsNeedApproval;
+    if (actionsNeedApproval !== undefined) {
+      this.permissions.browserActionsNeedApproval = actionsNeedApproval;
+      this.config.browser.actionsNeedApproval = actionsNeedApproval;
     }
-    await saveConfigPatch(this.config.dataDir, {
-      ...(patch.scope === undefined ? {} : { permissions: { scope: patch.scope } }),
-      ...(patch.browserActionsNeedApproval === undefined
-        ? {}
-        : { browser: { actionsNeedApproval: patch.browserActionsNeedApproval } }),
-    });
+    if (patch.browser?.engine !== undefined)
+      this.config.browser.engine = patch.browser.engine;
+    if (patch.model !== undefined)
+      this.config.model = { ...this.config.model, ...patch.model };
+    if (patch.search !== undefined)
+      this.config.search = { ...this.config.search, ...patch.search };
+    await saveConfigPatch(this.config.dataDir, patch);
     return this.settings();
   }
 

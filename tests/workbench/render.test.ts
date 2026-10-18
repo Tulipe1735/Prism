@@ -195,7 +195,7 @@ it("renders touched files as artifacts with their diff", () => {
   expect(renderArtifacts(emptyState())).toContain("还没有文件改动");
 });
 
-it("renders the effective settings and the two switches the kernel allows", () => {
+it("renders the effective settings with the fields the kernel lets the workbench change", () => {
   const state = reduce(emptyState(), {
     type: "settings",
     settings: {
@@ -206,18 +206,25 @@ it("renders the effective settings and the two switches the kernel allows", () =
         hasApiKey: true,
       },
       browser: { engine: "chromium", actionsNeedApproval: false },
-      search: { provider: "deepseek" },
+      search: { provider: "deepseek", baseUrl: "https://api.deepseek.com" },
       permissions: { scope: "workspace-write" },
     },
   });
 
   const html = renderSettings(state);
-  expect(html).toContain("https://api.deepseek.com/v1");
-  expect(html).toContain("deepseek-chat");
-  expect(html).toContain("已设置");
-  expect(html).toContain("chromium");
+  // The model, the engine and the search source are editable (US-45, US-28, US-37).
+  expect(html).toContain('data-action="settings-form" data-section="model"');
+  expect(html).toContain('name="baseUrl" value="https://api.deepseek.com/v1"');
+  expect(html).toContain('name="model" value="deepseek-chat"');
+  expect(html).toContain('name="apiKey" type="password"');
+  expect(html).toContain("已设置（留空不改）");
+  expect(html).toContain('data-action="settings-form" data-section="search"');
+  expect(html).toContain('name="provider" value="deepseek"');
+  for (const engine of ["chromium", "firefox", "webkit"]) {
+    expect(html).toContain(`data-action="set-engine" data-engine="${engine}"`);
+  }
+  expect(html).toMatch(/data-engine="chromium"[^>]*aria-pressed="true"/);
   expect(html).toContain("/home/demo/.prism/config.json");
-  expect(html).not.toContain("<input");
 
   // The three scopes are switchable and the current one is marked (US-14).
   for (const scope of ["read-only", "workspace-write", "full-access"]) {

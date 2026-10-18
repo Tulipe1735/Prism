@@ -118,6 +118,10 @@ interface Harness {
   };
   capture: EvidenceCapture;
   openSession: ReturnType<typeof vi.fn>;
+  /** Engine options the tool asked for, one entry per open. */
+  opened: EngineOptions[];
+  /** Changes what the tool reads as the current engine settings. */
+  setEngine: (next: EngineOptions) => void;
 }
 
 async function harness(): Promise<Harness> {
@@ -137,8 +141,12 @@ async function harness(): Promise<Harness> {
     close: vi.fn(async () => {}),
   } as unknown as EngineHandle;
   const openSession = vi.fn(async () => page as unknown as BrowserPage);
+  const opened: EngineOptions[] = [];
   const deps: BrowserToolDependencies = {
-    openEngine: async (_options: EngineOptions) => engine,
+    openEngine: async (options: EngineOptions) => {
+      opened.push(options);
+      return engine;
+    },
     openSession,
     capture: async () => structuredClone(capture),
     read: async (
@@ -152,11 +160,35 @@ async function harness(): Promise<Harness> {
       ),
     }),
   };
-  const tool = new BrowserTool({ directory }, deps);
-  return { directory, tool, deps, page, capture, openSession };
+  let settings: EngineOptions = {};
+  const tool = new BrowserTool({ directory, engine: () => settings }, deps);
+  return {
+    directory,
+    tool,
+    deps,
+    page,
+    capture,
+    openSession,
+    opened,
+    setEngine: (next: EngineOptions) => {
+      settings = next;
+    },
+  };
 }
 
 describe("browser tool observation references", () => {
+  it("opens with the engine settings in effect at that moment", async () => {
+    const { tool, opened, setEngine } = await harness();
+
+    await tool.open({ url: "https://example.com/" });
+    expect(opened[0]).toEqual({});
+
+    // The workbench switched the engine: the next session uses it, without a restart.
+    setEngine({ engine: "firefox" });
+    await tool.open({ url: "https://example.com/" });
+    expect(opened[1]).toEqual({ engine: "firefox" });
+  });
+
   it("executes a fill and expires the observation that produced its target", async () => {
     const { tool, page } = await harness();
     const { session } = await tool.open({ url: "https://example.com/" });
@@ -217,7 +249,7 @@ describe("browser tool observation references", () => {
       tool.act(session, { ...command, target: view.targets[1]!.ref }),
     ).rejects.toMatchObject({ code: "REQUEST_ID_CONFLICT" });
     await tool.close(session);
-    const restarted = new BrowserTool({ directory }, deps);
+    const restarted = new BrowserTool({ directory, engine: () => ({}) }, deps);
     expect(await restarted.receipt(session, "click1")).toEqual(first.receipt);
     const afterClose = await restarted.act(session, command);
     expect(afterClose).toMatchObject({ replayed: true, receipt: first.receipt });

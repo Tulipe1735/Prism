@@ -4,7 +4,7 @@ import type { KernelEvent } from "./events.ts";
 import type { InstructionRoots } from "./instructions.ts";
 import type { Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
-import type { PermissionScope } from "./types.ts";
+import type { BrowserEngine, PermissionScope } from "./types.ts";
 import { Buffer } from "node:buffer";
 import { createServer } from "node:http";
 import { join } from "node:path";
@@ -19,7 +19,12 @@ import {
   type SettingsPatch,
 } from "./kernel.ts";
 import { SessionStoreError } from "./session-store.ts";
-import { isPermissionScope, PERMISSION_SCOPES } from "./types.ts";
+import {
+  BROWSER_ENGINES,
+  isBrowserEngine,
+  isPermissionScope,
+  PERMISSION_SCOPES,
+} from "./types.ts";
 import { createWebTools, type WebFetchOverrides } from "./web-tools.ts";
 
 /** Cap on request bodies; the workbench sends small JSON documents. */
@@ -52,22 +57,25 @@ export async function startKernel(
   options: KernelServerOptions,
 ): Promise<RunningKernel> {
   // The preset capabilities join the registry before the kernel serves anything.
+  // Both read their settings per use, so `PUT /settings` applies without a restart.
   const browser = createBrowserTools({
     directory: join(options.config.dataDir, "browser"),
-    engine: options.config.browser.engine,
-    ...(options.config.browser.endpoint === undefined
-      ? {}
-      : { endpoint: options.config.browser.endpoint }),
+    engine: () => ({
+      engine: options.config.browser.engine,
+      ...(options.config.browser.endpoint === undefined
+        ? {}
+        : { endpoint: options.config.browser.endpoint }),
+    }),
   });
   const web = createWebTools({
     // The search source shares the model's DeepSeek key unless it sets its own.
-    search: {
+    search: () => ({
       provider: options.config.search.provider,
       apiKey: options.config.search.apiKey ?? options.config.model.apiKey,
       ...(options.config.search.baseUrl === undefined
         ? {}
         : { baseUrl: options.config.search.baseUrl }),
-    },
+    }),
     ...(options.webFetch === undefined ? {} : { fetch: options.webFetch }),
   });
   const mcp = await connectMcpServers(options.config.dataDir);
@@ -376,11 +384,11 @@ function requireBoolean(body: unknown, key: string): boolean {
 }
 
 /**
- * Reads the settings patch of `PUT /settings`. Only the settings 04 defines
- * are accepted; a key the kernel cannot change is refused instead of dropped.
+ * Reads the settings patch of `PUT /settings`. Only the settings the kernel can
+ * change are accepted; a key it cannot change is refused instead of dropped.
  */
 function parseSettingsPatch(body: unknown): SettingsPatch {
-  requireKnownKeys(body, ["permissions", "browser"]);
+  requireKnownKeys(body, ["permissions", "browser", "model", "search"]);
   const patch: SettingsPatch = {};
 
   const permissions = field(body, "permissions");
@@ -392,26 +400,71 @@ function parseSettingsPatch(body: unknown): SettingsPatch {
         "INVALID_REQUEST",
         `"permissions.scope" must be one of ${PERMISSION_SCOPES.join(", ")}`,
       );
-    patch.scope = scope;
+    patch.permissions = { scope };
   }
 
   const browser = field(body, "browser");
   if (browser !== undefined) {
-    requireKnownKeys(browser, ["actionsNeedApproval"]);
+    requireKnownKeys(browser, ["engine", "actionsNeedApproval"]);
+    const engineField = field(browser, "engine");
     const flag = field(browser, "actionsNeedApproval");
-    if (typeof flag !== "boolean")
+    let engine: BrowserEngine | undefined;
+    if (engineField !== undefined) {
+      if (!isBrowserEngine(engineField))
+        throw new KernelError(
+          "INVALID_REQUEST",
+          `"browser.engine" must be one of ${BROWSER_ENGINES.join(", ")}`,
+        );
+      engine = engineField;
+    }
+    if (flag !== undefined && typeof flag !== "boolean")
       throw new KernelError(
         "INVALID_REQUEST",
         '"browser.actionsNeedApproval" must be a boolean',
       );
-    patch.browserActionsNeedApproval = flag;
+    if (engine === undefined && flag === undefined)
+      throw new KernelError(
+        "INVALID_REQUEST",
+        'A "browser" patch must set "engine" or "actionsNeedApproval"',
+      );
+    patch.browser = {
+      ...(engine === undefined ? {} : { engine }),
+      ...(flag === undefined ? {} : { actionsNeedApproval: flag }),
+    };
   }
 
-  if (patch.scope === undefined && patch.browserActionsNeedApproval === undefined)
-    throw new KernelError(
-      "INVALID_REQUEST",
-      'A settings patch must set "permissions.scope" or "browser.actionsNeedApproval"',
-    );
+  const model = field(body, "model");
+  if (model !== undefined) {
+    requireKnownKeys(model, ["baseUrl", "model", "apiKey"]);
+    patch.model = {};
+    for (const key of ["baseUrl", "model", "apiKey"] as const) {
+      const value = optionalText(model, key);
+      if (value !== undefined) patch.model[key] = value;
+    }
+    if (Object.keys(patch.model).length === 0)
+      throw new KernelError(
+        "INVALID_REQUEST",
+        'A "model" patch must set "baseUrl", "model" or "apiKey"',
+      );
+  }
+
+  const search = field(body, "search");
+  if (search !== undefined) {
+    requireKnownKeys(search, ["provider", "baseUrl"]);
+    patch.search = {};
+    for (const key of ["provider", "baseUrl"] as const) {
+      const value = optionalText(search, key);
+      if (value !== undefined) patch.search[key] = value;
+    }
+    if (Object.keys(patch.search).length === 0)
+      throw new KernelError(
+        "INVALID_REQUEST",
+        'A "search" patch must set "provider" or "baseUrl"',
+      );
+  }
+
+  if (Object.keys(patch).length === 0)
+    throw new KernelError("INVALID_REQUEST", "A settings patch must set something");
   return patch;
 }
 

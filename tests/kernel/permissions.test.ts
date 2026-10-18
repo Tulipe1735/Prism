@@ -519,9 +519,10 @@ it("switches the scope over HTTP, keeps it in the config file and applies it nex
   expect(badFlag.status).toBe(400);
   const nothing = await api(kernel.url, "/settings", { method: "PUT", body: {} });
   expect(nothing.status).toBe(400);
+  // A section the kernel cannot change at runtime is refused, not dropped.
   const unknown = await api(kernel.url, "/settings", {
     method: "PUT",
-    body: { model: { model: "other" } },
+    body: { compaction: { keepTokens: 1000 } },
   });
   expect(unknown.status).toBe(400);
   events.close();
