@@ -31,7 +31,6 @@ export interface BrowserToolOptions {
   directory: string;
   engine?: EngineOptions["engine"];
   endpoint?: EngineOptions["endpoint"];
-  headless?: boolean;
 }
 
 export interface BrowserToolDependencies {
@@ -134,7 +133,6 @@ export class BrowserTool {
     const engine = await this.dependencies.openEngine({
       engine: this.options.engine,
       endpoint: this.options.endpoint,
-      headless: this.options.headless,
     });
     let page: BrowserPage;
     try {
