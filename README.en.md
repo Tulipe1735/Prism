@@ -15,10 +15,12 @@ Code: [browser capability](src/browser) · [browser CLI](src/interfaces/cli.ts) 
 ## Status
 
 Under reconstruction. The previous personal research assistant has been removed; the new
-agent kernel and Electron desktop are not implemented yet.
+agent kernel runs headless today, the Electron desktop is not implemented yet.
 
 Available today: the `prism` browser CLI, documented in the
-[browser guide](docs/browser-cli.md).
+[browser guide](docs/browser-cli.md); the kernel serves its sessions, task loop and tool
+execution over local HTTP/SSE, described in the
+[kernel contract](docs/kernel-contract.md).
 
 ## First-version goals
 
@@ -66,6 +68,14 @@ pnpm build
 See [skills/prism](skills/prism/SKILL.md) for the agent skill of the existing browser
 CLI, and [docs/skills.md](docs/skills.md) for the kernel's skill directory convention
 and priority order.
+
+The kernel starts headless, listens on `127.0.0.1` and prints its address as one JSON
+line (interface in [docs/kernel-contract.md](docs/kernel-contract.md)):
+
+```bash
+node --experimental-strip-types --disable-warning=ExperimentalWarning \
+  src/interfaces/kernel.ts [--port <n>] [--data-dir <path>]
+```
 
 MIT License. The README follows the structure of
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
