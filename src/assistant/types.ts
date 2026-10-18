@@ -1,7 +1,16 @@
 export type Role = "intelligence" | "qa";
 export type Effort = "normal" | "deep";
-export type TaskStatus = "queued" | "running" | "waiting-device" | "awaiting-confirmation" | "completed" | "partial" | "failed" | "cancelled";
-export type SourceKind = "notion" | "file" | "gmail" | "github" | "arxiv" | "web" | "course";
+export type TaskStatus =
+  | "queued"
+  | "running"
+  | "waiting-device"
+  | "awaiting-confirmation"
+  | "completed"
+  | "partial"
+  | "failed"
+  | "cancelled";
+export type SourceKind =
+  "notion" | "file" | "gmail" | "github" | "arxiv" | "web" | "course";
 
 export interface Document {
   id: string;
@@ -26,7 +35,14 @@ export interface Citation {
 
 export interface MemoryEntry {
   id: string;
-  kind: "progress" | "question" | "preference" | "correction" | "experience" | "reading" | "course";
+  kind:
+    | "progress"
+    | "question"
+    | "preference"
+    | "correction"
+    | "experience"
+    | "reading"
+    | "course";
   text: string;
   status: "confirmed" | "tentative";
   sourceTaskId?: string;
@@ -126,7 +142,11 @@ export interface ModelReply {
 }
 
 export interface Model {
-  complete(messages: ModelMessage[], tools: ToolDefinition[], options: { signal: AbortSignal; maxOutputTokens: number }): Promise<ModelReply>;
+  complete: (
+    messages: ModelMessage[],
+    tools: ToolDefinition[],
+    options: { signal: AbortSignal; maxOutputTokens: number },
+  ) => Promise<ModelReply>;
 }
 
 export interface ToolContext {
@@ -137,7 +157,7 @@ export interface ToolContext {
 
 export interface AgentTool {
   definition: ToolDefinition;
-  execute(args: Record<string, unknown>, context: ToolContext): Promise<unknown>;
+  execute: (args: Record<string, unknown>, context: ToolContext) => Promise<unknown>;
 }
 
 export interface LocalJob {
