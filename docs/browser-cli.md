@@ -1,0 +1,81 @@
+# Prism
+
+[English](browser-cli.en.md) | 简体中文
+
+Prism 是供外部 agent 使用的 browser-use
+CLI。外部 agent 负责规划、选择目标和判断任务是否完成；Prism 负责观察浏览器、返回目标上下文、校验动作引用和执行单步输入。Prism 不需要模型 API
+key，也不会自行调用模型。
+
+## 先决条件
+
+- Node.js ≥22.19.0
+- 可连接远程调试端口的 Chrome。Chrome
+  136+ 的默认 profile 不允许远程调试，因此使用独立配置目录：
+
+```bash
+google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.prism-chrome"
+```
+
+## 安装
+
+```bash
+npm install -g @tulipe1735/prism
+```
+
+也可以使用 `pnpm add -g @tulipe1735/prism`。包提供 `prism` 可执行入口。
+
+## 让 agent 安装
+
+将下面的提示词发给你的 agent，让它安装 Prism 并接入自身：
+
+```text
+Install Prism for browser work:
+1. Run `npm install -g @tulipe1735/prism` and check `prism --version`.
+2. Copy `$(npm root -g)/@tulipe1735/prism/skills/prism` into your skills
+   directory, for example `~/.config/opencode/skills/prism` for opencode or
+   `~/.claude/skills/prism` for Claude Code.
+3. Copy `$(npm root -g)/@tulipe1735/prism/commands/prism.md` into your commands
+   directory, for example `~/.config/opencode/commands/prism.md` for opencode or
+   `~/.claude/commands/prism.md` for Claude Code.
+4. Restart, then use the prism skill or `/prism <url>` for browser tasks.
+```
+
+agent 必须能运行 shell 命令并修改自己的配置目录。
+
+## 使用
+
+```bash
+prism session open --url https://example.com --browser-url http://127.0.0.1:9222
+prism observe --session <session> --scope local
+prism context --session <session> --observation <observation> --target <ref> --scope relations
+prism act --session <session> --observation <observation> --target <ref> --evidence <evidence> --operation click --request-id decision-1
+prism session close --session <session>
+```
+
+尖括号字段必须替换成上一条输出中的真实值。每次 `observe`
+返回新的 observation、evidence 与 target refs；旧观察立即失效。目标使用唯一的
+`description` 和显式状态，整份观察的 `state.controls/messages`
+提供只读结果证据，包含可见的禁用控件、已选项与公开反馈。检查 coverage 与截断信息，不能将未显示视为不存在。两种视图共用控件命名与状态读取规则，多行值保留换行。select 目标的
+`option_value/option_label` 描述可执行选项，`state.selected_options`
+描述当前选择；选择状态截断时拒绝执行。
+
+新动作保存输入回执后返回 `post_observation`。`captured` 的 `data` 是可继续使用的新观察；
+`failed`
+只表示观察失败，不改变输入回执。先读取新状态判断完成，异步结果未确定时再观察。未知输入或调用中断时使用
+`prism receipt --session <session> --request-id <id>`
+调查；同 request-id 的原样回放只返回历史回执，不返回当前观察引用。
+
+`prism <命令> --help` 显示参数与示例。供外部 agent 使用的完整说明在
+[skills/prism/SKILL.md](../skills/prism/SKILL.md)。
+
+## 从源码运行
+
+贡献者需要 pnpm：
+
+```bash
+pnpm install
+pnpm build
+node dist/cli.js --help
+```
+
+`pnpm dev` 直接在源码上运行命令，不生成 `dist/`。

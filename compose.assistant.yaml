@@ -1,0 +1,17 @@
+services:
+  assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile.assistant
+    env_file: .env
+    environment:
+      ASSISTANT_DATA_DIR: /data
+      ASSISTANT_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - assistant-data:/data
+    restart: unless-stopped
+    stop_grace_period: 30s
+volumes:
+  assistant-data:
