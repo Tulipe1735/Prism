@@ -18,6 +18,8 @@ export default antfu(
       "no-console": "off",
       "test/prefer-lowercase-title": "off",
       "ts/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
+      // Prettier lowercases hex digits; this rule insists on uppercase. Prettier owns formatting.
+      "unicorn/number-literal-case": "off",
     },
   },
 );

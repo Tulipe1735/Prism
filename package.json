@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "chrome-remote-interface": "0.34.0",
+    "html-to-text": "^10.0.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"
   },
@@ -40,6 +41,7 @@
     "@antfu/eslint-config": "4.0.1",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@types/chrome-remote-interface": "0.34.0",
+    "@types/html-to-text": "^9.0.4",
     "@types/node": "22.20.1",
     "eslint": "9.39.5",
     "prettier": "3.9.6",
