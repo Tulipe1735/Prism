@@ -48,9 +48,13 @@ function firstJsonLine(child: ChildProcess): Promise<Record<string, unknown>> {
     child.stderr?.on("data", (chunk: Buffer) => {
       stderr += chunk.toString();
     });
-    child.once("exit", (code) => {
+    child.once("exit", (code, signal) => {
       clearTimeout(timer);
-      reject(new Error(`Electron exited with code ${code}. stderr: ${stderr}`));
+      reject(
+        new Error(
+          `Electron exited with code ${code}, signal ${signal}. stderr: ${stderr}`,
+        ),
+      );
     });
   });
 }
@@ -65,10 +69,18 @@ describe.runIf(BINARY !== null && BUILT)(
   () => {
     it("opens the workbench window on a kernel it started itself", async () => {
       const dataDir = await mkdtemp(join(tmpdir(), "prism-electron-smoke-"));
-      const child = spawn(BINARY as string, [MAIN], {
-        env: { ...process.env, PRISM_DATA_DIR: dataDir, ELECTRON_ENABLE_LOGGING: "1" },
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      const child = spawn(
+        BINARY as string,
+        [MAIN, `--user-data-dir=${join(dataDir, "desktop")}`],
+        {
+          env: {
+            ...process.env,
+            PRISM_DATA_DIR: dataDir,
+            ELECTRON_ENABLE_LOGGING: "1",
+          },
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
       try {
         const ready = await firstJsonLine(child);
         expect(ready).toMatchObject({ type: "workbench.window" });
@@ -77,7 +89,7 @@ describe.runIf(BINARY !== null && BUILT)(
 
         const shell = await fetch(`${url}/`);
         expect(shell.status).toBe(200);
-        expect(await shell.text()).toContain('id="timeline"');
+        expect(await shell.text()).toContain('id="root"');
         expect(
           await fetch(`${url}/kernel/status`).then((response) => response.json()),
         ).toMatchObject({ status: "ready", dataDir });

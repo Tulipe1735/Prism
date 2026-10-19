@@ -12,8 +12,12 @@ Prism 自己运行任务循环，内置 Prism 浏览器能力、MCP、skills、�
 
 ## 状态
 
-重构中。旧的个人研究助手已移除；新的 agent 内核已可 headless 运行，工作台（Electron 壳 + 本地 Web
-UI）已可对着内核跑通工作区、会话、聊天流式、工具过程、代码改动、审批与设置展示。
+Windows 安装版从 [GitHub Releases](https://github.com/Tulipe1735/Prism/releases/latest)
+下载。安装 `Prism-<版本>-Setup-x64.exe`
+后打开 Prism，选择已设置好的 WSL 发行版，再填写模型设置。内核与 Node 随应用提供；无需检出仓库。详见[安装与运行](docs/workbench.md)。
+
+工作台使用 React + Tailwind
+CSS，提供工作区、会话、聊天流式、工具过程、代码改动、审批与设置。
 
 当前可用：`prism`
 浏览器 CLI，用法见[浏览器指南](docs/browser-cli.md)；内核的会话、任务循环与工具执行经本地 HTTP/SSE 提供，接口见[内核接口契约](docs/kernel-contract.md)；工作台的运行方式与结构见[工作台](docs/workbench.md)；用真实任务做首版验收的步骤见[首版验收](docs/acceptance.md)。
@@ -44,7 +48,7 @@ Electron 界面运行在 Windows，内核运行在 WSL，两者通过本地 HTTP
 
 ## 开发
 
-需要 Node.js ≥22.19 和 pnpm。
+需要 Node.js ≥22.23.2 和 pnpm。
 
 ```bash
 pnpm install

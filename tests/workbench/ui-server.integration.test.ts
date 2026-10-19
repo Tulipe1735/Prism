@@ -34,8 +34,7 @@ it("serves the workbench shell and refuses files outside the UI root", async () 
   expect(shell.status).toBe(200);
   expect(shell.headers.get("content-type")).toContain("text/html");
   const html = await shell.text();
-  expect(html).toContain('id="session-list"');
-  expect(html).toContain('id="chat"');
+  expect(html).toContain('id="root"');
   expect(html).toContain("app.js");
 
   const styles = await fetch(`${server.url}/app.css`);

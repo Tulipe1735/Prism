@@ -5,6 +5,31 @@ UI。它承担工作区选择、会话、聊天、工具执行过程、代码改
 
 ## 运行
 
+### Windows 安装版
+
+从 [GitHub Releases](https://github.com/Tulipe1735/Prism/releases/latest) 下载
+`Prism-<版本>-Setup-x64.exe`，按安装向导选择目录。安装程序会创建桌面与开始菜单快捷方式。
+
+需要 Windows x64，以及已完成首次用户设置的 x86_64 WSL
+Linux 发行版（推荐 Ubuntu）。没有 WSL 时，应用会显示安装说明。
+
+首次打开 Prism：
+
+1. 选择 WSL 发行版，点击「准备并开始」。内核和 Node 随安装包提供，无需检出仓库或另装 Node。
+2. 默认同时下载 Chromium；也可以取消勾选，稍后按 `Alt`
+   打开「运行环境」菜单，准备所需浏览器。
+3. 在自动展开的设置中填写模型端点、名称与 API 密钥，再选择 WSL 工作区，例如
+   `/home/you/projects/demo`。
+
+发行版选择保存在 Windows 的 `%APPDATA%/Prism/desktop.json`；内核运行时保存在所选发行版的
+`~/.local/share/prism/runtime/`（遵循 `XDG_DATA_HOME`），会话和模型设置保存在
+`~/.prism/`。升级和卸载不会删除会话与设置。更换发行版时，退出 Prism 后删除
+`desktop.json`，再重新打开。
+
+浏览器首次下载需要联网；Linux 缺少浏览器系统依赖时，按准备日志中的 Playwright 提示在所选发行版中安装。当前安装包没有代码签名，Windows 可能显示发布者未知。
+
+### 从源码运行
+
 产品入口是 Electron 工作台：它经 `wsl.exe`（Windows）或本地
 `node`（Linux 开发环境）拉起内核、起 UI 服务器、打开窗口；退出时先 `POST /shutdown`
 再关闭 UI 服务器。
@@ -25,14 +50,27 @@ pnpm workbench --kernel http://127.0.0.1:41234      # 对着已有内核跑
 
 要点：
 
-- 跨平台的内核命令见
-  `src/workbench/kernel-process.ts`；Windows 上的内核在 WSL 里，路径无法从 Windows 检出推导，用
-  `PRISM_KERNEL_ENTRY=/home/you/prism/dist/kernel.js`
-  明确指定，缺少时报错而不是静默降级。
+- 跨平台的内核命令见 `src/workbench/kernel-process.ts`；Windows 先通过
+  `src/workbench/wsl-runtime.ts`
+  展开并校验随应用提供的 WSL 运行时，再启动内核。Windows 源码开发时，先在 WSL 中执行
+  `pnpm package:win` 准备 `.packaging/resources`。
 - Electron 运行时由 `electron` 包在 `pnpm install`
   时下载；被环境拦住时（`pnpm approve-builds` 未批准或缺网）可在 `node_modules/electron`
   里手动 `node install.js`。
-- 失败时 Electron 把内核输出放进错误对话框，stderr 也留一份。
+- 准备失败时，启动页面显示可重试的错误与日志，stderr 也保留一份。
+
+### 构建 Windows 安装包
+
+在 Windows 中使用 Node.js ≥22.23.2 和 pnpm（Linux / WSL 构建还需要 Wine）：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm package:win
+```
+
+输出为 `release/Prism-<版本>-Setup-x64.exe`。构建脚本下载并校验 Linux
+Node，打包内核与 Playwright，再用 electron-builder 生成 NSIS 安装包。Windows 端只携带工作台，WSL 端携带完整 Node 运行时；两端都不依赖源码目录。构建缓存位于
+`.packaging/cache/`，构建内容与安装包目录已从版本控制中排除。
 
 ## 一个来源
 
@@ -45,6 +83,16 @@ pnpm workbench --kernel http://127.0.0.1:41234      # 对着已有内核跑
 ```
 
 ## UI 结构
+
+前端使用 React + Tailwind
+CSS。浅色界面以瑞士风格的网格、留白、细分隔线与朱红色强调为基础：左侧是工作区与会话，中间是任务对话，右侧是产物与设置。窄窗口通过顶栏按钮展开两侧面板。
+
+`src/workbench/ui/main.tsx` 挂载 React，`app.tsx` 组合各区域；`use-workbench.ts`
+管理内核连接和操作，继续复用 `client.ts`、`state.ts` 与
+`derive.ts`。流式更新由 React 更新对应节点，设置草稿和工具卡片的展开状态不会随事件重画而丢失。界面只用本地打包资源，无需从 CDN 下载脚本、字体或样式。
+
+`pnpm build` 分别构建 Node 与浏览器代码，再通过 Tailwind CLI 生成
+`dist/workbench-ui/app.css`。浏览器依赖随前端打包，Electron 仍使用运行时提供的模块。
 
 | 区域     | 内容                                                                                                     | 来源                                             |
 | -------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
@@ -88,7 +136,8 @@ PRISM_WORKBENCH_BROWSER=1 pnpm vitest run tests/workbench/browser.smoke.test.ts
 PRISM_ELECTRON_SMOKE=1 pnpm vitest run tests/workbench/electron.smoke.test.ts
 ```
 
-- `tests/workbench/derive.test.ts`、`render.test.ts`、`state.test.ts`：视图与状态推导，纯函数断言 HTML 与状态，另有一条用真实内核日志驱动的推导。
+- `tests/workbench/derive.test.ts`、`state.test.ts`：视图与状态推导，另有一条用真实内核日志驱动的推导。
+- `tests/workbench/ui/render.test.tsx`：React 组件渲染，覆盖不可信文本转义、会话、工具 diff、审批与设置。
 - `tests/workbench/client.integration.test.ts`：真内核 + 脚本化模型，覆盖会话 CRUD、重命名、取消、设置写入、审批通过与拒绝（含 04 对工作区外写入的真实审批）与事件流。
 - `tests/workbench/ui-server.integration.test.ts`：UI 服务器与 `/kernel`
   代理（含 SSE 与内核断开）。
@@ -97,6 +146,8 @@ PRISM_ELECTRON_SMOKE=1 pnpm vitest run tests/workbench/electron.smoke.test.ts
   → 一次审批 → 产物 → 权限范围切换 → 重命名/搜索/删除）。需要
   `pnpm build`，且构建产物必须比源码新。
 - `tests/workbench/electron.smoke.test.ts`：Electron 壳冒烟，需要 Electron 运行时与显示器。
+- `tests/workbench/electron-bundle.test.ts`：Electron 壳的构建产物契约（`electron`
+  保持外部依赖、UI 根目录指向 `dist/workbench-ui`），不需要 Electron 运行时。
 
 ## 本版限制
 

@@ -2,7 +2,7 @@ import type { Buffer } from "node:buffer";
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import process from "node:process";
 
 /** The kernel did not come up; `output` carries what it printed instead. */
@@ -37,10 +37,11 @@ export interface KernelLaunchOptions {
   dataDir?: string;
   port?: number;
   platform?: NodeJS.Platform;
-  /** Path of the kernel entry inside WSL; required on Windows. */
-  wslEntry?: string;
+  /** WSL distribution owning the prepared runtime; required on Windows. */
+  distribution?: string;
   /** Node binary inside WSL, or the host node elsewhere. */
   node?: string;
+  env?: NodeJS.ProcessEnv;
 }
 
 export interface RunningKernelProcess {
@@ -75,13 +76,10 @@ export function resolveKernelEntry(projectRoot: string): KernelEntry {
 }
 
 /**
- * Builds the spawn command. On Windows the kernel runs inside WSL (ADR-0001)
- * and its path cannot be derived from the Windows checkout, so the user states
- * it once in `PRISM_KERNEL_ENTRY`.
+ * Windows uses a prepared Linux runtime in a selected WSL distribution.
  */
 export function planKernelLaunch(options: KernelLaunchOptions): KernelLaunchPlan {
   const platform = options.platform ?? process.platform;
-  const node = options.node ?? process.execPath;
   const dataDir = options.dataDir;
   const port = options.port;
   const tail = [
@@ -90,16 +88,38 @@ export function planKernelLaunch(options: KernelLaunchOptions): KernelLaunchPlan
     ...(port === undefined || port === 0 ? [] : ["--port", String(port)]),
   ];
   if (platform === "win32") {
-    const entry = options.wslEntry ?? process.env.PRISM_KERNEL_ENTRY;
-    if (entry === undefined || entry === "")
+    if (
+      options.entry === undefined ||
+      options.node === undefined ||
+      options.distribution === undefined
+    )
       throw new KernelLaunchError(
-        "Set PRISM_KERNEL_ENTRY to the kernel entry inside WSL, for example /home/you/prism/dist/kernel.js",
+        "Windows needs a prepared WSL runtime. Start Prism and select a WSL distribution first.",
       );
-    return { command: "wsl.exe", args: ["-e", node, entry, ...tail] };
+    return {
+      command: "wsl.exe",
+      args: [
+        "--distribution",
+        options.distribution,
+        "--exec",
+        "sh",
+        "-c",
+        'node_dir=$1; shift; export PATH="$node_dir:$PATH"; exec "$@"',
+        "prism",
+        posix.dirname(options.node),
+        options.node,
+        ...options.entry.flags,
+        options.entry.path,
+        ...tail,
+      ],
+    };
   }
   const entry =
     options.entry ?? resolveKernelEntry(options.projectRoot ?? process.cwd());
-  return { command: node, args: [...entry.flags, entry.path, ...tail] };
+  return {
+    command: options.node ?? process.execPath,
+    args: [...entry.flags, entry.path, ...tail],
+  };
 }
 
 /** Starts the kernel and waits for the ready line that announces its port. */
@@ -107,7 +127,11 @@ export async function launchKernel(
   options: KernelLaunchOptions,
 ): Promise<RunningKernelProcess> {
   const plan = planKernelLaunch(options);
-  const child = spawn(plan.command, plan.args, { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(plan.command, plan.args, {
+    windowsHide: true,
+    env: options.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   const ready = await waitForReadyLine(child).catch(async (error: unknown) => {
     await stopProcess(child);
     throw error;

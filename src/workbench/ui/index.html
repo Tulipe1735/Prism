@@ -3,66 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f8f8f5" />
+    <meta name="color-scheme" content="light" />
     <title>Prism 工作台</title>
+    <link rel="icon" type="image/svg+xml" href="assets/prism-symbol-small.svg" />
     <link rel="stylesheet" href="app.css" />
   </head>
   <body>
-    <header id="topbar">
-      <strong class="brand">Prism</strong>
-      <span id="kernel-status" class="status"></span>
-      <span id="kernel-meta" class="muted"></span>
-      <nav id="views">
-        <button type="button" data-action="view" data-view="artifacts" class="active">
-          产物
-        </button>
-        <button type="button" data-action="view" data-view="settings">设置</button>
-      </nav>
-    </header>
-    <main>
-      <aside id="sidebar">
-        <section class="workspace">
-          <h2>工作区</h2>
-          <input
-            id="workspace-input"
-            list="known-workspaces"
-            placeholder="WSL 路径，例如 /home/me/project"
-            autocomplete="off"
-          />
-          <datalist id="known-workspaces"></datalist>
-          <div class="row">
-            <button type="button" data-action="use-workspace">打开工作区</button>
-            <button type="button" data-action="new-session">新建会话</button>
-          </div>
-        </section>
-        <section class="sessions">
-          <h2>会话</h2>
-          <input id="search" placeholder="搜索会话" autocomplete="off" />
-          <div id="session-list"></div>
-        </section>
-      </aside>
-      <section id="chat">
-        <div id="chat-header"></div>
-        <div id="timeline"></div>
-        <div id="approvals"></div>
-        <form id="composer">
-          <textarea
-            id="message"
-            rows="3"
-            placeholder="描述任务，回车发送（Shift+Enter 换行）"
-          ></textarea>
-          <div class="composer-actions">
-            <span id="task-state" class="muted"></span>
-            <button type="button" data-action="cancel" id="cancel">取消任务</button>
-            <button type="submit" id="send">发送</button>
-          </div>
-        </form>
-      </section>
-      <aside id="inspector">
-        <div id="artifacts"></div>
-        <div id="settings"></div>
-        <div id="notice"></div>
-      </aside>
-    </main>
+    <div id="root"></div>
     <script type="module" src="app.js"></script>
   </body>
 </html>

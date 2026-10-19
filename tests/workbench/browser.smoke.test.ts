@@ -91,15 +91,21 @@ describe.runIf(enabled)("workbench in a real browser", () => {
         tools: [editTool, outsideTool],
       });
       ui = await startUiServer({ kernelUrl: harness.kernel.url, uiRoot: UI_ROOT });
-      page = await browser.newPage();
+      page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
 
       // The browser runs the built bundle; a stale bundle would test old code.
       const built = statSync(join(UI_ROOT, "app.js")).mtimeMs;
       const sources = [
-        "app.ts",
+        "app.tsx",
+        "main.tsx",
         "client.ts",
         "derive.ts",
-        "render.ts",
+        "sidebar.tsx",
+        "timeline.tsx",
+        "inspector.tsx",
+        "settings.tsx",
+        "components.tsx",
+        "use-workbench.ts",
         "state.ts",
         "app.css",
       ].map((file) => statSync(resolve("src/workbench/ui", file)).mtimeMs);
@@ -140,6 +146,14 @@ describe.runIf(enabled)("workbench in a real browser", () => {
       expect(await card.textContent()).toContain("/etc/hosts");
       expect(await card.textContent()).toContain("会向系统文件追加一行");
       expect(await card.locator("button").count()).toBe(2);
+
+      // React keeps local form and disclosure state across SSE updates.
+      await page.click('[data-view="settings"]');
+      const modelInput = page.locator('#settings input[name="model"]');
+      await modelInput.fill("unsaved-model-draft");
+      const editDetails = page.locator('.tool[data-call="call-edit"]');
+      if ((await editDetails.getAttribute("open")) !== null)
+        await editDetails.locator("summary").click();
       await card.locator('[data-action="approve"]').click();
 
       await page.waitForSelector(
@@ -150,6 +164,9 @@ describe.runIf(enabled)("workbench in a real browser", () => {
       );
       await page.waitForSelector("#task-state >> text=空闲", { timeout: 10_000 });
       expect(await page.locator("#timeline").textContent()).toContain("全部完成。");
+      expect(await modelInput.inputValue()).toBe("unsaved-model-draft");
+      expect(await editDetails.getAttribute("open")).toBeNull();
+      await modelInput.fill("scripted-model");
 
       // Artifacts: the touched file with its diff.
       await page.click('[data-view="artifacts"]');
@@ -221,4 +238,51 @@ describe.runIf(enabled)("workbench in a real browser", () => {
       expect(await harness.kernel.kernel.listSessions()).toEqual([]);
     },
   );
+
+  it("keeps the workbench usable in a narrow window", async () => {
+    harness = await startTestKernel();
+    ui = await startUiServer({ kernelUrl: harness.kernel.url, uiRoot: UI_ROOT });
+    page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(ui.url);
+    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    expect(await page.locator("#message").isDisabled()).toBe(true);
+
+    await page.getByRole("button", { name: "切换会话导航" }).click();
+    await page.click('[data-action="new-session"]');
+    await page.waitForSelector("#notice >> text=先填一个工作区路径");
+    await page.fill("#workspace-input", harness.workspace);
+    await page.press("#workspace-input", "Enter");
+    await page.click('[data-action="new-session"]');
+    await page.waitForSelector("#chat-header strong");
+    expect(await page.locator("#sidebar").isVisible()).toBe(false);
+    await page.fill("#message", "尚未发送的任务草稿");
+
+    await page.getByRole("button", { name: "打开产物与设置" }).click();
+    await page.click('[data-view="settings"]');
+    await page.waitForSelector('#settings input[name="model"]');
+    const model = page.locator('#settings input[name="model"]');
+    await model.fill("local-draft");
+    await page.click('[data-view="artifacts"]');
+    await page.click('[data-view="settings"]');
+    expect(await model.inputValue()).toBe("local-draft");
+    await page.keyboard.press("Escape");
+    expect(await page.locator("#inspector").isVisible()).toBe(false);
+    expect(await page.locator("#message").inputValue()).toBe("尚未发送的任务草稿");
+
+    for (const width of [390, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 844 });
+      expect(
+        await page.evaluate(
+          "document.documentElement.scrollWidth <= window.innerWidth",
+        ),
+      ).toBe(true);
+      const composer = await page.locator("#composer").boundingBox();
+      expect(composer).not.toBeNull();
+      expect(composer!.width).toBeGreaterThan(250);
+      expect(composer!.y + composer!.height).toBeLessThan(844);
+    }
+    expect(errors).toEqual([]);
+  });
 });

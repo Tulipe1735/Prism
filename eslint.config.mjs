@@ -9,11 +9,17 @@ export default antfu(
     markdown: false,
     toml: false,
     yaml: false,
-    ignores: ["coverage/**", "dist/**", "src/browser/snapshot.js"],
+    ignores: [
+      "coverage/**",
+      "dist/**",
+      "release/**",
+      ".packaging/**",
+      "src/browser/snapshot.js",
+    ],
   },
   {
     name: "prism/typescript",
-    files: ["**/*.ts"],
+    files: ["**/*.{ts,tsx}"],
     rules: {
       "no-console": "off",
       "test/prefer-lowercase-title": "off",

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+release/
+.packaging/
 coverage/
 pnpm-lock.yaml
 LICENSE

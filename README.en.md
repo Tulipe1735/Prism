@@ -14,10 +14,14 @@ Code: [browser capability](src/browser) · [browser CLI](src/interfaces/cli.ts) 
 
 ## Status
 
-Under reconstruction. The previous personal research assistant has been removed; the new
-agent kernel runs headless today, and the workbench (Electron shell plus a local Web UI)
-already covers workspaces, sessions, streaming chat, the tool process, code changes,
-approvals and settings against the kernel.
+Download the Windows installer from
+[GitHub Releases](https://github.com/Tulipe1735/Prism/releases/latest). Install
+`Prism-<version>-Setup-x64.exe`, open Prism, choose an initialized WSL Linux
+distribution, and enter your model settings. The kernel and Node runtime ship with the
+app; no source checkout is required. See [installation and usage](docs/workbench.md).
+
+The React + Tailwind CSS workbench covers workspaces, sessions, streaming chat, tool
+activity, code changes, approvals, and settings.
 
 Available today: the `prism` browser CLI, documented in the
 [browser guide](docs/browser-cli.md); the kernel serves its sessions, task loop and tool
@@ -59,7 +63,7 @@ local HTTP/SSE, and the desktop starts the kernel through `wsl.exe`. See
 
 ## Development
 
-Requires Node.js ≥22.19 and pnpm.
+Requires Node.js ≥22.23.2 and pnpm.
 
 ```bash
 pnpm install

@@ -16,29 +16,37 @@ const PROJECT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 it("launches the kernel through wsl.exe on Windows", () => {
   const plan = planKernelLaunch({
     platform: "win32",
-    wslEntry: "/home/demo/prism/dist/kernel.js",
-    dataDir: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\.prism",
+    entry: { path: "/home/demo/.local/share/prism/runtime/test/kernel.cjs", flags: [] },
+    distribution: "Ubuntu",
+    dataDir: "/home/demo/.prism",
     port: 0,
     node: "/usr/bin/node",
   });
 
   expect(plan.command).toBe("wsl.exe");
   expect(plan.args).toEqual([
-    "-e",
+    "--distribution",
+    "Ubuntu",
+    "--exec",
+    "sh",
+    "-c",
+    'node_dir=$1; shift; export PATH="$node_dir:$PATH"; exec "$@"',
+    "prism",
+    "/usr/bin",
     "/usr/bin/node",
-    "/home/demo/prism/dist/kernel.js",
+    "/home/demo/.local/share/prism/runtime/test/kernel.cjs",
     "--data-dir",
-    "\\\\wsl.localhost\\Ubuntu\\home\\demo\\.prism",
+    "/home/demo/.prism",
   ]);
 });
 
-it("says what is missing when Windows has no kernel path inside WSL", () => {
+it("requires a prepared WSL runtime instead of using the Windows Electron executable", () => {
   expect(() =>
     planKernelLaunch({ platform: "win32", dataDir: "/home/demo/.prism" }),
   ).toThrow(KernelLaunchError);
   expect(() =>
     planKernelLaunch({ platform: "win32", dataDir: "/home/demo/.prism" }),
-  ).toThrow(/PRISM_KERNEL_ENTRY/);
+  ).toThrow(/prepared WSL runtime/);
 });
 
 it("prefers the built kernel and falls back to the TypeScript entry", async () => {
