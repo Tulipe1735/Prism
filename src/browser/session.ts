@@ -1,3 +1,12 @@
+/**
+ * The browser CLI's session: one page driven over the Chrome DevTools Protocol
+ * on a browser the user started.
+ *
+ * `src/kernel/browser/session.ts` is the kernel's port of the same semantics
+ * (ADR-0006): it drives a Playwright engine the kernel opens. The two are kept
+ * apart on purpose; share only what is engine-independent (`src/shared`,
+ * `src/browser/representation.ts`, `src/browser/state.ts`).
+ */
 import type { Snapshot, SnapshotAction } from "../shared/types.ts";
 import type { CdpClient } from "./connect.ts";
 import { createHash } from "node:crypto";
@@ -97,6 +106,16 @@ export class BrowserSession {
   }
 
   async observe(options: { screenshot?: boolean } = {}): Promise<Observation> {
+    const observation = await this.readObservation(() => this.observeOnce());
+    if (options.screenshot) {
+      const image = await this.captureScreenshot();
+      if (image !== undefined) observation.screenshot = image;
+    }
+    return observation;
+  }
+
+  /** Apply the same settling/retry policy to a caller's single coherent sample. */
+  async readObservation<T>(read: () => Promise<T>): Promise<T> {
     if (this.afterInput !== null) {
       const action = this.afterInput;
       this.afterInput = null;
@@ -109,7 +128,7 @@ export class BrowserSession {
 
     for (let attempt = 0; attempt < 10; attempt += 1) {
       try {
-        return await this.observeOnce(options.screenshot ?? false);
+        return await read();
       } catch (error) {
         if (!(error instanceof StalePageError) || attempt === 9) throw error;
         await sleep(20);
@@ -190,16 +209,11 @@ export class BrowserSession {
     }
   }
 
-  private async observeOnce(screenshot: boolean): Promise<Observation> {
+  private async observeOnce(): Promise<Observation> {
     const info = (await this.evaluate(READ_STATE)) as Snapshot | null | undefined;
     if (info === null || info === undefined)
       throw new StalePageError("Document is navigating");
-    const observation: Observation = { ...info, fingerprint: fingerprint(info) };
-    if (screenshot) {
-      const image = await this.captureScreenshot();
-      if (image !== undefined) observation.screenshot = image;
-    }
-    return observation;
+    return { ...info, fingerprint: fingerprint(info) };
   }
 
   private async execute(action: SnapshotAction, text: string | null): Promise<void> {

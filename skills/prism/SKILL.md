@@ -7,47 +7,46 @@ description:
 
 # Prism browser CLI
 
-The external agent owns the task policy, field values and completion decision. Prism
-owns observation refs and single-step browser execution. Use the installed `prism`
-command; from this repository, build once and use `node dist/cli.js`.
+You own decisions and completion. Prism observes, validates and executes one input. Use
+`prism`; from source, build once and use `node dist/cli.js`.
 
-1. Inspect `prism --help` and the relevant command help if the interface is unfamiliar.
-2. Open a session with `prism session open --url <user-task-url>`. Use `--browser-url`
-   if needed. Keep the returned session id and use the same `--state-dir` across
-   commands.
-3. Run `prism observe --session <s> --scope local`. Parse its JSON reply and copy the
-   offered observation, evidence and target refs exactly.
-4. If local evidence does not distinguish the requested target, use
-   `prism context --session <s> --observation <o> --target <ref> --scope structural` or
-   `--scope relations`. Relations exposes visible group identities. Request context for
-   alternatives when necessary; do not infer hidden relations from element order.
-5. Execute the chosen offered operation with
+1. Read command help only if needed. Open with `prism session open --url <url>`; supply
+   `--browser-url` if needed. Keep one `--state-dir` and the returned session id.
+2. Run `prism observe --session <s> --scope local`. Copy observation, evidence and
+   target refs exactly. Targets and read-only controls share naming and current-state
+   rules. Targets have one `description`, explicit `state`, and context. Observation
+   `state.controls` and `state.messages` are read-only result evidence; they offer no
+   action refs. Check coverage/truncation before interpreting absence.
+3. If local evidence is insufficient, request
+   `prism context --session <s> --observation <o> --target <ref> --scope relations` or
+   `--scope structural`. Inspect alternatives as needed; element order is not a hidden
+   relation.
+4. Execute an offered operation with its target-specific evidence:
    `prism act --session <s> --observation <o> --target <ref> --evidence <v> --operation <offered-operation> --request-id <new-decision-id>`.
-   Use evidence returned for this target. Only fill accepts `--value`; select uses the
-   offered option ref. For complex text, send the complete command JSON through
-   `act --stdin`.
-6. Read the receipt outcome, then observe again after executed or unknown actions. Check
-   visible state against the user's goal before reporting success.
-7. Close the owned tab with `prism session close --session <s>` when finished. Use
-   `daemon stop` only when all sessions in that state directory can close.
+   Only fill accepts `--value`, including `""`; select uses an offered option ref with
+   `option_value` and `option_label`. Its state includes the current `selected_options`.
+   Truncated select state cannot authorize input. For complex text, use `act --stdin`
+   with the full JSON, including `command:"act"`.
+5. Read `data.receipt.outcome`. If `data.post_observation.status` is `captured`, use its
+   `data` as the current observation. Check explicit state against the goal; observe
+   again if the result is pending or the capture failed. A failed capture does not
+   change the input outcome. Never equate `value:"on"` with checked=true.
+6. Close with `prism session close --session <s>`. Use `daemon stop` only when all
+   sessions in that directory may close. Use the host's plan for long tasks.
 
 ## Error handling
 
-- `not_executed`: inspect the error; on stale evidence/reference errors, observe again
-  and choose again. Do not swap in a guessed selector or another same-label target.
-- `executed`: input was acknowledged, but the goal is unverified. Read the new state.
-- `unknown`, interrupted act, or timeout: query
-  `prism receipt --session <s> --request-id <id>` and inspect the page. Do not issue the
-  same semantic action under a fresh id until the prior effect is understood.
-- Repeating the exact request with its original request id returns a stored receipt.
-  Changing the request while reusing the id causes a conflict. Re-observed or repaired
-  decisions require a new id.
-- Receipt queries can exit 0 while describing an unknown outcome. Read `ok`, `error` and
-  `data.receipt.outcome`; shell exit code alone is insufficient.
-- The broker may have expired after 15 minutes of inactivity. Receipts remain queryable,
-  but old session and observation refs cannot be restored.
+- `not_executed`: inspect the refusal; stale refs/evidence require a new observation and
+  decision. Do not guess selectors or substitute a same-label target.
+- `executed`: input acknowledged; public state must still support completion.
+- `unknown`, timeout or interruption: query
+  `prism receipt --session <s> --request-id <id>` and inspect current state. Do not
+  repeat the semantic action with a fresh id until the prior effect is understood.
+- Exact original-id replay returns only the stored receipt, never current observation
+  refs. Changed requests require new ids. Read receipt outcomes even when exit code
+  is 0.
+- After 15 minutes idle, the broker may close. Receipts survive; session/observation
+  refs cannot be restored from history.
 
-The CLI does not use a model key or perform automatic replanning. Do not place task
-oracles in inputs. It validates public state consistency, not intent correctness. The
-first version is control-focused and has no full-page reader, screenshots, iframe or
-shadow-DOM traversal. Report a specific limitation if the task needs those capabilities.
+Prism checks public consistency, not intent or task success. It has no model, full-page
+reader, screenshots, iframe or shadow-DOM traversal. Report evidence gaps explicitly.

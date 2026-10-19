@@ -1,6 +1,4 @@
-import type { SnapshotAction } from "../shared/types.ts";
-
-/** CLI method v1 starts from the archived research extractors. Historical files stay independent. */
+/** Product observation scopes; historical research formatters remain independent. */
 export type Representation = "local" | "structural" | "relations";
 export interface TargetContext {
   context: string;
@@ -15,29 +13,6 @@ export interface RelationEntry {
   layout?: "horizontal" | "vertical";
 }
 export type ActionRelations = Record<string, RelationEntry[]>;
-export const CONTEXT_LIMITS = { local: 80, nearby: 120, section: 48, ancestors: 6 };
-export function formatTarget(
-  id: string,
-  action: Pick<SnapshotAction, "label" | "role" | "value" | "current_value">,
-  representation: Representation,
-  context?: TargetContext,
-): string {
-  const name = action.label.replace(/\s+/g, " ").trim().slice(0, 160);
-  let line = `[${id}] ${`${action.role ?? "control"} ${JSON.stringify(name)}`}`;
-  if (action.current_value || action.value)
-    line += ` value=${JSON.stringify(action.current_value ?? action.value)}`;
-  if (representation === "local" && context?.context)
-    line += `\n  context: ${context.context.slice(0, CONTEXT_LIMITS.local)}`;
-  if (representation === "structural" && context) {
-    if (context.container) line += `\n  container: ${context.container.slice(0, 24)}`;
-    if (context.nearby_text)
-      line += `\n  nearby_text: ${context.nearby_text.slice(0, CONTEXT_LIMITS.nearby)}`;
-    if (context.section && !context.nearby_text.includes(context.section))
-      line += `\n  section: ${context.section.slice(0, CONTEXT_LIMITS.section)}`;
-  }
-  return line;
-}
-
 export function extractInPage(nodes: number[]): {
   contexts: Record<string, TargetContext>;
   status: string;
@@ -191,8 +166,7 @@ export function extractRelationsInPage(nodes: number[]): ActionRelations {
     )
       return "";
     const caption = table.caption;
-    if (caption && visible(caption) && collapsed(caption))
-      return collapsed(caption);
+    if (caption && visible(caption) && collapsed(caption)) return collapsed(caption);
     const heading = el.previousElementSibling;
     if (
       heading &&

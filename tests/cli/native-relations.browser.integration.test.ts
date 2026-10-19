@@ -2,7 +2,7 @@ import type { BrowserConnection } from "../../src/browser/connect.ts";
 import type { BrowserSession } from "../../src/browser/session.ts";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { connectBrowser, parseBrowserUrl } from "../../src/browser/connect.ts";
 import { captureEvidence, targetEvidence } from "../../src/browser/evidence.ts";
 import { openBrowserSession } from "../../src/browser/session.ts";
@@ -58,7 +58,9 @@ describe.runIf(process.env.PRISM_EVAL_CHROME === "1")(
     afterAll(async () => {
       await session?.close();
       await connection?.close();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      const closing = new Promise<void>((resolve) => server.close(() => resolve()));
+      server.closeAllConnections();
+      await closing;
     });
     async function targets() {
       const capture = await captureEvidence(session);
@@ -72,6 +74,22 @@ describe.runIf(process.env.PRISM_EVAL_CHROME === "1")(
         ),
       }));
     }
+    it("samples local targets and state in one evaluation and extracts relations only on demand", async () => {
+      const call = vi.spyOn(session, "call");
+      const local = await captureEvidence(session, "local");
+      expect(
+        call.mock.calls.filter(([method]) => method === "Runtime.evaluate"),
+      ).toHaveLength(1);
+      expect(local.relations).toEqual({});
+      expect(local.state.controls.length).toBeGreaterThan(0);
+      call.mockClear();
+      const richer = await captureEvidence(session, "relations");
+      expect(
+        call.mock.calls.filter(([method]) => method === "Runtime.evaluate"),
+      ).toHaveLength(1);
+      expect(Object.keys(richer.relations).length).toBeGreaterThan(0);
+      expect(richer.snapshot.actions).toEqual(local.snapshot.actions);
+    });
     it("inherits legends and rendered orientation for repeated public groups", async () => {
       const offered = await targets();
       expect(offered.find((t) => t.label === "A")?.relations).toContainEqual({

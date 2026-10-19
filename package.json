@@ -1,7 +1,7 @@
 {
   "name": "@tulipe1735/prism",
-  "version": "0.1.6",
-  "description": "Browser-use CLI for external agents with observation-bound targets and execution receipts.",
+  "version": "0.2.3",
+  "description": "Personal coding agent: Windows desktop workbench, agent execution in WSL.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -18,35 +18,60 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "tsup src/interfaces/cli.ts src/interfaces/daemon.ts --format esm --clean --sourcemap --no-splitting && node -e \"require('node:fs').copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup --config tsup.config.ts --sourcemap --no-splitting && pnpm build:ui:css && node -e \"const fs=require('node:fs');for(const file of ['index.html','startup.html'])fs.copyFileSync('src/workbench/ui/'+file,'dist/workbench-ui/'+file);fs.cpSync('src/workbench/ui/assets','dist/workbench-ui/assets',{recursive:true});fs.copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
+    "build:ui:css": "tailwindcss -i src/workbench/ui/app.css -o dist/workbench-ui/app.css --minify",
     "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/interfaces/cli.ts",
-    "eval": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/cli.ts",
-    "eval:report": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/report-cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
     "start": "node dist/cli.js",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "eval:cohort": "node --experimental-strip-types --disable-warning=ExperimentalWarning evals/runners/cohort.ts"
+    "test": "vitest run --exclude '.scratch/**'",
+    "typecheck": "tsc --noEmit && tsc -p src/workbench/ui/tsconfig.json --noEmit",
+    "workbench": "node dist/workbench-ui/server.js",
+    "workbench:electron": "electron dist/workbench/electron/main.cjs",
+    "package:win": "pnpm build && node --use-env-proxy --experimental-strip-types --disable-warning=ExperimentalWarning scripts/package-windows.ts"
   },
   "engines": {
-    "node": ">=22.19.0"
+    "node": ">=22.23.2"
   },
   "dependencies": {
+    "@clerk/electron": "0.1.1",
+    "@clerk/localizations": "4.23.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@radix-ui/react-dropdown-menu": "2.2.1",
     "chrome-remote-interface": "0.34.0",
+    "electron-store": "8.2.0",
+    "electron-updater": "6.8.9",
+    "html-to-text": "^10.0.1",
+    "lucide-react": "^1.59.0",
+    "playwright": "^1.64.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwind-merge": "^3.7.0",
+    "yaml": "^2.9.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@antfu/eslint-config": "4.0.1",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@tailwindcss/cli": "^4.3.3",
     "@types/chrome-remote-interface": "0.34.0",
+    "@types/html-to-text": "^9.0.4",
     "@types/node": "22.20.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
     "eslint": "9.39.5",
     "prettier": "3.9.6",
+    "tailwindcss": "^4.3.3",
     "tsup": "8.5.1",
     "typescript": "5.9.3",
     "vitest": "3.2.7"
   },
-  "packageManager": "pnpm@9.15.9"
+  "packageManager": "pnpm@9.15.9",
+  "main": "dist/workbench/electron/main.cjs",
+  "productName": "Prism"
 }
