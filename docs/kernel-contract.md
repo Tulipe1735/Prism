@@ -78,7 +78,7 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 ```json
 {
   "status": "ready",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "dataDir": "/home/demo/.prism",
   "runningTasks": 0
 }

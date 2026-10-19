@@ -61,7 +61,7 @@ async function main(): Promise<void> {
     height: 920,
     minWidth: 720,
     minHeight: 560,
-    backgroundColor: "#f8f8f5",
+    backgroundColor: "#ffffff",
     title: `Prism ${app.getVersion()}`,
     icon: join(uiRoot(), "assets/prism-icon.png"),
     autoHideMenuBar: true,

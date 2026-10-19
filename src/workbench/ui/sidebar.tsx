@@ -62,7 +62,7 @@ export function Sidebar({
       <Button
         variant="primary"
         hidden={!collapsed}
-        className="mx-auto mt-6 size-10 rounded-full px-0"
+        className="mx-auto mt-5 size-10 rounded-full px-0"
         onClick={() => void create()}
         disabled={creating || !state.connected}
         data-action="new-session-compact"
@@ -73,8 +73,8 @@ export function Sidebar({
         <Plus size={18} aria-hidden="true" />
       </Button>
       <div hidden={collapsed} className="flex min-h-0 flex-1 flex-col">
-        <div className="border-b px-5 py-6">
-          <SectionLabel number="01">Workspace / 工作区</SectionLabel>
+        <div className="border-b px-5 pt-6 pb-5">
+          <SectionLabel>工作区</SectionLabel>
           <WorkspacePicker
             key={state.workspace}
             inputRef={workspaceInput}
@@ -83,7 +83,7 @@ export function Sidebar({
           />
           <Button
             variant="primary"
-            className="mt-4 w-full justify-between"
+            className="mt-3.5 w-full justify-between"
             onClick={() => void create()}
             disabled={creating || !state.connected}
             data-action="new-session"
@@ -93,17 +93,14 @@ export function Sidebar({
           </Button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col px-3 py-5">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="eyebrow">Sessions / 会话</h2>
-            <span className="font-mono text-[10px] text-muted">
-              {String(state.sessions.length).padStart(2, "0")}
-            </span>
-          </div>
-          <div className="relative mx-2 mt-4 mb-3">
+          <h2 className="px-2 text-xs font-semibold tracking-[0.01em] text-muted">
+            会话
+          </h2>
+          <div className="relative mx-2 mt-3 mb-3">
             <Search
               size={14}
               aria-hidden="true"
-              className="pointer-events-none absolute top-2.5 left-2.5 text-muted"
+              className="pointer-events-none absolute top-2.5 left-2.5 text-muted/70"
             />
             <input
               id="search"
@@ -113,7 +110,7 @@ export function Sidebar({
               onChange={(event) =>
                 workbench.dispatch({ type: "search", query: event.target.value })
               }
-              className="field border-transparent bg-surface/60 py-2 pl-8"
+              className="field py-2 pl-8"
               autoComplete="off"
             />
           </div>
@@ -123,12 +120,12 @@ export function Sidebar({
             className="min-h-0 flex-1 overflow-y-auto"
           >
             {groups.length === 0 ? (
-              <div className="empty px-3 py-8 text-xs leading-6 text-muted">
+              <div className="empty px-3 py-8 text-[13px] leading-6 text-muted">
                 <MessageSquare
-                  size={19}
-                  strokeWidth={1.3}
+                  size={20}
+                  strokeWidth={1.4}
                   aria-hidden="true"
-                  className="mb-3"
+                  className="mb-3 text-muted/70"
                 />
                 {state.search.trim() === ""
                   ? "还没有会话。打开工作区，开始第一个任务。"
@@ -136,12 +133,12 @@ export function Sidebar({
               </div>
             ) : (
               groups.map((group) => (
-                <div key={group.workspace} className="group mb-5">
+                <div key={group.workspace} className="group mb-4">
                   <h3
                     title={group.workspace}
-                    className="mb-2 flex items-center gap-2 truncate px-2 text-[11px] text-muted"
+                    className="mb-1.5 flex items-center gap-2 truncate px-2 text-xs text-muted"
                   >
-                    <FolderOpen size={13} aria-hidden="true" />
+                    <FolderOpen size={13} aria-hidden="true" className="shrink-0" />
                     {workspaceName(group.workspace)}
                   </h3>
                   {group.sessions.map((session) => (
@@ -158,7 +155,7 @@ export function Sidebar({
           </nav>
         </div>
       </div>
-      <div className="mt-auto shrink-0 border-t p-3">
+      <div className="mt-auto shrink-0 border-t p-2.5">
         <AccountMenu
           collapsed={collapsed}
           taskRunning={state.taskRunning}
@@ -182,13 +179,13 @@ function WorkspacePicker({
   const [path, setPath] = useState(state.workspace);
   return (
     <form
-      className="mt-5"
+      className="mt-3"
       onSubmit={(event) => {
         event.preventDefault();
         onOpen(path);
       }}
     >
-      <label htmlFor="workspace-input" className="mb-2 block text-sm font-semibold">
+      <label htmlFor="workspace-input" className="mb-2 block text-[13px] font-semibold">
         {state.workspace === "" ? "选择你的工作区" : workspaceName(state.workspace)}
       </label>
       <div className="flex items-center gap-2">
@@ -200,7 +197,7 @@ function WorkspacePicker({
           value={path}
           onChange={(event) => setPath(event.target.value)}
           placeholder="/home/you/project"
-          className="field font-mono text-[11px]"
+          className="field font-mono text-xs"
           autoComplete="off"
         />
         <Button
@@ -208,7 +205,7 @@ function WorkspacePicker({
           data-action="use-workspace"
           title="打开工作区"
           aria-label="打开工作区"
-          className="size-9 px-0"
+          className="size-9 bg-paper px-0"
         >
           <ArrowUpRight size={16} aria-hidden="true" />
         </Button>
@@ -218,7 +215,6 @@ function WorkspacePicker({
           <option key={workspace} value={workspace} />
         ))}
       </datalist>
-      <p className="mt-2 text-[10px] text-muted">输入 WSL 中的项目目录</p>
     </form>
   );
 }
@@ -247,9 +243,9 @@ function SessionRow({
     );
   if (edit?.kind === "delete")
     return (
-      <div className="session mb-1 rounded-sm border border-accent/30 bg-accent-soft p-3">
-        <p className="title truncate text-xs font-medium">{title}</p>
-        <p className="my-2 text-[11px] leading-5 text-muted">删除这个会话及其日志？</p>
+      <div className="session mb-1 rounded-lg border bg-paper p-3">
+        <p className="title truncate text-[13px] font-medium">{title}</p>
+        <p className="my-2 text-xs leading-5 text-muted">删除这个会话及其日志？</p>
         <div className="flex gap-2">
           <Button
             data-action="delete-confirm"
@@ -269,8 +265,14 @@ function SessionRow({
     );
   return (
     <div
-      className={`session group/row relative mb-1 border-l-2 ${active ? "active border-accent bg-surface" : "border-transparent hover:bg-surface/60"}`}
+      className={`session group/row relative mb-0.5 rounded-md ${active ? "active bg-paper shadow-[0_1px_2px_rgba(31,35,40,0.06)]" : "hover:bg-ink/[0.035]"}`}
     >
+      {active ? (
+        <span
+          aria-hidden="true"
+          className="absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-full bg-accent"
+        />
+      ) : null}
       <button
         type="button"
         data-action="open-session"
@@ -280,18 +282,18 @@ function SessionRow({
           void workbench.openSession(session.id);
           onNavigate();
         }}
-        className="block w-full min-w-0 py-3 pr-17 pl-3 text-left"
+        className="block w-full min-w-0 py-2.5 pr-16 pl-3 text-left"
       >
         <span
-          className={`title block truncate text-xs ${active ? "font-semibold" : "font-medium"}`}
+          className={`title block truncate text-[13px] ${active ? "font-semibold" : "font-medium"}`}
         >
           {title}
         </span>
-        <span className="mt-1.5 block font-mono text-[9px] text-muted">
-          {session.entryCount} 条记录 · {formatDate(session.updatedAt)}
+        <span className="mt-0.5 block truncate text-xs text-muted">
+          {formatDate(session.updatedAt)}
         </span>
       </button>
-      <div className="absolute top-2 right-1 flex opacity-50 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100">
+      <div className="absolute top-2 right-1 flex opacity-0 transition-opacity delay-100 duration-150 group-focus-within/row:opacity-100 group-focus-within/row:delay-0 group-hover/row:opacity-100 group-hover/row:delay-0">
         <Button
           variant="ghost"
           className="size-7 min-h-7 px-0"
@@ -335,7 +337,7 @@ function RenameSession({
   const [value, setValue] = useState(title);
   return (
     <form
-      className="session space-y-2 border p-3"
+      className="session space-y-2 rounded-lg border bg-paper p-3"
       data-action="rename-form"
       data-session={sessionId}
       onSubmit={(event) => {
@@ -369,7 +371,7 @@ function RenameSession({
 
 function formatDate(value: string): string {
   return new Date(value).toLocaleDateString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
+    month: "long",
+    day: "numeric",
   });
 }

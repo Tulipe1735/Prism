@@ -50,8 +50,8 @@ function Startup(): JSX.Element {
           <PrismMark />
           <span className="text-3xl font-semibold tracking-tighter">Prism.</span>
         </div>
-        <SectionLabel number="01">Welcome / 开始工作</SectionLabel>
-        <h1 className="mt-6 text-4xl leading-tight font-semibold tracking-tight">
+        <SectionLabel>开始工作</SectionLabel>
+        <h1 className="mt-6 text-[32px] leading-[1.2] font-semibold tracking-[-0.03em]">
           {state.message}
         </h1>
         <p className="mt-4 text-sm leading-7 text-muted">
@@ -66,7 +66,7 @@ function Startup(): JSX.Element {
               void window.prismSetup.prepare({ distribution, installBrowser: browser });
             }}
           >
-            <label className="block text-xs font-medium">
+            <label className="block text-[13px] font-medium">
               WSL 发行版
               <select
                 id="distribution"
@@ -82,7 +82,7 @@ function Startup(): JSX.Element {
                 ))}
               </select>
             </label>
-            <label className="flex items-start gap-3 text-xs leading-6 text-muted">
+            <label className="flex items-start gap-3 text-[13px] leading-6 text-muted">
               <input
                 type="checkbox"
                 checked={browser}
@@ -92,7 +92,7 @@ function Startup(): JSX.Element {
               />
               <span>
                 同时准备 Chromium 浏览器
-                <span className="block text-[11px]">
+                <span className="block text-[13px] text-muted">
                   首次准备需要联网。也可以稍后通过工作台菜单安装浏览器。
                 </span>
               </span>
@@ -113,7 +113,7 @@ function Startup(): JSX.Element {
             </Button>
           </form>
         ) : busy ? (
-          <p className="mt-8 flex items-center gap-3 text-xs text-muted">
+          <p className="mt-8 flex items-center gap-3 text-[13px] text-muted">
             <LoaderCircle size={15} className="animate-spin" />
             {state.message}
           </p>
@@ -143,7 +143,10 @@ function Startup(): JSX.Element {
           </div>
         )}
         {state.phase === "error" ? (
-          <p role="alert" className="mt-5 flex items-center gap-2 text-xs text-accent">
+          <p
+            role="alert"
+            className="mt-5 flex items-center gap-2 text-[13px] text-accent"
+          >
             <TriangleAlert size={14} />
             准备未完成。检查下面的详情后可以重试。
           </p>
@@ -152,7 +155,7 @@ function Startup(): JSX.Element {
           <pre
             role="log"
             aria-label="准备日志"
-            className="mt-5 max-h-40 overflow-auto whitespace-pre-wrap break-words border bg-surface p-4 font-mono text-[11px] leading-6"
+            className="mt-5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-surface p-4 font-mono text-xs leading-6 text-muted"
           >
             {state.detail}
           </pre>

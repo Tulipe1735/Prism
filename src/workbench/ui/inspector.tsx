@@ -19,7 +19,7 @@ export function Inspector({
   const artifacts = useMemo(() => toArtifacts(state.entries), [state.entries]);
   return (
     <>
-      <div className="flex h-16 shrink-0 items-center justify-between border-b px-5">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b px-5">
         <nav
           id="views"
           aria-label="详情视图"
@@ -38,12 +38,12 @@ export function Inspector({
               data-view={view}
               aria-pressed={state.view === view}
               onClick={() => dispatch({ type: "view", view })}
-              className={`relative text-xs ${state.view === view ? "font-semibold text-ink after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:bg-accent" : "text-muted hover:text-ink"}`}
+              className={`relative flex items-center gap-1.5 text-[13px] transition-colors ${state.view === view ? "font-semibold text-ink after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-accent" : "text-muted hover:text-ink"}`}
             >
               {label}
               {view === "artifacts" ? (
-                <span className="ml-2 font-mono text-[10px] text-muted">
-                  {String(artifacts.length).padStart(2, "0")}
+                <span className="text-xs tabular-nums text-muted/80">
+                  {artifacts.length}
                 </span>
               ) : null}
             </button>
@@ -60,22 +60,22 @@ export function Inspector({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div id="artifacts" hidden={state.view !== "artifacts"}>
-          <div className="p-5">
-            <SectionLabel number="03">Output / 任务产物</SectionLabel>
-            <p className="mt-2 text-[11px] leading-6 text-muted">
+          <div className="px-5 pt-5 pb-3">
+            <SectionLabel>任务产物</SectionLabel>
+            <p className="mt-1.5 text-[13px] leading-6 text-muted">
               本次会话产生的文件改动与执行结果。
             </p>
           </div>
           {artifacts.length === 0 ? (
-            <div className="empty mx-5 border border-dashed px-5 py-9">
+            <div className="empty mx-5 rounded-lg border border-dashed px-5 py-9">
               <Files
-                size={24}
-                strokeWidth={1.2}
-                className="mb-4 text-muted"
+                size={22}
+                strokeWidth={1.3}
+                className="mb-3 text-muted/70"
                 aria-hidden="true"
               />
-              <p className="text-xs font-medium">还没有文件改动</p>
-              <p className="mt-2 text-[11px] leading-6 text-muted">
+              <p className="text-[13px] font-medium">还没有文件改动</p>
+              <p className="mt-1.5 text-[13px] leading-6 text-muted">
                 任务开始后，改动的文件会出现在这里。
               </p>
             </div>
@@ -86,8 +86,8 @@ export function Inspector({
               ))}
             </div>
           )}
-          <div className="mx-5 mt-9 border-t pt-5 pb-6">
-            <dl className="mt-4 space-y-4 text-[11px]">
+          <div className="mx-5 mt-8 border-t pt-5 pb-6">
+            <dl className="space-y-3 text-[13px]">
               <div className="flex justify-between gap-3">
                 <dt className="text-muted">工作区</dt>
                 <dd className="truncate font-medium" title={state.workspace}>
@@ -96,7 +96,7 @@ export function Inspector({
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-muted">模型</dt>
-                <dd className="truncate font-mono">
+                <dd className="truncate font-mono text-xs">
                   {state.settings?.model.model ?? "—"}
                 </dd>
               </div>
@@ -115,11 +115,11 @@ export function Inspector({
           <Settings workbench={workbench} />
         </div>
       </div>
-      <div className="border-t px-5 py-3 text-[10px] text-muted">
-        {state.approvals.length > 0
-          ? `${state.approvals.length} 个动作等待审批`
-          : "工作清晰，专注当下。"}
-      </div>
+      {state.approvals.length > 0 ? (
+        <div className="border-t px-5 py-2.5 text-xs text-muted">
+          {state.approvals.length} 个动作等待审批
+        </div>
+      ) : null}
     </>
   );
 }
@@ -127,27 +127,30 @@ export function Inspector({
 function ArtifactCard({ artifact }: { artifact: Artifact }): JSX.Element {
   return (
     <details
-      className="artifact min-w-0 overflow-hidden rounded-sm border"
+      className="artifact min-w-0 overflow-hidden rounded-lg border bg-paper"
       data-path={artifact.path}
     >
-      <summary className="flex items-center gap-2 p-3 text-[11px]">
+      <summary className="flex items-center gap-2 p-3 text-[13px] transition-colors hover:bg-surface/70">
         <ChevronRight
-          size={11}
+          size={12}
           className="disclosure shrink-0 text-muted"
           aria-hidden="true"
         />
-        <FileCode2 size={13} className="shrink-0 text-muted" aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate font-mono" title={artifact.path}>
+        <FileCode2 size={14} className="shrink-0 text-muted" aria-hidden="true" />
+        <span
+          className="min-w-0 flex-1 truncate font-mono text-xs"
+          title={artifact.path}
+        >
           {artifact.path}
         </span>
-        <span className="counts shrink-0 font-mono text-[10px]">
+        <span className="counts shrink-0 font-mono text-xs tabular-nums">
           <span className="text-success">+{artifact.added}</span>{" "}
           <span className="text-accent">−{artifact.removed}</span>
         </span>
       </summary>
       <div className="border-t">
         <p
-          className={`px-3 pt-2 text-[10px] ${artifact.state === "failed" ? "text-accent" : "text-muted"}`}
+          className={`px-3.5 pt-2.5 text-xs ${artifact.state === "failed" ? "text-accent" : "text-muted"}`}
         >
           {artifact.state === "failed"
             ? "修改失败"
@@ -160,7 +163,7 @@ function ArtifactCard({ artifact }: { artifact: Artifact }): JSX.Element {
         ) : (
           <>
             {artifact.written !== null ? (
-              <p className="px-3 pt-2 text-[10px] leading-5 text-muted">
+              <p className="px-3.5 pt-2 text-xs leading-5 text-muted">
                 工具没有返回 diff；下面是这次写入的内容。
               </p>
             ) : null}

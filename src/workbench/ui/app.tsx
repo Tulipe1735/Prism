@@ -43,10 +43,14 @@ export function App(): JSX.Element {
   const inspectorButton = useRef<HTMLButtonElement>(null);
   const navigationVisible = navigationOpen && (inlineNavigation || !inspectorOpen);
   const navigationWidth =
-    inlineNavigation && navigationVisible ? (inlineInspector ? 252 : 240) : 64;
+    inlineNavigation && navigationVisible ? (inlineInspector ? 268 : 248) : 64;
   const inspectorWidth = inlineInspector && inspectorOpen ? 320 : 0;
   const overlayOpen =
     (!inlineNavigation && navigationVisible) || (!inlineInspector && inspectorOpen);
+  const sidebarContent = useDelayedFlag(navigationVisible, 120);
+  const inspectorClass = inlineInspector
+    ? `col-start-3 row-start-1 ${inspectorOpen ? "border-l" : "border-l-0"}`
+    : "fixed top-14 right-0 bottom-0 z-30 w-[min(92vw,360px)] border-l shadow-xl";
 
   function expandNavigation(): void {
     setNavigationOpen(true);
@@ -73,30 +77,30 @@ export function App(): JSX.Element {
   }, [navigationVisible, inspectorOpen, inlineNavigation, inlineInspector]);
 
   return (
-    <div className="grid h-dvh grid-rows-[64px_minmax(0,1fr)_32px] overflow-hidden">
+    <div className="grid h-dvh grid-rows-[56px_minmax(0,1fr)] overflow-hidden">
       <a
         href="#message"
-        className="fixed top-2 left-2 z-50 -translate-y-20 bg-ink px-4 py-2 text-xs text-paper focus:translate-y-0"
+        className="fixed top-2 left-2 z-50 -translate-y-20 rounded-md bg-ink px-4 py-2 text-[13px] text-paper focus:translate-y-0"
       >
         跳到任务输入
       </a>
       <header id="topbar" className="flex min-w-0 items-center border-b">
         <div
           style={{ width: navigationWidth }}
-          className={`flex h-full shrink-0 items-center border-r ${navigationWidth === 64 ? "justify-center" : "gap-3 px-5"}`}
+          className={`flex h-full shrink-0 items-center border-r bg-surface transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${navigationWidth === 64 ? "justify-center" : "gap-2.5 px-5"}`}
           aria-label="Prism"
         >
           <PrismMark />
           {navigationWidth > 64 ? (
-            <>
-              <span id="wordmark" className="text-xl font-semibold tracking-tight">
-                Prism.
-              </span>
-              <span className="eyebrow ml-auto text-[9px]">Workbench</span>
-            </>
+            <span
+              id="wordmark"
+              className="text-[17px] font-semibold tracking-[-0.03em]"
+            >
+              Prism
+            </span>
           ) : null}
         </div>
-        <div className="flex min-w-0 flex-1 items-center gap-3 px-2 md:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 px-3 md:px-5">
           <button
             ref={navigationButton}
             type="button"
@@ -108,17 +112,17 @@ export function App(): JSX.Element {
               if (navigationVisible) setNavigationOpen(false);
               else expandNavigation();
             }}
-            className="flex size-9 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-surface hover:text-ink"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface hover:text-ink"
           >
             {navigationVisible ? (
-              <PanelLeftClose size={17} aria-hidden="true" />
+              <PanelLeftClose size={16} aria-hidden="true" />
             ) : (
-              <PanelLeftOpen size={17} aria-hidden="true" />
+              <PanelLeftOpen size={16} aria-hidden="true" />
             )}
           </button>
-          <div className="hidden min-w-0 items-center gap-2 text-[11px] sm:flex">
+          <div className="hidden min-w-0 items-center gap-1.5 text-[13px] sm:flex">
             <span className="text-muted">工作台</span>
-            <ChevronRight size={12} className="text-muted" aria-hidden="true" />
+            <ChevronRight size={13} className="text-muted/60" aria-hidden="true" />
             <span className="truncate font-medium">
               {state.workspace === "" ? "开始" : workspaceName(state.workspace)}
             </span>
@@ -137,19 +141,19 @@ export function App(): JSX.Element {
               setInspectorOpen((open) => !open);
               if (!inlineNavigation) setNavigationOpen(false);
             }}
-            className="flex size-9 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-surface hover:text-ink"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface hover:text-ink"
           >
             {inspectorOpen ? (
-              <PanelRightClose size={17} aria-hidden="true" />
+              <PanelRightClose size={16} aria-hidden="true" />
             ) : (
-              <PanelRightOpen size={17} aria-hidden="true" />
+              <PanelRightOpen size={16} aria-hidden="true" />
             )}
           </button>
         </div>
       </header>
 
       <main
-        className="relative grid min-h-0"
+        className="relative grid min-h-0 transition-[grid-template-columns] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
         style={{
           gridTemplateColumns: `${navigationWidth}px minmax(0,1fr) ${inspectorWidth}px`,
         }}
@@ -158,7 +162,7 @@ export function App(): JSX.Element {
           <button
             type="button"
             aria-label="关闭侧栏"
-            className="fixed top-16 right-0 bottom-8 left-0 z-20 bg-ink/10"
+            className="fixed top-14 right-0 bottom-0 left-0 z-20 bg-ink/15"
             onClick={() => {
               if (!inlineNavigation) setNavigationOpen(false);
               if (!inlineInspector) setInspectorOpen(false);
@@ -168,11 +172,11 @@ export function App(): JSX.Element {
         <aside
           id="sidebar"
           aria-label="工作区与会话"
-          className={`${navigationVisible && !inlineNavigation ? "fixed top-16 bottom-8 left-0 z-30 w-[min(88vw,280px)] shadow-xl" : "col-start-1 row-start-1"} flex min-h-0 min-w-0 flex-col border-r bg-paper`}
+          className={`${navigationVisible && !inlineNavigation ? "fixed top-14 bottom-0 left-0 z-30 w-[min(88vw,288px)] shadow-xl" : "col-start-1 row-start-1"} flex min-h-0 min-w-0 flex-col overflow-hidden border-r bg-surface`}
         >
           <Sidebar
             workbench={workbench}
-            collapsed={!navigationVisible}
+            collapsed={!sidebarContent}
             onExpand={expandNavigation}
             onNavigate={finishNavigation}
             onSettings={() => {
@@ -189,18 +193,18 @@ export function App(): JSX.Element {
         >
           <div
             id="chat-header"
-            className="flex h-16 shrink-0 items-center justify-between gap-3 border-b px-5 md:px-8 lg:px-12"
+            className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-5 md:px-8 lg:px-12"
           >
             <div className="min-w-0">
               {state.session === null ? (
-                <SectionLabel number="02">Conversation / 任务对话</SectionLabel>
+                <SectionLabel>任务对话</SectionLabel>
               ) : (
                 <>
-                  <strong className="block truncate text-xs font-semibold">
+                  <strong className="block truncate text-sm font-semibold">
                     {state.session.title ?? "未命名会话"}
                   </strong>
                   <span
-                    className="mt-1 block truncate font-mono text-[9px] text-muted"
+                    className="mt-0.5 block truncate text-xs text-muted"
                     title={state.session.workspace}
                   >
                     {state.session.workspace}
@@ -208,14 +212,10 @@ export function App(): JSX.Element {
                 </>
               )}
             </div>
-            {state.session === null ? (
-              <span className="eyebrow hidden text-[9px] sm:block">
-                Make room for progress
-              </span>
-            ) : (
+            {state.session === null ? null : (
               <Button
                 variant="ghost"
-                className="px-2 text-[10px]"
+                className="px-2 text-xs"
                 data-action="compact"
                 disabled={state.taskRunning || !state.connected}
                 title="把较早的上下文换成摘要，保留原始日志"
@@ -245,8 +245,10 @@ export function App(): JSX.Element {
         <aside
           id="inspector"
           aria-label="产物与设置"
-          hidden={!inspectorOpen}
-          className={`${inlineInspector ? "col-start-3 row-start-1" : "fixed top-16 right-0 bottom-8 z-30 w-[min(92vw,360px)] shadow-xl"} flex min-h-0 min-w-0 flex-col border-l bg-paper`}
+          aria-hidden={!inspectorOpen}
+          inert={!inspectorOpen}
+          hidden={!inspectorOpen && !inlineInspector}
+          className={`${inspectorClass} flex min-h-0 min-w-0 flex-col overflow-hidden bg-paper`}
         >
           <Inspector
             workbench={workbench}
@@ -258,25 +260,19 @@ export function App(): JSX.Element {
         </aside>
       </main>
 
-      <footer className="flex items-center justify-between gap-3 border-t px-5 font-mono text-[9px] text-muted">
-        <span className="tracking-[0.12em]">PRISM / PERSONAL CODING AGENT</span>
-        <span className="hidden sm:inline">
-          {state.workspace === "" ? "等待选择工作区" : state.workspace}
-        </span>
-        <span>{state.kernel === null ? "CONNECTING" : `v${state.kernel.version}`}</span>
-      </footer>
       {state.notice === null ? (
         <div id="notice" />
       ) : (
         <div
           id="notice"
           role="status"
-          className="fixed right-4 bottom-12 left-4 z-40 mx-auto flex max-w-xl items-start gap-3 rounded-sm border bg-paper p-4 text-xs leading-6 shadow-lg sm:left-auto"
+          className="fixed right-4 bottom-6 left-4 z-40 mx-auto flex max-w-xl items-start gap-3 rounded-lg border bg-paper p-4 text-sm leading-6 shadow-lg shadow-ink/5 sm:left-auto"
         >
           <Circle
-            size={12}
+            size={9}
+            fill="currentColor"
             aria-hidden="true"
-            className="mt-1.5 shrink-0 text-accent"
+            className="mt-2 shrink-0 text-accent"
           />
           <span className="notice flex-1 break-words">{state.notice}</span>
           <Button
@@ -285,12 +281,26 @@ export function App(): JSX.Element {
             aria-label="关闭提示"
             onClick={() => workbench.dispatch({ type: "notice", notice: null })}
           >
-            <X size={13} aria-hidden="true" />
+            <X size={14} aria-hidden="true" />
           </Button>
         </div>
       )}
     </div>
   );
+}
+
+/** Keeps a flag true for `delay` ms after it turns false, so content can fade. */
+function useDelayedFlag(value: boolean, delay: number): boolean {
+  const [shown, setShown] = useState(value);
+  useEffect(() => {
+    if (value) {
+      setShown(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setShown(false), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+  return shown;
 }
 
 function useMediaQuery(query: string): boolean {
@@ -318,7 +328,7 @@ export function KernelStatus({ state }: { state: UiState }): JSX.Element {
     <span
       data-status={status}
       title={state.kernel?.dataDir}
-      className="flex shrink-0 items-center gap-2 text-[10px] text-muted"
+      className="flex shrink-0 items-center gap-2 text-xs text-muted"
     >
       <span
         className={`size-1.5 rounded-full ${status === "ready" ? "bg-success" : status === "offline" || status === "error" ? "bg-accent" : "animate-pulse bg-muted"}`}
@@ -351,7 +361,7 @@ function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
     <div className="shrink-0 px-5 pt-3 pb-4 md:px-8 md:pb-6 lg:px-12">
       <form
         id="composer"
-        className="mx-auto max-w-3xl rounded-sm border border-line bg-white/60 transition-colors focus-within:border-ink"
+        className="mx-auto max-w-3xl rounded-lg border border-line bg-paper transition-[border-color,box-shadow] duration-200 focus-within:border-accent/40 focus-within:shadow-[0_1px_3px_rgba(37,99,235,0.06)] focus-within:ring-2 focus-within:ring-accent/10"
         onSubmit={(event) => {
           event.preventDefault();
           void send();
@@ -372,7 +382,7 @@ function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
               ? "新建或选择一个会话，开始你的任务…"
               : "你想完成什么？"
           }
-          className="block max-h-48 min-h-24 w-full border-0 bg-transparent px-4 pt-4 pb-2 text-[13px] leading-6 outline-none placeholder:text-muted/70 focus-visible:outline-none disabled:cursor-not-allowed md:px-5"
+          className="block max-h-48 min-h-[88px] w-full border-0 bg-transparent px-4 pt-4 pb-2 text-sm leading-6 outline-none placeholder:text-muted/60 focus-visible:outline-none disabled:cursor-not-allowed md:px-5"
           onKeyDown={(event) => {
             if (
               event.key === "Enter" &&
@@ -385,15 +395,15 @@ function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
             }
           }}
         />
-        <div className="flex min-h-12 items-center justify-between gap-2 px-3 pb-3 md:px-4">
-          <div className="flex min-w-0 items-center gap-2 text-[10px] text-muted">
-            <ShieldCheck size={13} className="shrink-0" aria-hidden="true" />
+        <div className="flex min-h-11 items-center justify-between gap-2 px-3 pb-3 md:px-4">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-muted">
+            <ShieldCheck size={14} className="shrink-0" aria-hidden="true" />
             <span>
               {state.settings === null
                 ? "读取设置中"
                 : SCOPE_LABELS[state.settings.permissions.scope]}
             </span>
-            <span className="hidden truncate border-l pl-2 font-mono text-[9px] sm:inline">
+            <span className="hidden truncate border-l pl-2 text-xs sm:inline">
               {state.settings?.model.model}
             </span>
           </div>
@@ -404,7 +414,7 @@ function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
               disabled={!state.taskRunning || !state.connected}
               onClick={() => void workbench.cancel()}
             >
-              <Square size={10} fill="currentColor" aria-hidden="true" />
+              <Square size={9} fill="currentColor" aria-hidden="true" />
               取消任务
             </Button>
           ) : (
@@ -413,7 +423,7 @@ function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
               type="submit"
               variant="primary"
               disabled={!enabled || draft.trim() === ""}
-              className="size-8 min-h-8 px-0"
+              className="size-9 min-h-9 rounded-full border-accent bg-accent px-0 text-white hover:border-[#1d4ed8] hover:bg-[#1d4ed8]"
               aria-label="发送任务"
               title="发送任务"
             >
@@ -422,10 +432,10 @@ function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
           )}
         </div>
       </form>
-      <div className="mx-auto mt-3 flex max-w-3xl items-center justify-between gap-3 text-[9px] text-muted">
+      <div className="mx-auto mt-2.5 flex max-w-3xl items-center justify-between gap-3 text-xs text-muted">
         <span id="task-state" role="status" className="flex items-center gap-1.5">
           <span
-            className={`size-1 rounded-full ${busy ? "animate-pulse bg-accent" : "bg-muted/50"}`}
+            className={`size-1 rounded-full ${busy ? "animate-pulse bg-accent" : "bg-muted/40"}`}
           />
           {state.session === null
             ? "准备好，开始下一件事。"
@@ -434,8 +444,14 @@ function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
               : "空闲 · 随时开始"}
         </span>
         <span className="hidden sm:inline">
-          <kbd className="font-mono">Enter</kbd> 发送<span className="mx-1.5">/</span>
-          <kbd className="font-mono">Shift + Enter</kbd> 换行
+          <kbd className="rounded border border-line bg-surface px-1.5 py-0.5 font-mono text-[11px]">
+            Enter
+          </kbd>{" "}
+          发送<span className="mx-1.5 text-muted/50">/</span>
+          <kbd className="rounded border border-line bg-surface px-1.5 py-0.5 font-mono text-[11px]">
+            Shift + Enter
+          </kbd>{" "}
+          换行
         </span>
       </div>
     </div>
@@ -461,26 +477,28 @@ export function ApprovalCard({
   }
   return (
     <section
-      className="approval mx-auto mb-4 max-w-3xl border border-accent/40 bg-accent-soft p-4"
+      className="approval mx-auto mb-4 max-w-3xl rounded-lg border border-line border-l-2 border-l-accent bg-paper p-4 shadow-[0_1px_2px_rgba(31,35,40,0.04)]"
       data-request={approval.requestId}
       aria-label="需要审批"
     >
-      <h3 className="flex items-center gap-2 text-xs font-semibold">
-        <ShieldCheck size={15} className="text-accent" aria-hidden="true" />
+      <h3 className="flex items-center gap-2 text-sm font-semibold">
+        <ShieldCheck size={16} className="text-accent" aria-hidden="true" />
         需要审批
-        <span className="ml-auto font-mono text-[10px] text-muted">
+        <span className="ml-auto font-mono text-xs font-normal text-muted">
           {approval.tool}
         </span>
       </h3>
-      <dl className="my-4 grid grid-cols-[32px_minmax(0,1fr)] gap-x-4 gap-y-2 text-[11px] leading-6">
+      <dl className="my-4 grid grid-cols-[36px_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px] leading-6">
         <dt className="text-muted">理由</dt>
         <dd className="break-words">{approval.reason}</dd>
         <dt className="text-muted">目标</dt>
-        <dd className="font-mono break-all">{approval.target}</dd>
+        <dd className="font-mono text-xs leading-6 break-all">{approval.target}</dd>
         <dt className="text-muted">影响</dt>
         <dd className="break-words">{approval.impact}</dd>
         <dt className="text-muted">会话</dt>
-        <dd className="font-mono">{approval.sessionId.slice(0, 8)}</dd>
+        <dd className="font-mono text-xs leading-6">
+          {approval.sessionId.slice(0, 8)}
+        </dd>
       </dl>
       <div className="flex gap-2">
         <Button
@@ -491,7 +509,7 @@ export function ApprovalCard({
           data-request={approval.requestId}
           onClick={() => void answer(true)}
         >
-          <Check size={12} aria-hidden="true" />
+          <Check size={13} aria-hidden="true" />
           允许一次
         </Button>
         <Button

@@ -11,15 +11,15 @@ export function Button({
   variant?: "primary" | "outline" | "ghost";
 }): JSX.Element {
   const styles = {
-    primary: "border-ink bg-ink text-paper hover:border-accent hover:bg-accent",
-    outline: "border-line bg-transparent text-ink hover:border-ink hover:bg-surface",
-    ghost: "border-transparent text-muted hover:bg-surface hover:text-ink",
+    primary: "border-ink bg-ink text-paper hover:border-[#33373d] hover:bg-[#33373d]",
+    outline: "border-line bg-paper text-ink hover:border-[#d5d8dd] hover:bg-surface",
+    ghost: "border-transparent text-muted hover:bg-ink/5 hover:text-ink",
   };
   return (
     <button
       type={type}
       className={twMerge(
-        "inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-sm border px-3 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-40",
+        "inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-150 disabled:pointer-events-none disabled:opacity-40",
         styles[variant],
         className,
       )}
@@ -30,18 +30,10 @@ export function Button({
   );
 }
 
-export function SectionLabel({
-  number,
-  children,
-}: {
-  number: string;
-  children: ReactNode;
-}): JSX.Element {
+/** One quiet section label. No numbering, no uppercase, no second language. */
+export function SectionLabel({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <div className="eyebrow flex items-center gap-3">
-      <span className="text-accent">{number}</span>
-      {children}
-    </div>
+    <h2 className="text-xs font-semibold tracking-[0.01em] text-muted">{children}</h2>
   );
 }
 

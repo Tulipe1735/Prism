@@ -1,21 +1,49 @@
 @import "tailwindcss" source(none);
 @source "./";
 
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("./assets/fonts/inter-latin-wght-normal.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF,
+    U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("./assets/fonts/inter-latin-ext-wght-normal.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 @theme {
   --font-sans:
-    "Inter", "Helvetica Neue", "Arial", "PingFang SC", "Microsoft YaHei", sans-serif;
+    "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Noto Sans CJK SC",
+    "Microsoft YaHei", sans-serif;
   --font-mono: "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
-  --color-paper: #f8f8f5;
-  --color-surface: #f0f0eb;
-  --color-ink: #22231f;
-  --color-muted: #70716b;
-  --color-line: #deded6;
-  --color-accent: #cf4025;
-  --color-accent-soft: #f8e9e3;
-  --color-success: #48724b;
+  --color-paper: #ffffff;
+  --color-surface: #f7f8fa;
+  --color-ink: #1f2328;
+  --color-muted: #6b7280;
+  --color-line: #e7e9ed;
+  --color-accent: #2563eb;
+  --color-success: #2f7d5b;
 }
 
 @layer base {
+  :root {
+    --ease-out-quiet: cubic-bezier(0.22, 1, 0.36, 1);
+  }
   * {
     border-color: var(--color-line);
   }
@@ -24,12 +52,25 @@
   #root {
     height: 100%;
   }
+  html {
+    font-synthesis-weight: none;
+  }
   body {
     margin: 0;
     background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    letter-spacing: -0.006em;
+    font-optical-sizing: auto;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
   }
   button,
   summary {
@@ -40,10 +81,10 @@
   }
   :focus-visible {
     outline: 2px solid var(--color-accent);
-    outline-offset: 3px;
+    outline-offset: 2px;
   }
   ::selection {
-    background: #edc0af;
+    background: #dbe8fd;
     color: var(--color-ink);
   }
   textarea {
@@ -55,8 +96,14 @@
   summary::-webkit-details-marker {
     display: none;
   }
+  summary .disclosure {
+    transition: transform 200ms var(--ease-out-quiet);
+  }
   details[open] > summary .disclosure {
     transform: rotate(90deg);
+  }
+  details:not([open]) > summary .disclosure {
+    transition-delay: 40ms;
   }
   pre {
     tab-size: 2;
@@ -66,30 +113,54 @@
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: #c9c9c0 transparent;
+    scrollbar-color: #d9dce1 transparent;
+  }
+}
+
+/*
+ * A quiet collapse: the content holds for 40ms, then folds away. Chromium 131+
+ * interpolates `block-size: auto`; older engines fall back to an instant fold.
+ */
+@supports (interpolate-size: allow-keywords) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    opacity: 0;
+    transition:
+      block-size 240ms var(--ease-out-quiet) 40ms,
+      opacity 160ms ease 40ms,
+      content-visibility 240ms allow-discrete 40ms;
+  }
+  details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+    transition:
+      block-size 240ms var(--ease-out-quiet),
+      opacity 160ms ease,
+      content-visibility 240ms allow-discrete;
   }
 }
 
 @layer components {
-  .eyebrow {
-    @apply font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-muted;
-  }
   .field {
-    @apply w-full min-w-0 rounded-sm border bg-paper px-3 py-2.5 text-xs text-ink placeholder:text-muted/80 focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink;
+    @apply w-full min-w-0 rounded-md border bg-paper px-3 py-2 text-[13px] text-ink placeholder:text-muted/70 focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none;
   }
   .diff {
-    @apply overflow-x-auto py-2 font-mono text-[11px] leading-6;
+    @apply overflow-x-auto py-2 font-mono text-xs leading-6;
   }
   .diff > div {
     @apply min-w-max whitespace-pre px-4;
   }
   .diff .add {
-    background: #eaf1e5;
-    color: #3d643a;
+    background: #eef6f1;
+    color: #2f6b4f;
   }
   .diff .remove {
-    background: #f8e9e3;
-    color: #a33724;
+    background: #eef3fb;
+    color: #3f5f8f;
   }
   .diff .hunk {
     @apply bg-surface text-muted;
@@ -98,7 +169,7 @@
     @apply text-muted;
   }
   .code-output {
-    @apply max-h-80 overflow-auto whitespace-pre-wrap break-words bg-surface/60 p-4 font-mono text-[11px] leading-6;
+    @apply max-h-80 overflow-auto whitespace-pre-wrap break-words bg-surface/70 p-4 font-mono text-xs leading-6 text-[#3a414b];
   }
 }
 

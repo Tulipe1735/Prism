@@ -50,11 +50,12 @@ export function AccountProvider({ children }: { children: ReactNode }): JSX.Elem
       localization={localization}
       appearance={{
         variables: {
-          colorPrimary: "#22231f",
-          colorBackground: "#f8f8f5",
-          colorForeground: "#22231f",
-          fontFamily: 'Inter, "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif',
-          borderRadius: "4px",
+          colorPrimary: "#1f2328",
+          colorBackground: "#ffffff",
+          colorForeground: "#1f2328",
+          fontFamily:
+            '"Inter Variable", Inter, "Segoe UI", "Microsoft YaHei", sans-serif',
+          borderRadius: "6px",
         },
       }}
     >

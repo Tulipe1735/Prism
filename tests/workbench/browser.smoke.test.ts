@@ -258,6 +258,8 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     await page.press("#workspace-input", "Enter");
     await page.click('[data-action="new-session"]');
     await page.waitForSelector("#chat-header strong");
+    // The overlay folds 120ms after the session opens; wait for the rail.
+    await page.waitForTimeout(250);
     expect(await page.locator("#workspace-input").isVisible()).toBe(false);
     expect(await page.locator('[data-action="new-session-compact"]').isVisible()).toBe(
       true,
@@ -326,6 +328,8 @@ describe.runIf(enabled)("workbench in a real browser", () => {
 
     await navigation.click();
     expect(await navigation.getAttribute("aria-expanded")).toBe("false");
+    // The rail keeps its content for 120ms, then folds; wait for both transitions.
+    await page.waitForTimeout(350);
     expect(await page.locator("#workspace-input").isVisible()).toBe(false);
     expect(await page.locator("#sidebar button:visible").count()).toBe(2);
     expect(await chatWidth()).toBeGreaterThan(initialWidth);
@@ -355,8 +359,10 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     await model.fill("collapsed-settings-draft");
     await page.getByRole("button", { name: "关闭详情" }).click();
     expect(await inspector.getAttribute("aria-expanded")).toBe("false");
+    await page.waitForTimeout(350);
     expect(await page.locator("#inspector").isVisible()).toBe(false);
     await navigation.click();
+    await page.waitForTimeout(350);
     expect(await chatWidth()).toBeGreaterThan(initialWidth + 400);
     expect(await page.locator("#message").inputValue()).toBe("折叠时保留的任务草稿");
     await inspector.click();
@@ -369,6 +375,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
 
     // A configured workspace can create a real session without expanding the rail.
     await navigation.click();
+    await page.waitForTimeout(350);
     await compactCreate.click();
     await page.waitForSelector(
       `[data-action="open-session"][aria-current="page"]:not([data-session="${firstId}"])`,

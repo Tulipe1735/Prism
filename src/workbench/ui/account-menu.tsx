@@ -79,11 +79,11 @@ export function AccountMenu({
   }
 
   const item =
-    "flex cursor-pointer items-center gap-3 rounded-sm px-3 py-2.5 text-xs outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[highlighted]:bg-surface";
+    "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-[13px] outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[highlighted]:bg-surface";
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
-        className={`flex min-h-10 items-center rounded-sm text-left outline-none hover:bg-surface focus-visible:outline-2 focus-visible:outline-accent ${collapsed ? "mx-auto size-10 justify-center" : "w-full gap-3 px-2 py-2"}`}
+        className={`flex min-h-10 items-center rounded-md text-left outline-none hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-accent ${collapsed ? "mx-auto size-10 justify-center" : "w-full gap-3 px-2 py-2"}`}
         aria-label="账户与更新"
         data-account-state={account?.status ?? "unavailable"}
         title={collapsed ? name : undefined}
@@ -98,8 +98,8 @@ export function AccountMenu({
         {collapsed ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-medium">{name}</span>
-              <span className="mt-1 block truncate text-[10px] text-muted">
+              <span className="block truncate text-[13px] font-medium">{name}</span>
+              <span className="mt-0.5 block truncate text-xs text-muted">
                 {signedIn ? account.email : loading ? "正在连接账号…" : "本地工作台"}
               </span>
             </span>
@@ -113,13 +113,13 @@ export function AccountMenu({
           align="start"
           sideOffset={10}
           collisionPadding={8}
-          className="z-50 w-64 rounded-md border bg-paper p-1.5 text-ink shadow-lg"
+          className="z-50 w-64 rounded-lg border bg-paper p-1.5 text-ink shadow-lg shadow-ink/5"
         >
           <DropdownMenu.Label className="px-3 py-3">
-            <span className="block truncate text-xs font-semibold">
+            <span className="block truncate text-[13px] font-semibold">
               {signedIn ? name : "Prism"}
             </span>
-            <span className="mt-1 block truncate text-[10px] text-muted">
+            <span className="mt-0.5 block truncate text-xs text-muted">
               {signedIn ? account.email : "你的工作，你的空间。"}
             </span>
           </DropdownMenu.Label>
@@ -169,12 +169,12 @@ export function AccountMenu({
             {updateLabel}
           </DropdownMenu.Item>
           {update.message ? (
-            <p role="status" className="px-3 py-2 text-[10px] leading-5 text-accent">
+            <p role="status" className="px-3 py-2 text-xs leading-5 text-accent">
               {update.message}
             </p>
           ) : null}
           {update.phase === "downloaded" && taskRunning ? (
-            <p className="px-3 py-2 text-[10px] leading-5 text-muted">
+            <p className="px-3 py-2 text-xs leading-5 text-muted">
               任务完成后即可安装。
             </p>
           ) : null}
@@ -193,8 +193,8 @@ export function AccountMenu({
             </>
           ) : null}
           <DropdownMenu.Separator className="my-1 h-px bg-line" />
-          <div className="px-3 py-2 font-mono text-[9px] text-muted">
-            PRISM / v{update.version}
+          <div className="px-3 py-1.5 text-[11px] tabular-nums text-muted">
+            Prism v{update.version}
           </div>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
