@@ -90,17 +90,25 @@ is in [skills/prism](skills/prism/SKILL.md).
 
 ## Architecture
 
-![Prism architecture](docs/architecture.svg)
+![Prism Agent system architecture](docs/architecture.svg)
 
 The Electron interface runs on Windows; the kernel runs in WSL. The two communicate over
 local HTTP/SSE, and the desktop starts the kernel through `wsl.exe`. See
 [ADR-0001](docs/adr/0001-windows-ui-wsl-execution.md).
 
-[Editable Excalidraw source](docs/architecture.excalidraw) · [Glossary](GLOSSARY.md) ·
-[Requirements](docs/requirements-2026-10-18-coding-agent.md)
+The kernel owns the model/tool loop, session context, permission checks and local
+storage. Its tools cover files and commands, browsers, web retrieval, MCP and skills.
+The `prism` browser CLI for external agents is a separate entry point.
 
-Code: [workbench](src/workbench) · [kernel](src/kernel) · [browser](src/browser) ·
-[browser CLI](src/interfaces/cli.ts)
+[Complete architecture and HTML source](docs/architecture.html) includes the system
+overview, kernel and tools, external browser CLI, and links to their implementation.
+Redrawn with [diagram-design](https://github.com/cathrynlavery/diagram-design), using
+Prism's blue accent and Inter typography.
+
+[Glossary](GLOSSARY.md) · [Requirements](docs/requirements-2026-10-18-coding-agent.md)
+
+Code: [workbench](src/workbench) · [kernel](src/kernel) ·
+[kernel browser](src/kernel/browser) · [browser CLI](src/interfaces/cli.ts)
 
 ## Development
 

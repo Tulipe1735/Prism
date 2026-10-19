@@ -75,15 +75,21 @@ prism --help
 
 ## 架构
 
-![Prism 架构](docs/architecture.svg)
+![Prism Agent 整体架构](docs/architecture.svg)
 
 Electron 界面运行在 Windows，内核运行在 WSL，两者通过本地 HTTP/SSE 通信，由桌面端通过
 `wsl.exe` 启动内核。运行边界见 [ADR-0001](docs/adr/0001-windows-ui-wsl-execution.md)。
 
-[可编辑 Excalidraw 源图](docs/architecture.excalidraw) · [领域词汇](GLOSSARY.md) ·
-[首版需求](docs/requirements-2026-10-18-coding-agent.md)
+内核管理模型与工具调用循环、会话上下文、权限审批和本地存储，并注册文件与命令、浏览器、联网检索、MCP 和技能工具。外部 agent 使用的
+`prism` 浏览器 CLI 是独立入口。
 
-代码：[工作台](src/workbench) · [内核](src/kernel) · [浏览器](src/browser) ·
+[完整架构图与 HTML 源文件](docs/architecture.html)包含整体架构、内核与工具能力、外部浏览器 CLI 三个视图及代码映射。图示使用
+[diagram-design](https://github.com/cathrynlavery/diagram-design)
+重绘，沿用 Prism 的蓝色与 Inter 字体。
+
+[领域词汇](GLOSSARY.md) · [首版需求](docs/requirements-2026-10-18-coding-agent.md)
+
+代码：[工作台](src/workbench) · [内核](src/kernel) · [内核浏览器](src/kernel/browser) ·
 [浏览器 CLI](src/interfaces/cli.ts)
 
 ## 开发

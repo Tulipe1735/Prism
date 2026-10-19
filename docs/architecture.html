@@ -1,0 +1,1399 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Prism Agent 的完整架构：Windows 工作台、WSL 内核、任务循环、模型、工具、权限、会话与独立浏览器 CLI。"
+    />
+    <meta
+      name="generator"
+      content="diagram-design / cathrynlavery / 550fd66 / Prism custom skin"
+    />
+    <title>Prism Agent · 完整架构</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #ffffff;
+        --surface: #f7f8fa;
+        --ink: #1f2328;
+        --muted: #6b7280;
+        --rule: #e7e9ed;
+        --accent: #2563eb;
+        --font-sans:
+          "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --font-mono:
+          "SFMono-Regular", "Cascadia Code", "Consolas", ui-monospace, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--font-sans);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+      main {
+        max-width: 1360px;
+        margin: 0 auto;
+        padding: 64px 32px 40px;
+        min-width: 0;
+      }
+      header {
+        padding-bottom: 32px;
+        border-bottom: 1px solid var(--rule);
+      }
+      .eyebrow {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      h1 {
+        margin: 0 0 16px;
+        font-size: clamp(32px, 4vw, 48px);
+        line-height: 1.15;
+        font-weight: 600;
+        letter-spacing: -0.035em;
+      }
+      .lead {
+        max-width: 780px;
+        margin: 0;
+        font-size: 16px;
+        color: var(--muted);
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 28px;
+        margin-top: 24px;
+      }
+      a {
+        color: var(--accent);
+        text-underline-offset: 4px;
+      }
+      a:focus-visible,
+      summary:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 4px;
+      }
+      section {
+        margin-top: 40px;
+        scroll-margin-top: 20px;
+      }
+      .diagram-container {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        overflow-x: auto;
+      }
+      svg {
+        width: 100%;
+        min-width: 1280px;
+        display: block;
+        font-family: var(--font-sans);
+      }
+      svg text {
+        fill: var(--ink);
+      }
+      .diagram-title {
+        font-family: var(--font-sans);
+        font-size: 40px;
+        font-weight: 600;
+        letter-spacing: -1px;
+      }
+      .node-name {
+        font-family: var(--font-sans);
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .body {
+        font-family: var(--font-sans);
+        font-size: 12px;
+        font-weight: 400;
+        fill: var(--muted);
+      }
+      .zone-label {
+        font-family: var(--font-sans);
+        font-size: 12px;
+        font-weight: 500;
+        fill: var(--muted);
+      }
+      .technical,
+      .arrow-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 400;
+        fill: var(--muted);
+      }
+      .tag {
+        font-family: var(--font-mono);
+        font-size: 8px;
+        font-weight: 500;
+        fill: var(--muted);
+        letter-spacing: 0.04em;
+      }
+      .caption {
+        margin: 12px 40px 24px;
+        max-width: 1000px;
+        color: var(--muted);
+      }
+      .notes {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 28px;
+        margin: 32px 40px;
+      }
+      .note {
+        padding-top: 16px;
+        border-top: 1px solid var(--rule);
+      }
+      h2 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 12px;
+      }
+      h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 12px;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+      details {
+        margin: 32px 40px;
+        padding-top: 20px;
+        border-top: 1px solid var(--rule);
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .table-scroll {
+        overflow-x: auto;
+        margin-top: 16px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 12px;
+        border-bottom: 1px solid var(--rule);
+      }
+      th {
+        background: var(--surface);
+        font-weight: 600;
+      }
+      footer {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid var(--rule);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      @media (max-width: 640px) {
+        main {
+          padding: 32px 16px;
+        }
+        .notes {
+          grid-template-columns: 1fr;
+        }
+        .notes,
+        details,
+        .caption {
+          margin-left: 0;
+          margin-right: 0;
+        }
+      }
+      @media print {
+        main {
+          max-width: none;
+          padding: 0;
+        }
+        nav {
+          display: none;
+        }
+        .diagram-container {
+          overflow-x: visible;
+        }
+        svg {
+          min-width: 0;
+        }
+        section {
+          break-inside: avoid;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">PRISM · ARCHITECTURE · v0.2.3</p>
+        <h1>从任务到结果，Prism 怎样工作。</h1>
+        <p class="lead">
+          Windows 桌面工作台承载交互，WSL 内核运行
+          Agent。模型负责生成回复与工具调用，内核管理上下文、执行工具、检查权限并持久化过程。
+        </p>
+        <nav aria-label="架构视图">
+          <a href="#overview">01 整体架构</a><a href="#kernel-tools">02 内核与工具</a
+          ><a href="#browser-cli">03 外部 CLI</a><a href="#source-map">代码映射</a>
+        </nav>
+      </header>
+      <section id="overview" aria-label="整体架构">
+        <div class="diagram-container">
+          <svg
+            id="prism-system"
+            viewBox="0 0 1280 720"
+            xmlns="http://www.w3.org/2000/svg"
+            role="img"
+            aria-labelledby="prism-system-title prism-system-desc"
+          >
+            <title id="prism-system-title">Prism Agent · 整体架构</title>
+            <desc id="prism-system-desc">
+              Prism 的 Windows 工作台通过桌面服务连接 WSL
+              内核，内核管理任务循环、模型、工具、会话和权限审批，并接入身份与更新服务。
+            </desc>
+            <defs>
+              <marker
+                id="prism-system-arrow-muted"
+                markerWidth="8"
+                markerHeight="6"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0 0 L8 3 L0 6 Z" fill="#6b7280" />
+              </marker>
+              <marker
+                id="prism-system-arrow-accent"
+                markerWidth="8"
+                markerHeight="6"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0 0 L8 3 L0 6 Z" fill="#2563eb" />
+              </marker>
+            </defs>
+            <rect x="0" y="0" width="1280" height="720" fill="#ffffff" />
+            <text x="40" y="57" class="diagram-title">Prism Agent · 整体架构</text>
+            <text x="40" y="86" class="body">
+              从用户任务到模型调用、工具执行、结果落盘与界面反馈。基于 v0.2.3 当前实现。
+            </text>
+            <rect
+              x="40"
+              y="128"
+              width="336"
+              height="456"
+              rx="8"
+              fill="#f7f8fa"
+              stroke="#e7e9ed"
+              stroke-width="1"
+            />
+            <text x="56" y="153" class="zone-label">Windows · 桌面与宿主命令</text>
+            <rect
+              x="416"
+              y="128"
+              width="496"
+              height="456"
+              rx="8"
+              fill="#f7f8fa"
+              stroke="#e7e9ed"
+              stroke-width="1"
+            />
+            <text x="432" y="153" class="zone-label">WSL · Agent 内核与本地状态</text>
+            <rect
+              x="936"
+              y="128"
+              width="304"
+              height="456"
+              rx="8"
+              fill="#f7f8fa"
+              stroke="#e7e9ed"
+              stroke-width="1"
+            />
+            <text x="952" y="153" class="zone-label">依赖服务与工具资源</text>
+            <path
+              data-connection="界面通过 preload IPC 与桌面服务协作"
+              d="M208 264 V328"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <path
+              data-connection="UI 服务器代理本地 HTTP 请求"
+              d="M352 360 H400 Q408 360 408 352 V208 Q408 200 416 200 H440"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <path
+              data-connection="SSE 事件返回桌面工作台"
+              d="M440 216 H432 Q424 216 424 224 V392 Q424 400 416 400 H352"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              stroke-dasharray="5 4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <path
+              data-connection="桌面身份登录与应用更新"
+              d="M352 344 H376 Q384 344 384 336 V120 Q384 112 392 112 H1076 Q1084 112 1084 120 V168"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <path
+              data-connection="API 启动会话任务"
+              d="M496 232 V296"
+              fill="none"
+              stroke="#2563eb"
+              stroke-width="1.4"
+              marker-end="url(#prism-system-arrow-accent)"
+            />
+            <path
+              data-connection="内核推送任务事件与审批请求"
+              d="M616 296 V232"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              stroke-dasharray="5 4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <path
+              data-connection="API 读写会话和设置"
+              d="M784 232 V296"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <path
+              data-connection="任务追加会话日志"
+              d="M648 328 H680"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <path
+              data-connection="上下文从会话历史重建"
+              d="M680 360 H648"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              stroke-dasharray="5 4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <path
+              data-connection="模型适配器调用 OpenAI 兼容 Chat Completions"
+              d="M616 392 V416 Q616 424 624 424 H1076 Q1084 424 1084 416 V392"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <path
+              data-connection="执行前按 effects 检查权限和一次性审批"
+              d="M544 392 V456"
+              fill="none"
+              stroke="#2563eb"
+              stroke-width="1.4"
+              marker-end="url(#prism-system-arrow-accent)"
+            />
+            <path
+              data-connection="经 WSL interop 运行 Windows 命令"
+              d="M440 520 H352"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <path
+              data-connection="调用浏览器、联网检索和配置的 MCP 服务器"
+              d="M888 504 H952"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-system-arrow-muted)"
+            />
+            <rect x="216" y="288" width="112" height="16" rx="2" fill="#ffffff" />
+            <text x="272.0" y="300" class="arrow-label" text-anchor="middle">
+              PRELOAD / IPC
+            </text>
+            <rect x="448" y="256" width="48" height="16" rx="2" fill="#ffffff" />
+            <text x="472.0" y="268" class="arrow-label" text-anchor="middle">TASK</text>
+            <rect x="552" y="420" width="144" height="16" rx="2" fill="#ffffff" />
+            <text x="624.0" y="432" class="body" text-anchor="middle">
+              权限与一次性审批
+            </text>
+            <rect x="784" y="400" width="120" height="16" rx="2" fill="#ffffff" />
+            <text x="844.0" y="412" class="arrow-label" text-anchor="middle">
+              HTTPS / STREAM
+            </text>
+            <g id="system-workbench" data-node="system-workbench">
+              <rect x="64" y="168" width="288" height="96" rx="6" fill="#ffffff" />
+              <rect
+                x="64"
+                y="168"
+                width="288"
+                height="96"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="80" y="185" class="tag">ELECTRON / REACT</text>
+              <text x="80" y="209" class="node-name">桌面工作台</text>
+              <text x="80" y="231" class="body">工作区 · 会话 · 流式对话</text>
+              <text x="80" y="251" class="body">工具过程 · 产物 · 审批 · 设置</text>
+            </g>
+            <g id="system-desktop" data-node="system-desktop">
+              <rect x="64" y="328" width="288" height="96" rx="6" fill="#ffffff" />
+              <rect
+                x="64"
+                y="328"
+                width="288"
+                height="96"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="80" y="345" class="tag">MAIN / PRELOAD / UI SERVER</text>
+              <text x="80" y="369" class="node-name">桌面服务</text>
+              <text x="80" y="391" class="body">准备 WSL 运行时并启动内核</text>
+              <text x="80" y="411" class="body">界面资源与 /kernel 请求代理</text>
+            </g>
+            <g id="system-windows" data-node="system-windows">
+              <rect x="64" y="488" width="288" height="64" rx="6" fill="#ffffff" />
+              <rect
+                x="64"
+                y="488"
+                width="288"
+                height="64"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="80" y="505" class="tag">HOST COMMANDS</text>
+              <text x="80" y="523" class="node-name">Windows 执行目标</text>
+              <text x="80" y="543" class="technical">WSL interop → cmd.exe</text>
+            </g>
+            <g id="system-api" data-node="system-api">
+              <rect x="440" y="168" width="448" height="64" rx="6" fill="#ffffff" />
+              <rect
+                x="440"
+                y="168"
+                width="448"
+                height="64"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="456" y="185" class="tag">127.0.0.1</text>
+              <text x="456" y="203" class="node-name">内核 HTTP / SSE API</text>
+              <text x="456" y="223" class="technical">
+                sessions / messages / settings / approvals / events
+              </text>
+            </g>
+            <g id="system-agent" data-node="system-agent">
+              <rect x="440" y="296" width="208" height="96" rx="6" fill="#ffffff" />
+              <rect
+                x="440"
+                y="296"
+                width="208"
+                height="96"
+                rx="6"
+                fill="#eff4ff"
+                stroke="#2563eb"
+                stroke-width="1.2"
+              />
+              <text x="456" y="313" class="tag">KERNEL / LOOP / MODEL</text>
+              <text x="456" y="337" class="node-name">Agent 任务循环</text>
+              <text x="456" y="359" class="body">上下文 → 模型 → 工具</text>
+              <text x="456" y="379" class="body">结果回流，直到任务结束</text>
+            </g>
+            <g id="system-state" data-node="system-state">
+              <rect x="680" y="296" width="208" height="96" rx="6" fill="#ffffff" />
+              <rect
+                x="680"
+                y="296"
+                width="208"
+                height="96"
+                rx="6"
+                fill="#f7f8fa"
+                stroke="#6b7280"
+                stroke-width="1.2"
+              />
+              <text x="696" y="313" class="tag">LOCAL STATE</text>
+              <text x="696" y="337" class="node-name">会话与上下文</text>
+              <text x="696" y="359" class="body">会话日志 · 指令 · 压缩</text>
+              <text x="696" y="379" class="technical">~/.prism/ · JSONL</text>
+            </g>
+            <g id="system-tools" data-node="system-tools">
+              <rect x="440" y="456" width="448" height="96" rx="6" fill="#ffffff" />
+              <rect
+                x="440"
+                y="456"
+                width="448"
+                height="96"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="456" y="473" class="tag">TOOL REGISTRY</text>
+              <text x="456" y="497" class="node-name">工具能力与扩展</text>
+              <text x="456" y="519" class="body">
+                文件与命令 · Prism 浏览器 · 联网检索
+              </text>
+              <text x="456" y="539" class="body">
+                MCP 客户端 · 技能加载（详见下一图）
+              </text>
+            </g>
+            <g id="system-identity" data-node="system-identity">
+              <rect x="952" y="168" width="264" height="64" rx="6" fill="#ffffff" />
+              <rect
+                x="952"
+                y="168"
+                width="264"
+                height="64"
+                rx="6"
+                fill="#f7f8fa"
+                stroke="#6b7280"
+                stroke-width="1.2"
+                stroke-dasharray="5 4"
+              />
+              <text x="968" y="185" class="tag">DESKTOP SERVICES</text>
+              <text x="968" y="203" class="node-name">账号与版本分发</text>
+              <text x="968" y="223" class="technical">Clerk / GitHub Releases</text>
+            </g>
+            <g id="system-model" data-node="system-model">
+              <rect x="952" y="296" width="264" height="96" rx="6" fill="#ffffff" />
+              <rect
+                x="952"
+                y="296"
+                width="264"
+                height="96"
+                rx="6"
+                fill="#f7f8fa"
+                stroke="#6b7280"
+                stroke-width="1.2"
+                stroke-dasharray="5 4"
+              />
+              <text x="968" y="313" class="tag">MODEL PROVIDER</text>
+              <text x="968" y="337" class="node-name">模型服务</text>
+              <text x="968" y="359" class="body">DeepSeek / OpenAI 兼容端点</text>
+              <text x="968" y="379" class="technical">/chat/completions · SSE</text>
+            </g>
+            <g id="system-resources" data-node="system-resources">
+              <rect x="952" y="456" width="264" height="96" rx="6" fill="#ffffff" />
+              <rect
+                x="952"
+                y="456"
+                width="264"
+                height="96"
+                rx="6"
+                fill="#f7f8fa"
+                stroke="#6b7280"
+                stroke-width="1.2"
+                stroke-dasharray="5 4"
+              />
+              <text x="968" y="473" class="tag">TOOL RESOURCES</text>
+              <text x="968" y="497" class="node-name">浏览器、网络与 MCP</text>
+              <text x="968" y="519" class="body">浏览器在 WSL；MCP 可本地或远程</text>
+              <text x="968" y="539" class="body">网页 · 搜索 API · 外部工具服务</text>
+            </g>
+            <line x1="40" y1="616" x2="1240" y2="616" stroke="#e7e9ed" />
+            <rect
+              x="40"
+              y="636"
+              width="28"
+              height="16"
+              rx="2"
+              fill="#eff4ff"
+              stroke="#2563eb"
+            />
+            <text x="80" y="649" class="body">执行核心</text>
+            <line
+              x1="240"
+              y1="644"
+              x2="268"
+              y2="644"
+              stroke="#6b7280"
+              stroke-width="1.4"
+            />
+            <text x="280" y="649" class="body">调用 / 执行</text>
+            <line
+              x1="480"
+              y1="644"
+              x2="508"
+              y2="644"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              stroke-dasharray="5 4"
+            />
+            <text x="520" y="649" class="body">事件 / 上下文回流</text>
+            <rect
+              x="784"
+              y="636"
+              width="28"
+              height="16"
+              rx="2"
+              fill="#f7f8fa"
+              stroke="#6b7280"
+            />
+            <text x="824" y="649" class="body">本地状态</text>
+            <rect
+              x="1008"
+              y="636"
+              width="28"
+              height="16"
+              rx="2"
+              fill="#f7f8fa"
+              stroke="#6b7280"
+              stroke-dasharray="5 4"
+            />
+            <text x="1048" y="649" class="body">依赖服务</text>
+            <text x="40" y="688" class="body">
+              桌面经 wsl.exe
+              启动内核；工具的同步返回沿原调用返回。图中的分区不代表操作系统沙箱。
+            </text>
+          </svg>
+        </div>
+        <p class="caption">
+          工作台发送任务、取消与审批决定，内核以 SSE
+          返回文字流、工具过程和会话事件。桌面账号与更新连接 Clerk /
+          GitHub；会话、配置与模型密钥保存在本机。
+        </p>
+      </section>
+      <section id="kernel-tools" aria-label="内核与工具能力">
+        <div class="diagram-container">
+          <svg
+            id="prism-kernel"
+            viewBox="0 0 1280 832"
+            xmlns="http://www.w3.org/2000/svg"
+            role="img"
+            aria-labelledby="prism-kernel-title prism-kernel-desc"
+          >
+            <title id="prism-kernel-title">Agent 内核 · 上下文与工具执行</title>
+            <desc id="prism-kernel-desc">
+              任务循环从会话日志和指令重建上下文，接收模型的工具调用，按工具声明的效果检查权限后执行文件、命令、浏览器、联网、MCP
+              和技能工具，并将结果写回日志。
+            </desc>
+            <defs>
+              <marker
+                id="prism-kernel-arrow-muted"
+                markerWidth="8"
+                markerHeight="6"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0 0 L8 3 L0 6 Z" fill="#6b7280" />
+              </marker>
+              <marker
+                id="prism-kernel-arrow-accent"
+                markerWidth="8"
+                markerHeight="6"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0 0 L8 3 L0 6 Z" fill="#2563eb" />
+              </marker>
+            </defs>
+            <rect x="0" y="0" width="1280" height="832" fill="#ffffff" />
+            <text x="40" y="57" class="diagram-title">
+              Agent 内核 · 上下文与工具执行
+            </text>
+            <text x="40" y="86" class="body">
+              每轮重建上下文 → 流式请求模型 → 校验并执行工具 → 追加结果 →
+              下一轮；没有工具调用时结束。
+            </text>
+            <rect
+              x="24"
+              y="128"
+              width="320"
+              height="568"
+              rx="8"
+              fill="#f7f8fa"
+              stroke="#e7e9ed"
+              stroke-width="1"
+            />
+            <text x="40" y="153" class="zone-label">任务与持久状态</text>
+            <rect
+              x="360"
+              y="128"
+              width="328"
+              height="568"
+              rx="8"
+              fill="#f7f8fa"
+              stroke="#e7e9ed"
+              stroke-width="1"
+            />
+            <text x="376" y="153" class="zone-label">工具执行边界</text>
+            <rect
+              x="784"
+              y="128"
+              width="472"
+              height="568"
+              rx="8"
+              fill="#f7f8fa"
+              stroke="#e7e9ed"
+              stroke-width="1"
+            />
+            <text x="800" y="153" class="zone-label">内核注册的工具</text>
+            <path
+              data-connection="模型返回的工具调用进入注册表"
+              d="M296 208 H376"
+              fill="none"
+              stroke="#2563eb"
+              stroke-width="1.4"
+              marker-end="url(#prism-kernel-arrow-accent)"
+            />
+            <path
+              data-connection="工具结果返回循环并继续请求模型"
+              d="M376 248 H296"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              stroke-dasharray="5 4"
+              marker-end="url(#prism-kernel-arrow-muted)"
+            />
+            <path
+              data-connection="每轮重建模型上下文"
+              d="M168 360 V280"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-kernel-arrow-muted)"
+            />
+            <path
+              data-connection="从历史与压缩摘要恢复上下文"
+              d="M168 536 V464"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              stroke-dasharray="5 4"
+              marker-end="url(#prism-kernel-arrow-muted)"
+            />
+            <path
+              data-connection="消息与工具结果追加至 JSONL"
+              d="M296 264 H312 Q320 264 320 272 V580 Q320 588 312 588 H296"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              stroke-dasharray="5 4"
+              marker-end="url(#prism-kernel-arrow-muted)"
+            />
+            <path
+              data-connection="文件与命令工具"
+              d="M664 184 H760 Q768 184 768 192 V192 Q768 200 776 200 H800"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-kernel-arrow-muted)"
+            />
+            <path
+              data-connection="浏览器工具"
+              d="M664 200 H744 Q752 200 752 208 V304 Q752 312 760 312 H800"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-kernel-arrow-muted)"
+            />
+            <path
+              data-connection="联网检索工具"
+              d="M664 216 H728 Q736 216 736 224 V360 Q736 368 744 368 H1012 Q1020 368 1020 376 V384"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-kernel-arrow-muted)"
+            />
+            <path
+              data-connection="MCP 工具"
+              d="M664 232 H712 Q720 232 720 240 V464 Q720 472 728 472 H1012 Q1020 472 1020 480 V488"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-kernel-arrow-muted)"
+            />
+            <path
+              data-connection="按需加载技能说明"
+              d="M664 248 H696 Q704 248 704 256 V568 Q704 576 712 576 H1012 Q1020 576 1020 584 V592"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-kernel-arrow-muted)"
+            />
+            <rect x="304" y="184" width="64" height="16" rx="2" fill="#ffffff" />
+            <text x="336.0" y="196" class="arrow-label" text-anchor="middle">CALL</text>
+            <rect x="312" y="224" width="56" height="16" rx="2" fill="#ffffff" />
+            <text x="340.0" y="236" class="arrow-label" text-anchor="middle">
+              RESULT
+            </text>
+            <rect x="176" y="316" width="112" height="16" rx="2" fill="#ffffff" />
+            <text x="232.0" y="328" class="body" text-anchor="middle">
+              构建请求上下文
+            </text>
+            <rect x="328" y="480" width="96" height="16" rx="2" fill="#ffffff" />
+            <text x="376.0" y="492" class="body" text-anchor="middle">
+              追加会话日志
+            </text>
+            <g id="kernel-loop" data-node="kernel-loop">
+              <rect x="40" y="176" width="256" height="104" rx="6" fill="#ffffff" />
+              <rect
+                x="40"
+                y="176"
+                width="256"
+                height="104"
+                rx="6"
+                fill="#eff4ff"
+                stroke="#2563eb"
+                stroke-width="1.2"
+              />
+              <text x="56" y="193" class="tag">MODEL ↔ TOOLS</text>
+              <text x="56" y="217" class="node-name">Agent 任务循环</text>
+              <text x="56" y="239" class="technical">runTask → streamChat</text>
+              <text x="56" y="259" class="body">流式文字 / tool_calls / 取消</text>
+            </g>
+            <g id="kernel-context" data-node="kernel-context">
+              <rect x="40" y="360" width="256" height="104" rx="6" fill="#ffffff" />
+              <rect
+                x="40"
+                y="360"
+                width="256"
+                height="104"
+                rx="6"
+                fill="#f7f8fa"
+                stroke="#6b7280"
+                stroke-width="1.2"
+              />
+              <text x="56" y="377" class="tag">CONTEXT / COMPACTION</text>
+              <text x="56" y="401" class="node-name">会话上下文</text>
+              <text x="56" y="423" class="technical">AGENTS.md + skills + history</text>
+              <text x="56" y="443" class="body">按需发现指令；自动 / 手动压缩</text>
+            </g>
+            <g id="kernel-store" data-node="kernel-store">
+              <rect x="40" y="536" width="256" height="104" rx="6" fill="#ffffff" />
+              <rect
+                x="40"
+                y="536"
+                width="256"
+                height="104"
+                rx="6"
+                fill="#f7f8fa"
+                stroke="#6b7280"
+                stroke-width="1.2"
+              />
+              <text x="56" y="553" class="tag">SESSION STORE</text>
+              <text x="56" y="577" class="node-name">会话存储与配置</text>
+              <text x="56" y="599" class="technical">
+                sessions/&lt;workspace&gt;/*.jsonl
+              </text>
+              <text x="56" y="619" class="body">config.json 与会话摘要</text>
+            </g>
+            <g id="kernel-dispatch" data-node="kernel-dispatch">
+              <rect x="376" y="176" width="288" height="104" rx="6" fill="#ffffff" />
+              <rect
+                x="376"
+                y="176"
+                width="288"
+                height="104"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="392" y="193" class="tag">AUTHORIZE → EXECUTE</text>
+              <text x="392" y="217" class="node-name">权限检查与工具分发</text>
+              <text x="392" y="239" class="technical">ToolRegistry + effects</text>
+              <text x="392" y="259" class="body">三档范围；需要时先请求一次审批</text>
+            </g>
+            <g id="tool-files" data-node="tool-files">
+              <rect x="800" y="176" width="440" height="80" rx="6" fill="#ffffff" />
+              <rect
+                x="800"
+                y="176"
+                width="440"
+                height="80"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="816" y="193" class="tag">FILES / RUN_COMMAND</text>
+              <text x="816" y="217" class="node-name">文件与命令</text>
+              <text x="816" y="239" class="body">
+                读写 · 目录 · glob / grep；命令默认在 WSL
+              </text>
+            </g>
+            <g id="tool-browser" data-node="tool-browser">
+              <rect x="800" y="280" width="440" height="80" rx="6" fill="#ffffff" />
+              <rect
+                x="800"
+                y="280"
+                width="440"
+                height="80"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="816" y="297" class="tag">
+                OPEN / OBSERVE / CONTEXT / ACT / RECEIPT / CLOSE
+              </text>
+              <text x="816" y="321" class="node-name">Prism 浏览器工具</text>
+              <text x="816" y="343" class="body">
+                Playwright；Chromium / Firefox / WebKit
+              </text>
+            </g>
+            <g id="tool-web" data-node="tool-web">
+              <rect x="800" y="384" width="440" height="80" rx="6" fill="#ffffff" />
+              <rect
+                x="800"
+                y="384"
+                width="440"
+                height="80"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="816" y="401" class="tag">WEB TOOLS</text>
+              <text x="816" y="425" class="node-name">联网检索</text>
+              <text x="816" y="447" class="body">
+                web_search / web_fetch → 搜索与网页正文
+              </text>
+            </g>
+            <g id="tool-mcp" data-node="tool-mcp">
+              <rect x="800" y="488" width="440" height="80" rx="6" fill="#ffffff" />
+              <rect
+                x="800"
+                y="488"
+                width="440"
+                height="80"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="816" y="505" class="tag">MCP SDK / EXTERNAL TOOLS</text>
+              <text x="816" y="529" class="node-name">MCP 客户端</text>
+              <text x="816" y="551" class="body">
+                从 mcp.json 连接工具服务器；stdio / HTTP
+              </text>
+            </g>
+            <g id="tool-skill" data-node="tool-skill">
+              <rect x="800" y="592" width="440" height="80" rx="6" fill="#ffffff" />
+              <rect
+                x="800"
+                y="592"
+                width="440"
+                height="80"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="816" y="609" class="tag">SKILL DISCOVERY / LOAD</text>
+              <text x="816" y="633" class="node-name">技能加载</text>
+              <text x="816" y="655" class="body">
+                项目级 → 全局 → 预置；按需读取 SKILL.md
+              </text>
+            </g>
+            <line x1="40" y1="728" x2="1240" y2="728" stroke="#e7e9ed" />
+            <rect
+              x="40"
+              y="748"
+              width="28"
+              height="16"
+              rx="2"
+              fill="#eff4ff"
+              stroke="#2563eb"
+            />
+            <text x="80" y="761" class="body">模型与工具的闭环</text>
+            <line
+              x1="360"
+              y1="756"
+              x2="388"
+              y2="756"
+              stroke="#6b7280"
+              stroke-width="1.4"
+            />
+            <text x="400" y="761" class="body">执行前检查权限</text>
+            <line
+              x1="736"
+              y1="756"
+              x2="764"
+              y2="756"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              stroke-dasharray="5 4"
+            />
+            <text x="776" y="761" class="body">结果与历史回流</text>
+            <rect
+              x="1056"
+              y="748"
+              width="28"
+              height="16"
+              rx="2"
+              fill="#f7f8fa"
+              stroke="#6b7280"
+            />
+            <text x="1096" y="761" class="body">持久状态</text>
+            <text x="40" y="796" class="body">
+              浏览器保留观察引用、动作校验与输入回执；Chromium 可经 CDP 接管 Chrome /
+              Edge。
+            </text>
+          </svg>
+        </div>
+        <div class="notes">
+          <div class="note">
+            <h3>上下文从已有记录重建</h3>
+            <p>
+              会话按工作区分组，采用带父子关系的 JSONL 日志。每轮加载生效的
+              <code>AGENTS.md</code
+              >、技能摘要与会话上下文；压缩用模型生成摘要，原始条目继续保留。
+            </p>
+          </div>
+          <div class="note">
+            <h3>执行和审批发生在内核</h3>
+            <p>
+              权限范围为只读、工作区可写、完全访问。内核按工具声明的效果逐次检查；审批不长期记忆。命令默认在
+              WSL，显式选择 Windows 时经 interop 执行。
+            </p>
+          </div>
+        </div>
+        <p class="caption">
+          浏览器默认在 WSL
+          后台运行。工具先观察页面并返回引用，再校验引用与证据、执行单步输入并落盘回执。MCP
+          默认没有服务器，技能通过工具按需加载。
+        </p>
+      </section>
+      <section id="browser-cli" aria-label="独立浏览器 CLI">
+        <div class="diagram-container">
+          <svg
+            id="prism-cli"
+            viewBox="0 0 1280 392"
+            xmlns="http://www.w3.org/2000/svg"
+            role="img"
+            aria-labelledby="prism-cli-title prism-cli-desc"
+          >
+            <title id="prism-cli-title">外部 Agent · 浏览器 CLI</title>
+            <desc id="prism-cli-desc">
+              外部 Agent 调用 prism CLI，经本地 broker 使用 CDP 连接已有 Chrome 或
+              Edge，获得页面观察、单步动作和输入回执。
+            </desc>
+            <defs>
+              <marker
+                id="prism-cli-arrow-muted"
+                markerWidth="8"
+                markerHeight="6"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0 0 L8 3 L0 6 Z" fill="#6b7280" />
+              </marker>
+              <marker
+                id="prism-cli-arrow-accent"
+                markerWidth="8"
+                markerHeight="6"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0 0 L8 3 L0 6 Z" fill="#2563eb" />
+              </marker>
+            </defs>
+            <rect x="0" y="0" width="1280" height="392" fill="#ffffff" />
+            <text x="40" y="57" class="diagram-title">外部 Agent · 浏览器 CLI</text>
+            <text x="40" y="86" class="body">
+              同一仓库的独立 browser-use 入口；由调用方负责规划和判断任务结果。
+            </text>
+            <path
+              data-connection="外部 Agent 调用 Prism CLI"
+              d="M288 200 H352"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-cli-arrow-muted)"
+            />
+            <path
+              data-connection="CLI 向本地 broker 发送命令"
+              d="M600 200 H664"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-cli-arrow-muted)"
+            />
+            <path
+              data-connection="broker 通过 CDP 控制其拥有的标签页"
+              d="M912 200 H976"
+              fill="none"
+              stroke="#6b7280"
+              stroke-width="1.4"
+              marker-end="url(#prism-cli-arrow-muted)"
+            />
+            <rect x="296" y="176" width="48" height="16" rx="2" fill="#ffffff" />
+            <text x="320.0" y="188" class="arrow-label" text-anchor="middle">JSON</text>
+            <rect x="608" y="176" width="48" height="16" rx="2" fill="#ffffff" />
+            <text x="632.0" y="188" class="arrow-label" text-anchor="middle">IPC</text>
+            <rect x="920" y="176" width="48" height="16" rx="2" fill="#ffffff" />
+            <text x="944.0" y="188" class="arrow-label" text-anchor="middle">CDP</text>
+            <g id="cli-agent" data-node="cli-agent">
+              <rect x="40" y="152" width="248" height="104" rx="6" fill="#ffffff" />
+              <rect
+                x="40"
+                y="152"
+                width="248"
+                height="104"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="56" y="169" class="tag">CALLER</text>
+              <text x="56" y="193" class="node-name">外部 Agent</text>
+              <text x="56" y="215" class="body">规划任务、选择动作、判断结果</text>
+              <text x="56" y="235" class="body">可通过 skill / 命令调用 CLI</text>
+            </g>
+            <g id="cli-entry" data-node="cli-entry">
+              <rect x="352" y="152" width="248" height="104" rx="6" fill="#ffffff" />
+              <rect
+                x="352"
+                y="152"
+                width="248"
+                height="104"
+                rx="6"
+                fill="#eff4ff"
+                stroke="#2563eb"
+                stroke-width="1.2"
+              />
+              <text x="368" y="169" class="tag">src/interfaces/cli.ts</text>
+              <text x="368" y="193" class="node-name">prism 浏览器 CLI</text>
+              <text x="368" y="215" class="technical">session / observe / context</text>
+              <text x="368" y="235" class="technical">act / receipt / close</text>
+            </g>
+            <g id="cli-broker" data-node="cli-broker">
+              <rect x="664" y="152" width="248" height="104" rx="6" fill="#ffffff" />
+              <rect
+                x="664"
+                y="152"
+                width="248"
+                height="104"
+                rx="6"
+                fill="#ffffff"
+                stroke="#1f2328"
+                stroke-width="1.2"
+              />
+              <text x="680" y="169" class="tag">DAEMON / SESSIONS</text>
+              <text x="680" y="193" class="node-name">本地 Broker</text>
+              <text x="680" y="215" class="body">维护标签页、观察与持久回执</text>
+              <text x="680" y="235" class="body">调用 src/browser 的 CDP 实现</text>
+            </g>
+            <g id="cli-browser" data-node="cli-browser">
+              <rect x="976" y="152" width="264" height="104" rx="6" fill="#ffffff" />
+              <rect
+                x="976"
+                y="152"
+                width="264"
+                height="104"
+                rx="6"
+                fill="#f7f8fa"
+                stroke="#6b7280"
+                stroke-width="1.2"
+                stroke-dasharray="5 4"
+              />
+              <text x="992" y="169" class="tag">CHROMIUM / CDP</text>
+              <text x="992" y="193" class="node-name">Chrome / Edge</text>
+              <text x="992" y="215" class="body">连接已有远程调试端口</text>
+              <text x="992" y="235" class="body">只管理自己创建的标签页</text>
+            </g>
+            <line x1="40" y1="288" x2="1240" y2="288" stroke="#e7e9ed" />
+            <rect
+              x="40"
+              y="308"
+              width="28"
+              height="16"
+              rx="2"
+              fill="#eff4ff"
+              stroke="#2563eb"
+            />
+            <text x="80" y="321" class="body">外部 CLI 入口</text>
+            <line
+              x1="360"
+              y1="316"
+              x2="388"
+              y2="316"
+              stroke="#6b7280"
+              stroke-width="1.4"
+            />
+            <text x="400" y="321" class="body">命令调用</text>
+            <rect
+              x="736"
+              y="308"
+              width="28"
+              height="16"
+              rx="2"
+              fill="#f7f8fa"
+              stroke="#6b7280"
+              stroke-dasharray="5 4"
+            />
+            <text x="776" y="321" class="body">已有浏览器</text>
+            <text x="40" y="356" class="body">
+              这一入口不调用模型；Agent 内核中的浏览器工具由 Playwright
+              驱动，两者分别提供入口并复用页面观察语义。
+            </text>
+          </svg>
+        </div>
+      </section>
+      <details id="source-map" open>
+        <summary>组件与当前代码的对应关系</summary>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">组件</th>
+                <th scope="col">职责</th>
+                <th scope="col">实现入口</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>桌面工作台与宿主服务</td>
+                <td>Electron 窗口、preload IPC、WSL 准备、UI 服务代理。</td>
+                <td>
+                  <a href="../src/workbench/electron/main.ts"><code>main.ts</code></a>
+                </td>
+              </tr>
+              <tr>
+                <td>内核 API 与预置能力</td>
+                <td>HTTP 路由、SSE、浏览器与联网工具注册、MCP 连接。</td>
+                <td>
+                  <a href="../src/kernel/server.ts"><code>server.ts</code></a>
+                </td>
+              </tr>
+              <tr>
+                <td>任务循环与模型适配</td>
+                <td>重建请求、流式模型调用、工具分发、结果落盘、取消。</td>
+                <td>
+                  <a href="../src/kernel/loop.ts"><code>loop.ts</code></a>
+                </td>
+              </tr>
+              <tr>
+                <td>会话上下文与压缩</td>
+                <td>AGENTS.md、技能发现、会话重建与摘要。</td>
+                <td>
+                  <a href="../src/kernel/compaction.ts"><code>compaction.ts</code></a>
+                </td>
+              </tr>
+              <tr>
+                <td>权限检查</td>
+                <td>依据工具声明的 effects 判断允许、拒绝或一次审批。</td>
+                <td>
+                  <a href="../src/kernel/permissions.ts"><code>permissions.ts</code></a>
+                </td>
+              </tr>
+              <tr>
+                <td>浏览器能力</td>
+                <td>Playwright 会话、观察引用、动作校验与输入回执。</td>
+                <td>
+                  <a href="../src/kernel/browser/engine.ts"
+                    ><code>browser/engine.ts</code></a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>文件与命令</td>
+                <td>工作区读写、diff、命令取消；Windows 命令通过 interop。</td>
+                <td>
+                  <a href="../src/kernel/command-tool.ts"
+                    ><code>command-tool.ts</code></a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>MCP 扩展</td>
+                <td>官方 SDK；stdio 或 Streamable HTTP；按配置连接。</td>
+                <td>
+                  <a href="../src/mcp/host.ts"><code>mcp/host.ts</code></a>
+                </td>
+              </tr>
+              <tr>
+                <td>外部浏览器 CLI</td>
+                <td>独立的 JSON 命令、broker 与 CDP 页面会话。</td>
+                <td>
+                  <a href="../src/interfaces/cli.ts"><code>interfaces/cli.ts</code></a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <details>
+        <summary>重绘范围与样式来源</summary>
+        <p>
+          旧图的 12 个可绘制模块与 7
+          条关系重新组织为三个视图。模型适配、任务循环与会话存储在总览中保持核心关系；文件与命令、浏览器、联网检索、MCP、技能在第二图展开。新增当前代码中的桌面生命周期、HTTP/SSE、上下文压缩、Windows
+          命令、Clerk、更新与外部 CLI；将“首版目标形态”改为当前实现。
+        </p>
+        <p>
+          使用 diagram-design 的 Architecture 语法。总览采用 faithful 分区以容纳 10
+          个节点；内核详情 9 个节点，CLI 4 个节点。画布宽度
+          1280，窄屏在图内横向滚动；图形为静态，阅读不依赖脚本。
+        </p>
+        <p>
+          样式取自 <code>src/workbench/ui/app.css</code>：白底
+          <code>#ffffff</code>、面板 <code>#f7f8fa</code>、正文
+          <code>#1f2328</code>、次要文字 <code>#6b7280</code>、蓝色
+          <code>#2563eb</code>。Inter 通过 Google Fonts 加载，字重 400 / 500 /
+          600；中文由平台字体补充。离线时使用同一字体栈的系统回退。
+        </p>
+        <p>
+          图示的边界检查由工具层实施；不是操作系统级隔离。未增加多
+          Agent、调度队列、数据库或独立向量记忆模块。
+        </p>
+      </details>
+      <footer>
+        基于 Prism v0.2.3 当前实现 · 2026-10-19 ·
+        设计语法：diagram-design，cathrynlavery/diagram-design，MIT，550fd66。此 HTML
+        为源文件；README 使用其整体架构 SVG 导出。
+      </footer>
+    </main>
+  </body>
+</html>
