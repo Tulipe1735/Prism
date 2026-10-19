@@ -108,6 +108,8 @@ it("groups sessions by workspace and provides keyboard accessible session button
   const html = renderToStaticMarkup(
     <Sidebar
       workbench={workbench(state)}
+      collapsed={false}
+      onExpand={() => {}}
       onNavigate={() => {}}
       onSettings={() => {}}
     />,
@@ -126,6 +128,8 @@ it("groups sessions by workspace and provides keyboard accessible session button
     renderToStaticMarkup(
       <Sidebar
         workbench={workbench(state)}
+        collapsed={false}
+        onExpand={() => {}}
         onNavigate={() => {}}
         onSettings={() => {}}
       />,
@@ -139,6 +143,8 @@ it("groups sessions by workspace and provides keyboard accessible session button
     renderToStaticMarkup(
       <Sidebar
         workbench={workbench(state)}
+        collapsed={false}
+        onExpand={() => {}}
         onNavigate={() => {}}
         onSettings={() => {}}
       />,

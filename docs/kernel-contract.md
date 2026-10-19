@@ -76,7 +76,12 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 ### GET /status
 
 ```json
-{ "status": "ready", "version": "0.1.6", "dataDir": "/home/demo/.prism" }
+{
+  "status": "ready",
+  "version": "0.2.2",
+  "dataDir": "/home/demo/.prism",
+  "runningTasks": 0
+}
 ```
 
 `status` 取 `start` 时用的内核状态字面量：`starting` | `ready` | `stopping` | `error`。

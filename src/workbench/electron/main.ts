@@ -2,9 +2,13 @@ import type { DesktopSetupChoice, DesktopSetupState } from "./desktop-contract.t
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createClerkBridge } from "@clerk/electron";
+import { storage } from "@clerk/electron/storage";
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
+import { NsisUpdater } from "electron-updater";
 import { BROWSER_ENGINES, type BrowserEngine } from "../../kernel/types.ts";
+import { VERSION } from "../../shared/version.ts";
 import {
   type KernelLaunchOptions,
   launchKernel,
@@ -16,6 +20,9 @@ import {
   listDistributions,
   prepareWslRuntime,
 } from "../wsl-runtime.ts";
+import { RENDERER_HOST, RENDERER_ORIGIN, RENDERER_SCHEME } from "./identity-config.ts";
+import { isRendererUrl, registerRenderer } from "./renderer.ts";
+import { createDesktopUpdates } from "./updates.ts";
 
 let kernel: RunningKernelProcess | null = null;
 let ui: RunningUiServer | null = null;
@@ -36,11 +43,19 @@ let setup: DesktopSetupState = {
 app.setName("Prism");
 app.setAppUserModelId("io.github.tulipe1735.prism");
 const ownsInstance = app.requestSingleInstanceLock();
+const clerk = ownsInstance
+  ? createClerkBridge({
+      storage: storage(),
+      renderer: { scheme: RENDERER_SCHEME, host: RENDERER_HOST },
+      manageSingleInstanceLock: false,
+    })
+  : null;
 if (!ownsInstance) app.quit();
 else void main().catch(fail);
 
 async function main(): Promise<void> {
   await app.whenReady();
+  registerRenderer(() => ui?.url);
   window = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -61,7 +76,61 @@ async function main(): Promise<void> {
     window = null;
     app.quit();
   });
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  const startupUrl = pathToFileURL(join(uiRoot(), "startup.html")).href;
+  const trustedNavigation = (url: string): boolean =>
+    isRendererUrl(url) || url === startupUrl;
+  window.webContents.on("will-navigate", (event, url) => {
+    if (trustedNavigation(url)) return;
+    event.preventDefault();
+    if (url.startsWith("https://") || url.startsWith("http://"))
+      void shell.openExternal(url);
+  });
+  window.webContents.on("will-redirect", (event, url) => {
+    if (event.isMainFrame && !trustedNavigation(url)) event.preventDefault();
+  });
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://") || url.startsWith("http://"))
+      void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  const updates = createDesktopUpdates({
+    updater: app.isPackaged && process.platform === "win32" ? new NsisUpdater() : null,
+    version: app.isPackaged ? app.getVersion() : VERSION,
+    publish: (state) => {
+      if (window !== null && !window.isDestroyed())
+        window.webContents.send("prism:updates:state", state);
+    },
+  });
+  const requireWorkbench = (event: Electron.IpcMainInvokeEvent): void => {
+    if (
+      event.sender !== window?.webContents ||
+      event.senderFrame !== window.webContents.mainFrame ||
+      !isRendererUrl(event.senderFrame.url)
+    )
+      throw new Error("此操作只能在 Prism 工作台中执行。");
+  };
+  ipcMain.handle("prism:updates:read", (event) => {
+    requireWorkbench(event);
+    return updates.read();
+  });
+  ipcMain.handle("prism:updates:check", (event) => {
+    requireWorkbench(event);
+    return updates.check();
+  });
+  ipcMain.handle("prism:updates:download", (event) => {
+    requireWorkbench(event);
+    return updates.download();
+  });
+  ipcMain.handle("prism:updates:install", async (event) => {
+    requireWorkbench(event);
+    if (kernel === null) throw new Error("请等待内核启动完成。");
+    const status = (await fetch(`${kernel.url}/status`).then((response) =>
+      response.json(),
+    )) as { runningTasks: number };
+    if (status.runningTasks !== 0)
+      throw new Error("还有任务正在运行，请等待完成后再安装更新。");
+    updates.install();
+  });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
@@ -217,9 +286,11 @@ async function openWorkbench(): Promise<void> {
   const settings = (await fetch(`${kernel.url}/settings`).then((response) =>
     response.json(),
   )) as { model: { hasApiKey: boolean } };
-  await window.loadURL(`${ui.url}/${settings.model.hasApiKey ? "" : "?setup=model"}`);
+  await window.loadURL(
+    `${RENDERER_ORIGIN}/${settings.model.hasApiKey ? "" : "?setup=model"}`,
+  );
   process.stdout.write(
-    `${JSON.stringify({ type: "workbench.window", url: ui.url, port: ui.port, kernelUrl: kernel.url })}\n`,
+    `${JSON.stringify({ type: "workbench.window", url: ui.url, rendererUrl: RENDERER_ORIGIN, port: ui.port, kernelUrl: kernel.url })}\n`,
   );
 }
 
@@ -287,6 +358,7 @@ app.on("before-quit", (event) => {
   if (stopping) return;
   event.preventDefault();
   stopping = true;
+  clerk?.cleanup();
   preparation.abort();
   void (async () => {
     await ui?.close();

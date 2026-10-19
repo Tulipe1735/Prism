@@ -105,6 +105,8 @@ describe.runIf(enabled)("workbench in a real browser", () => {
         "inspector.tsx",
         "settings.tsx",
         "components.tsx",
+        "account.tsx",
+        "account-menu.tsx",
         "use-workbench.ts",
         "state.ts",
         "app.css",
@@ -256,10 +258,13 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     await page.press("#workspace-input", "Enter");
     await page.click('[data-action="new-session"]');
     await page.waitForSelector("#chat-header strong");
-    expect(await page.locator("#sidebar").isVisible()).toBe(false);
+    expect(await page.locator("#workspace-input").isVisible()).toBe(false);
+    expect(await page.locator('[data-action="new-session-compact"]').isVisible()).toBe(
+      true,
+    );
     await page.fill("#message", "尚未发送的任务草稿");
 
-    await page.getByRole("button", { name: "打开产物与设置" }).click();
+    await page.getByRole("button", { name: "切换产物与设置" }).click();
     await page.click('[data-view="settings"]');
     await page.waitForSelector('#settings input[name="model"]');
     const model = page.locator('#settings input[name="model"]');
@@ -284,5 +289,148 @@ describe.runIf(enabled)("workbench in a real browser", () => {
       expect(composer!.y + composer!.height).toBeLessThan(844);
     }
     expect(errors).toEqual([]);
+  });
+
+  it("collapses either desktop sidebar and creates a session from the compact rail", async () => {
+    harness = await startTestKernel();
+    ui = await startUiServer({ kernelUrl: harness.kernel.url, uiRoot: UI_ROOT });
+    page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(ui.url);
+    await page.waitForSelector('#kernel-status [data-status="ready"]');
+
+    const navigation = page.getByRole("button", { name: "切换会话导航" });
+    const inspector = page.getByRole("button", { name: "切换产物与设置" });
+    const compactCreate = page.getByRole("button", { name: "新建会话", exact: true });
+    const chatWidth = async (): Promise<number> =>
+      (await page.locator("#chat").boundingBox())!.width;
+    const initialWidth = await chatWidth();
+    expect(await navigation.getAttribute("aria-expanded")).toBe("true");
+    expect(await inspector.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      await page
+        .locator("#wordmark")
+        .evaluate(
+          (element) =>
+            element.ownerDocument.defaultView!.getComputedStyle(element).fontFamily,
+        ),
+    ).toBe(
+      await page
+        .locator("body")
+        .evaluate(
+          (element) =>
+            element.ownerDocument.defaultView!.getComputedStyle(element).fontFamily,
+        ),
+    );
+
+    await navigation.click();
+    expect(await navigation.getAttribute("aria-expanded")).toBe("false");
+    expect(await page.locator("#workspace-input").isVisible()).toBe(false);
+    expect(await page.locator("#sidebar button:visible").count()).toBe(2);
+    expect(await chatWidth()).toBeGreaterThan(initialWidth);
+    const circle = await compactCreate.evaluate((element) => ({
+      width: element.getBoundingClientRect().width,
+      height: element.getBoundingClientRect().height,
+      radius: element.ownerDocument.defaultView!.getComputedStyle(element).borderRadius,
+    }));
+    expect(circle.width).toBe(circle.height);
+    expect(Number.parseFloat(circle.radius)).toBeGreaterThanOrEqual(circle.width / 2);
+
+    // A new install has no workspace yet: the compact action opens its picker.
+    await compactCreate.click();
+    await page.waitForFunction('document.activeElement?.id === "workspace-input"');
+    await page.fill("#workspace-input", harness.workspace);
+    await page.press("#workspace-input", "Enter");
+    await page.click('[data-action="new-session"]');
+    await page.waitForSelector("#chat-header strong");
+    const firstId = await page
+      .locator('[data-action="open-session"][aria-current="page"]')
+      .getAttribute("data-session");
+    await page.fill("#message", "折叠时保留的任务草稿");
+    await page.fill("#workspace-input", `${harness.workspace}/unsaved-path`);
+
+    await page.click('[data-view="settings"]');
+    const model = page.locator('#settings input[name="model"]');
+    await model.fill("collapsed-settings-draft");
+    await page.getByRole("button", { name: "关闭详情" }).click();
+    expect(await inspector.getAttribute("aria-expanded")).toBe("false");
+    expect(await page.locator("#inspector").isVisible()).toBe(false);
+    await navigation.click();
+    expect(await chatWidth()).toBeGreaterThan(initialWidth + 400);
+    expect(await page.locator("#message").inputValue()).toBe("折叠时保留的任务草稿");
+    await inspector.click();
+    expect(await model.inputValue()).toBe("collapsed-settings-draft");
+    expect(await navigation.getAttribute("aria-expanded")).toBe("false");
+    await navigation.click();
+    expect(await page.locator("#workspace-input").inputValue()).toBe(
+      `${harness.workspace}/unsaved-path`,
+    );
+
+    // A configured workspace can create a real session without expanding the rail.
+    await navigation.click();
+    await compactCreate.click();
+    await page.waitForSelector(
+      `[data-action="open-session"][aria-current="page"]:not([data-session="${firstId}"])`,
+      { state: "attached" },
+    );
+    expect(await navigation.getAttribute("aria-expanded")).toBe("false");
+    expect(await page.locator("#message").isDisabled()).toBe(false);
+    const sessions = await harness.kernel.kernel.listSessions();
+    expect(sessions).toHaveLength(2);
+    expect(sessions.every((session) => session.workspace === harness.workspace)).toBe(
+      true,
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("keeps account and update actions in the bottom-left menu when collapsed", async () => {
+    harness = await startTestKernel();
+    ui = await startUiServer({ kernelUrl: harness.kernel.url, uiRoot: UI_ROOT });
+    page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
+    await page.addInitScript(`
+      let state = { phase: 'idle', version: '0.2.2' };
+      let listener;
+      window.__prismInstallCalls = 0;
+      function publish(patch) { state = { version: '0.2.2', ...patch }; listener?.(state); return state; }
+      window.prismDesktop = {
+        version: '0.2.2', clerkPublishableKey: '',
+        updates: {
+          read: async () => state,
+          subscribe: (receive) => { listener = receive; return () => { listener = undefined; }; },
+          check: async () => { publish({ phase: 'checking' }); await Promise.resolve(); return publish({ phase: 'available', latestVersion: '0.2.3' }); },
+          download: async () => { publish({ phase: 'downloading', percent: 50, latestVersion: '0.2.3' }); await Promise.resolve(); return publish({ phase: 'downloaded', latestVersion: '0.2.3' }); },
+          install: async () => { window.__prismInstallCalls++; },
+        },
+      };
+    `);
+    await page.goto(ui.url);
+    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    await page.getByRole("button", { name: "切换会话导航" }).click();
+    const account = page.getByRole("button", { name: "账户与更新" });
+    const position = await account.boundingBox();
+    expect(position!.x).toBeLessThan(64);
+    expect(position!.y).toBeGreaterThan(800);
+    await account.focus();
+    await page.keyboard.press("Enter");
+    await page.getByRole("menu").waitFor();
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(
+      'document.activeElement?.getAttribute("aria-label") === "账户与更新"',
+    );
+    await account.click();
+    await page.getByRole("menuitem", { name: "检查更新", exact: true }).click();
+    await page.getByRole("menuitem", { name: "下载 v0.2.3", exact: true }).click();
+    await page.getByRole("menuitem", { name: "重启并安装更新", exact: true }).waitFor();
+    expect(await page.evaluate("window.__prismInstallCalls")).toBe(0);
+    await page.getByRole("menuitem", { name: "重启并安装更新", exact: true }).click();
+    expect(await page.evaluate("window.__prismInstallCalls")).toBe(1);
+    await page.getByRole("menuitem", { name: "工作台设置", exact: true }).click();
+    await page.locator('#settings input[name="model"]').waitFor();
+    expect(
+      await page
+        .getByRole("button", { name: "切换会话导航" })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
   });
 });

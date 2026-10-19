@@ -6,15 +6,23 @@ import {
   Check,
   ChevronRight,
   Circle,
-  Files,
-  Menu,
   Minimize2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   ShieldCheck,
   Square,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Button, SCOPE_LABELS, SectionLabel, workspaceName } from "./components.tsx";
+import {
+  Button,
+  PrismMark,
+  SCOPE_LABELS,
+  SectionLabel,
+  workspaceName,
+} from "./components.tsx";
 import { Inspector } from "./inspector.tsx";
 import { Sidebar } from "./sidebar.tsx";
 import { Timeline } from "./timeline.tsx";
@@ -23,24 +31,46 @@ import { useWorkbench } from "./use-workbench.ts";
 export function App(): JSX.Element {
   const workbench = useWorkbench();
   const { state } = workbench;
-  const [navigationOpen, setNavigationOpen] = useState(false);
+  const inlineNavigation = useMediaQuery("(min-width: 768px)");
+  const inlineInspector = useMediaQuery("(min-width: 1280px)");
+  const [navigationOpen, setNavigationOpen] = useState(inlineNavigation);
   const [inspectorOpen, setInspectorOpen] = useState(
-    () => new URLSearchParams(window.location.search).get("setup") === "model",
+    () =>
+      inlineInspector ||
+      new URLSearchParams(window.location.search).get("setup") === "model",
   );
   const navigationButton = useRef<HTMLButtonElement>(null);
   const inspectorButton = useRef<HTMLButtonElement>(null);
+  const navigationVisible = navigationOpen && (inlineNavigation || !inspectorOpen);
+  const navigationWidth =
+    inlineNavigation && navigationVisible ? (inlineInspector ? 252 : 240) : 64;
+  const inspectorWidth = inlineInspector && inspectorOpen ? 320 : 0;
+  const overlayOpen =
+    (!inlineNavigation && navigationVisible) || (!inlineInspector && inspectorOpen);
+
+  function expandNavigation(): void {
+    setNavigationOpen(true);
+    if (!inlineInspector) setInspectorOpen(false);
+  }
+
+  function finishNavigation(): void {
+    if (!inlineNavigation) setNavigationOpen(false);
+  }
 
   useEffect(() => {
     const escape = (event: KeyboardEvent): void => {
       if (event.key !== "Escape") return;
-      if (inspectorOpen) inspectorButton.current?.focus();
-      else if (navigationOpen) navigationButton.current?.focus();
-      setNavigationOpen(false);
-      setInspectorOpen(false);
+      if (inspectorOpen && !inlineInspector) {
+        setInspectorOpen(false);
+        inspectorButton.current?.focus();
+      } else if (navigationVisible && !inlineNavigation) {
+        setNavigationOpen(false);
+        navigationButton.current?.focus();
+      }
     };
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
-  }, [navigationOpen, inspectorOpen]);
+  }, [navigationVisible, inspectorOpen, inlineNavigation, inlineInspector]);
 
   return (
     <div className="grid h-dvh grid-rows-[64px_minmax(0,1fr)_32px] overflow-hidden">
@@ -51,30 +81,40 @@ export function App(): JSX.Element {
         跳到任务输入
       </a>
       <header id="topbar" className="flex min-w-0 items-center border-b">
-        <div className="flex h-full w-auto shrink-0 items-center gap-3 px-5 md:w-60 md:border-r xl:w-63">
-          <img
-            src="assets/prism-logo.svg"
-            alt="Prism"
-            width={112}
-            height={40}
-            className="block h-10 w-28 shrink-0"
-          />
-          <span className="eyebrow ml-auto hidden text-[9px] md:block">Workbench</span>
+        <div
+          style={{ width: navigationWidth }}
+          className={`flex h-full shrink-0 items-center border-r ${navigationWidth === 64 ? "justify-center" : "gap-3 px-5"}`}
+          aria-label="Prism"
+        >
+          <PrismMark />
+          {navigationWidth > 64 ? (
+            <>
+              <span id="wordmark" className="text-xl font-semibold tracking-tight">
+                Prism.
+              </span>
+              <span className="eyebrow ml-auto text-[9px]">Workbench</span>
+            </>
+          ) : null}
         </div>
         <div className="flex min-w-0 flex-1 items-center gap-3 px-2 md:px-6">
           <button
             ref={navigationButton}
             type="button"
             aria-label="切换会话导航"
-            aria-expanded={navigationOpen}
+            aria-expanded={navigationVisible}
             aria-controls="sidebar"
+            title={navigationVisible ? "折叠左侧栏" : "展开左侧栏"}
             onClick={() => {
-              setNavigationOpen(!navigationOpen);
-              setInspectorOpen(false);
+              if (navigationVisible) setNavigationOpen(false);
+              else expandNavigation();
             }}
-            className="flex size-9 shrink-0 items-center justify-center rounded-sm hover:bg-surface md:hidden"
+            className="flex size-9 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-surface hover:text-ink"
           >
-            <Menu size={17} aria-hidden="true" />
+            {navigationVisible ? (
+              <PanelLeftClose size={17} aria-hidden="true" />
+            ) : (
+              <PanelLeftOpen size={17} aria-hidden="true" />
+            )}
           </button>
           <div className="hidden min-w-0 items-center gap-2 text-[11px] sm:flex">
             <span className="text-muted">工作台</span>
@@ -89,54 +129,63 @@ export function App(): JSX.Element {
           <button
             ref={inspectorButton}
             type="button"
-            aria-label="打开产物与设置"
+            aria-label="切换产物与设置"
             aria-controls="inspector"
             aria-expanded={inspectorOpen}
+            title={inspectorOpen ? "折叠右侧栏" : "展开右侧栏"}
             onClick={() => {
-              setInspectorOpen(!inspectorOpen);
-              setNavigationOpen(false);
+              setInspectorOpen((open) => !open);
+              if (!inlineNavigation) setNavigationOpen(false);
             }}
-            className="flex size-9 shrink-0 items-center justify-center rounded-sm hover:bg-surface xl:hidden"
+            className="flex size-9 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-surface hover:text-ink"
           >
-            <Files size={16} aria-hidden="true" />
+            {inspectorOpen ? (
+              <PanelRightClose size={17} aria-hidden="true" />
+            ) : (
+              <PanelRightOpen size={17} aria-hidden="true" />
+            )}
           </button>
-        </div>
-        <div className="eyebrow hidden w-80 shrink-0 px-5 xl:block">
-          A space for focused work
         </div>
       </header>
 
-      <main className="relative grid min-h-0 grid-cols-[minmax(0,1fr)] md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[252px_minmax(0,1fr)_320px]">
-        {navigationOpen || inspectorOpen ? (
+      <main
+        className="relative grid min-h-0"
+        style={{
+          gridTemplateColumns: `${navigationWidth}px minmax(0,1fr) ${inspectorWidth}px`,
+        }}
+      >
+        {overlayOpen ? (
           <button
             type="button"
             aria-label="关闭侧栏"
-            className={`fixed top-16 right-0 bottom-8 left-0 z-20 bg-ink/10 ${inspectorOpen ? "xl:hidden" : "md:hidden"}`}
+            className="fixed top-16 right-0 bottom-8 left-0 z-20 bg-ink/10"
             onClick={() => {
-              setNavigationOpen(false);
-              setInspectorOpen(false);
+              if (!inlineNavigation) setNavigationOpen(false);
+              if (!inlineInspector) setInspectorOpen(false);
             }}
           />
         ) : null}
         <aside
           id="sidebar"
           aria-label="工作区与会话"
-          className={`${navigationOpen ? "fixed top-16 bottom-8 left-0 z-30 flex w-[min(88vw,280px)] shadow-xl md:shadow-none" : "hidden"} min-h-0 flex-col border-r bg-paper md:static md:flex md:w-auto`}
+          className={`${navigationVisible && !inlineNavigation ? "fixed top-16 bottom-8 left-0 z-30 w-[min(88vw,280px)] shadow-xl" : "col-start-1 row-start-1"} flex min-h-0 min-w-0 flex-col border-r bg-paper`}
         >
           <Sidebar
             workbench={workbench}
-            onNavigate={() => setNavigationOpen(false)}
+            collapsed={!navigationVisible}
+            onExpand={expandNavigation}
+            onNavigate={finishNavigation}
             onSettings={() => {
               workbench.dispatch({ type: "view", view: "settings" });
               setInspectorOpen(true);
-              setNavigationOpen(false);
+              finishNavigation();
             }}
           />
         </aside>
         <section
           id="chat"
           aria-label="任务对话"
-          className="flex min-h-0 min-w-0 flex-col"
+          className="col-start-2 row-start-1 flex min-h-0 min-w-0 flex-col"
         >
           <div
             id="chat-header"
@@ -196,7 +245,8 @@ export function App(): JSX.Element {
         <aside
           id="inspector"
           aria-label="产物与设置"
-          className={`${inspectorOpen ? "fixed top-16 right-0 bottom-8 z-30 flex w-[min(92vw,360px)] shadow-xl xl:shadow-none" : "hidden"} min-h-0 min-w-0 flex-col border-l bg-paper xl:static xl:flex xl:w-auto`}
+          hidden={!inspectorOpen}
+          className={`${inlineInspector ? "col-start-3 row-start-1" : "fixed top-16 right-0 bottom-8 z-30 w-[min(92vw,360px)] shadow-xl"} flex min-h-0 min-w-0 flex-col border-l bg-paper`}
         >
           <Inspector
             workbench={workbench}
@@ -241,6 +291,18 @@ export function App(): JSX.Element {
       )}
     </div>
   );
+}
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = (): void => setMatches(media.matches);
+    media.addEventListener("change", update);
+    update();
+    return () => media.removeEventListener("change", update);
+  }, [query]);
+  return matches;
 }
 
 const STATUS_LABELS = {

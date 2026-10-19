@@ -73,6 +73,7 @@ export interface KernelStatusReport {
   status: KernelStatus;
   version: string;
   dataDir: string;
+  runningTasks: number;
 }
 
 /**
@@ -136,7 +137,12 @@ export class Kernel {
   }
 
   statusReport(): KernelStatusReport {
-    return { status: this.status, version: VERSION, dataDir: this.config.dataDir };
+    return {
+      status: this.status,
+      version: VERSION,
+      dataDir: this.config.dataDir,
+      runningTasks: this.runs.size,
+    };
   }
 
   statusEvent(): Extract<KernelEvent, { type: "kernel.status" }> {

@@ -51,7 +51,7 @@ export function Inspector({
         </nav>
         <Button
           variant="ghost"
-          className="size-7 min-h-7 px-0 xl:hidden"
+          className="size-7 min-h-7 px-0"
           onClick={onClose}
           aria-label="关闭详情"
         >
@@ -62,9 +62,6 @@ export function Inspector({
         <div id="artifacts" hidden={state.view !== "artifacts"}>
           <div className="p-5">
             <SectionLabel number="03">Output / 任务产物</SectionLabel>
-            <h2 className="mt-5 text-lg font-semibold tracking-tight">
-              每一步，都有迹可循。
-            </h2>
             <p className="mt-2 text-[11px] leading-6 text-muted">
               本次会话产生的文件改动与执行结果。
             </p>
@@ -90,7 +87,6 @@ export function Inspector({
             </div>
           )}
           <div className="mx-5 mt-9 border-t pt-5 pb-6">
-            <h3 className="eyebrow">Session context / 会话环境</h3>
             <dl className="mt-4 space-y-4 text-[11px]">
               <div className="flex justify-between gap-3">
                 <dt className="text-muted">工作区</dt>

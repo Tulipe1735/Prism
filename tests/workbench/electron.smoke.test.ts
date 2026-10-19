@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import process from "node:process";
 import { describe, expect, it } from "vitest";
 
-const MAIN = resolve("dist/workbench/electron/main.js");
+const MAIN = resolve("dist/workbench/electron/main.cjs");
 
 /**
  * The Electron shell can only be started where an Electron runtime and a

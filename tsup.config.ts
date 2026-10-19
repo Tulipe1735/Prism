@@ -11,12 +11,24 @@ export default defineConfig([
       daemon: "src/interfaces/daemon.ts",
       kernel: "src/interfaces/kernel.ts",
       "workbench-ui/server": "src/workbench/interfaces/workbench.ts",
-      "workbench/electron/main": "src/workbench/electron/main.ts",
     },
     // Only `dependencies` are external by default; Electron's main process must
     // get the runtime's own `electron` module, not the npm wrapper that spawns
     // the binary (and that no ESM bundle can `require`).
     external: ["electron"],
+  },
+  {
+    entry: { "workbench/electron/main": "src/workbench/electron/main.ts" },
+    target: "node22",
+    platform: "node",
+    format: ["cjs"],
+    external: ["electron"],
+    noExternal: [/^(?!electron$).+/],
+    outExtension: () => ({ js: ".cjs" }),
+    define: { "import.meta.url": "__prismModuleUrl" },
+    banner: {
+      js: 'const __prismModuleUrl = require("node:url").pathToFileURL(__filename).href;',
+    },
   },
   {
     entry: {
@@ -28,7 +40,7 @@ export default defineConfig([
     format: ["esm"],
     target: "es2022",
     tsconfig: "src/workbench/ui/tsconfig.json",
-    noExternal: ["react", "react-dom", "scheduler", "lucide-react", "tailwind-merge"],
+    noExternal: [/.*/],
     define: { "process.env.NODE_ENV": '"production"' },
     minify: true,
   },
@@ -38,6 +50,7 @@ export default defineConfig([
     target: "node22",
     format: ["cjs"],
     external: ["electron"],
+    noExternal: [/^(?!electron$).+/],
     outExtension: () => ({ js: ".cjs" }),
   },
 ]);

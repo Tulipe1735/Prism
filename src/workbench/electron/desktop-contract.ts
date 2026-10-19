@@ -17,3 +17,31 @@ export interface DesktopSetupApi {
   subscribe: (listener: (state: DesktopSetupState) => void) => () => void;
   openWslGuide: () => Promise<void>;
 }
+
+export interface UpdateState {
+  phase:
+    | "idle"
+    | "checking"
+    | "current"
+    | "available"
+    | "downloading"
+    | "downloaded"
+    | "error"
+    | "unsupported";
+  version: string;
+  latestVersion?: string;
+  percent?: number;
+  message?: string;
+}
+
+export interface DesktopApi {
+  version: string;
+  clerkPublishableKey: string;
+  updates: {
+    read: () => Promise<UpdateState>;
+    check: () => Promise<UpdateState>;
+    download: () => Promise<UpdateState>;
+    install: () => Promise<void>;
+    subscribe: (listener: (state: UpdateState) => void) => () => void;
+  };
+}

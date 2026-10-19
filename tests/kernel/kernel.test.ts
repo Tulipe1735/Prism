@@ -36,7 +36,12 @@ it("reports kernel status over HTTP and pushes it to new event subscribers", asy
     kernel.url,
     "/status",
   );
-  expect(status.body).toEqual({ status: "ready", version: VERSION, dataDir });
+  expect(status.body).toEqual({
+    status: "ready",
+    version: VERSION,
+    dataDir,
+    runningTasks: 0,
+  });
 
   const events = await connectEvents(`${kernel.url}/events`);
   await expect(
@@ -216,6 +221,7 @@ it("refuses to rename a session while its task runs", async () => {
   );
   expect(renamed.status).toBe(409);
   expect(renamed.body).toMatchObject({ error: { code: "TASK_RUNNING" } });
+  expect((await api(kernel.url, "/status")).body).toMatchObject({ runningTasks: 1 });
 
   await api(kernel.url, `/sessions/${sessionId}/cancel`, { method: "POST" });
   const after = await api<{ session: SessionSummary }>(
@@ -225,6 +231,7 @@ it("refuses to rename a session while its task runs", async () => {
   );
   expect(after.status).toBe(200);
   expect(after.body.session.title).toBe("too early");
+  expect((await api(kernel.url, "/status")).body).toMatchObject({ runningTasks: 0 });
 });
 
 it("waits for a cancelled task to finish writing before closing", async () => {

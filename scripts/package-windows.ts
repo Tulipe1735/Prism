@@ -120,6 +120,7 @@ for (const directory of ["dist/workbench/electron", "dist/workbench-ui"])
     filter: (path) => !path.endsWith(".map"),
   });
 await cp(join(root, "LICENSE"), join(app, "LICENSE"));
+await cp(join(root, "THIRD_PARTY_NOTICES.md"), join(app, "THIRD_PARTY_NOTICES.md"));
 await writeFile(
   join(app, "package.json"),
   `${JSON.stringify(
@@ -132,7 +133,7 @@ await writeFile(
       author: "Tulipe1735",
       repository: metadata.repository,
       type: "module",
-      main: "dist/workbench/electron/main.js",
+      main: "dist/workbench/electron/main.cjs",
     },
     null,
     2,
@@ -155,9 +156,11 @@ await packageApp({
       output: join(root, "release"),
       buildResources: join(root, "src/workbench/ui/assets"),
     },
-    files: ["dist/**/*", "package.json", "LICENSE"],
+    files: ["dist/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md"],
     extraResources: [{ from: resources, to: "runtime" }],
     asar: true,
+    publish: [{ provider: "github", owner: "Tulipe1735", repo: "Prism" }],
+    protocols: [{ name: "Prism", schemes: ["prism"] }],
     // The desktop shell is already bundled and has no external Node dependencies.
     beforeBuild: async () => false,
     // electron-builder expands these tokens when it names the installer.
