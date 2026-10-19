@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { execFile, spawn } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 import { promisify } from "node:util";
@@ -85,16 +85,20 @@ it.runIf(process.platform === "linux")(
     await chmod(join(helpers, "wslpath"), 0o755);
     await execute("tar", ["-czf", archive, "-C", fixture, "."]);
 
-    const run = (): Promise<string> =>
+    const run = (override?: string): Promise<string> =>
       new Promise((resolve, reject) => {
-        const child = spawn("sh", ["-s", "--", archive, "0.1.6-test", "0", data], {
-          env: {
-            ...process.env,
-            PATH: `${helpers}:${process.env.PATH}`,
-            XDG_DATA_HOME: join(root, "xdg"),
+        const child = spawn(
+          "sh",
+          ["-s", "--", archive, "0.1.6-test", "0", ...(override ? [override] : [])],
+          {
+            env: {
+              ...process.env,
+              PATH: `${helpers}:${process.env.PATH}`,
+              XDG_DATA_HOME: join(root, "xdg"),
+            },
+            stdio: ["pipe", "pipe", "pipe"],
           },
-          stdio: ["pipe", "pipe", "pipe"],
-        });
+        );
         let stdout = "";
         let stderr = "";
         child.stdout.on("data", (chunk: Buffer) => {
@@ -109,7 +113,7 @@ it.runIf(process.platform === "linux")(
         );
         child.stdin.end(PREPARE_RUNTIME_SCRIPT);
       });
-    const first = await run();
+    const first = await run(data);
     const ready = first
       .split("\n")
       .find((line) => line.startsWith("PRISM_RUNTIME_READY="))!;
@@ -121,8 +125,16 @@ it.runIf(process.platform === "linux")(
     expect(await readFile(result.entry.path, "utf8")).toContain("kernel help");
     expect(await readFile(join(data, "config.json"), "utf8")).toBe('{"keep":true}');
     expect(first).toContain("正在展开");
-    const second = await run();
+    const second = await run(data);
     expect(second).not.toContain("正在展开");
     expect(second).toContain("PRISM_RUNTIME_READY=");
+    const defaultReady = (await run())
+      .split("\n")
+      .find((line) => line.startsWith("PRISM_RUNTIME_READY="))!;
+    expect(JSON.parse(defaultReady.slice("PRISM_RUNTIME_READY=".length))).toMatchObject(
+      {
+        dataDir: join(homedir(), ".prism"),
+      },
+    );
   },
 );

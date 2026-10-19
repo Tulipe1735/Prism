@@ -1,6 +1,6 @@
 {
   "name": "@tulipe1735/prism",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Personal coding agent: Windows desktop workbench, agent execution in WSL.",
   "license": "MIT",
   "repository": {

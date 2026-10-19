@@ -72,6 +72,13 @@ pnpm package:win
 Node，打包内核与 Playwright，再用 electron-builder 生成 NSIS 安装包。Windows 端只携带工作台，WSL 端携带完整 Node 运行时；两端都不依赖源码目录。构建缓存位于
 `.packaging/cache/`，构建内容与安装包目录已从版本控制中排除。
 
+在同时具有 Windows
+Node 和 WSL 的本机上，可从 WSL 运行默认目录与显式目录的真实跨系统回归检查：
+
+```bash
+PRISM_WINDOWS_RUNTIME=1 pnpm exec vitest run tests/workbench/windows-runtime.integration.test.ts
+```
+
 ## 一个来源
 
 浏览器只跟 UI 服务器同源通信：UI 服务器把

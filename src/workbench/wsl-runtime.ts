@@ -31,7 +31,7 @@ export const PREPARE_RUNTIME_SCRIPT = `set -eu
 payload=$(wslpath -u "$1")
 runtime_id=$2
 install_browser=$3
-data_override=$4
+data_override=\${4-}
 if [ "$(uname -m)" != x86_64 ]; then
   echo 'This installer needs an x86_64 WSL distribution.' >&2
   exit 1
@@ -104,7 +104,7 @@ export async function prepareWslRuntime(options: {
       payload,
       `${manifest.version}-${checksum.slice(0, 12)}`,
       options.installBrowser ? "1" : "0",
-      options.dataDir ?? "",
+      ...(options.dataDir ? [options.dataDir] : []),
     ],
     {
       input: PREPARE_RUNTIME_SCRIPT,
@@ -184,10 +184,10 @@ function run(
     }
     child.stdout.on("data", (chunk: Buffer) => {
       stdout.push(chunk);
-      options.onProgress?.(chunk.toString("utf8"));
+      options.onProgress?.(decodeWslOutput(chunk));
     });
     child.stderr.on("data", (chunk: Buffer) => {
-      const text = chunk.toString(chunk.includes(0) ? "utf16le" : "utf8");
+      const text = decodeWslOutput(chunk);
       detail = (detail + text).slice(-8000);
       options.onProgress?.(text);
     });
@@ -196,10 +196,18 @@ function run(
       finish(
         code === 0
           ? undefined
-          : new Error(detail.trim() || `WSL 命令退出（${code}）。`),
+          : new Error(
+              detail.trim() ||
+                decodeWslOutput(Buffer.concat(stdout)).trim() ||
+                `WSL 命令退出（${code}）。`,
+            ),
       ),
     );
     child.stdin.on("error", () => {});
     child.stdin.end(options.input);
   });
+}
+
+function decodeWslOutput(output: Buffer): string {
+  return output.toString(output.includes(0) ? "utf16le" : "utf8");
 }
