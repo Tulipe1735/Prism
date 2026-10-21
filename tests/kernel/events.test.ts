@@ -14,6 +14,7 @@ function category(event: KernelEvent): string {
     case "approval.requested":
     case "approval.resolved":
       return "approval";
+    case "canvas.updated":
     case "session.updated":
       return "session";
     case "session.compacted":

@@ -42,6 +42,7 @@ export interface UiState {
   deltas: Record<string, string>;
   approvals: PendingApproval[];
   taskRunning: boolean;
+  canvasRevision: number;
   search: string;
   view: UiView;
   settings: KernelSettings | null;
@@ -77,6 +78,7 @@ export function emptyState(workspace = ""): UiState {
     deltas: {},
     approvals: [],
     taskRunning: false,
+    canvasRevision: 0,
     search: "",
     view: "artifacts",
     settings: null,
@@ -127,6 +129,7 @@ export function reduce(state: UiState, action: UiAction): UiState {
         deltas: {},
         taskRunning: isTaskRunning(action.entries),
         edit: null,
+        canvasRevision: 0,
       };
     case "entries":
       return {
@@ -195,6 +198,10 @@ function reduceEvent(state: UiState, event: KernelEvent): UiState {
     case "tool.failed":
       if (event.sessionId !== state.activeId) return state;
       return { ...state, taskRunning: true };
+    case "canvas.updated":
+      return event.sessionId === state.activeId
+        ? { ...state, canvasRevision: event.revision }
+        : state;
     case "approval.requested": {
       const approval: PendingApproval = {
         sessionId: event.sessionId,

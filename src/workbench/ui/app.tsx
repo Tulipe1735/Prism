@@ -10,10 +10,11 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  PenLine,
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Button, PrismMark, SectionLabel, workspaceName } from "./components.tsx";
 import { Composer } from "./composer.tsx";
 import { Inspector } from "./inspector.tsx";
@@ -21,6 +22,9 @@ import { Sidebar } from "./sidebar.tsx";
 import { WorkspaceTerminal } from "./terminal.tsx";
 import { Timeline } from "./timeline.tsx";
 import { useWorkbench } from "./use-workbench.ts";
+
+/** Drawn only after the first click: Excalidraw is far larger than the shell. */
+const Canvas = lazy(() => import("./canvas.tsx"));
 
 export function App(): JSX.Element {
   const workbench = useWorkbench();
@@ -33,12 +37,16 @@ export function App(): JSX.Element {
       inlineInspector ||
       new URLSearchParams(window.location.search).get("setup") === "model",
   );
+  const [canvasOpen, setCanvasOpen] = useState(false);
+  const [canvasMounted, setCanvasMounted] = useState(false);
+  const [canvasExpanded, setCanvasExpanded] = useState(false);
   const navigationButton = useRef<HTMLButtonElement>(null);
   const inspectorButton = useRef<HTMLButtonElement>(null);
   const navigationVisible = navigationOpen && (inlineNavigation || !inspectorOpen);
   const navigationWidth =
     inlineNavigation && navigationVisible ? (inlineInspector ? 268 : 248) : 64;
-  const inspectorWidth = inlineInspector && inspectorOpen ? 320 : 0;
+  const inspectorWidth = inlineInspector && inspectorOpen && !canvasOpen ? 320 : 0;
+  const canvasInline = canvasOpen && inlineInspector && !canvasExpanded;
   const overlayOpen =
     (!inlineNavigation && navigationVisible) || (!inlineInspector && inspectorOpen);
   const sidebarContent = useDelayedFlag(navigationVisible, 120);
@@ -129,6 +137,20 @@ export function App(): JSX.Element {
             </span>
           </div>
           <button
+            type="button"
+            data-action="canvas"
+            aria-label="打开画板"
+            aria-pressed={canvasOpen}
+            title="画板"
+            onClick={() => {
+              setCanvasMounted(true);
+              setCanvasOpen(true);
+            }}
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface hover:text-ink"
+          >
+            <PenLine size={16} aria-hidden="true" />
+          </button>
+          <button
             ref={inspectorButton}
             type="button"
             aria-label="切换产物与设置"
@@ -153,7 +175,7 @@ export function App(): JSX.Element {
       <main
         className="relative grid min-h-0 transition-[grid-template-columns] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
         style={{
-          gridTemplateColumns: `${navigationWidth}px minmax(0,1fr) ${inspectorWidth}px`,
+          gridTemplateColumns: `${navigationWidth}px minmax(0,1fr) ${canvasInline ? "minmax(620px,1.3fr)" : `${inspectorWidth}px`}`,
         }}
       >
         {overlayOpen ? (
@@ -244,10 +266,10 @@ export function App(): JSX.Element {
         <aside
           id="inspector"
           aria-label="产物与设置"
-          aria-hidden={!inspectorOpen}
-          inert={!inspectorOpen}
-          hidden={!inspectorOpen && !inlineInspector}
-          className={`${inspectorClass} flex min-h-0 min-w-0 flex-col overflow-hidden bg-paper`}
+          aria-hidden={!inspectorOpen || canvasOpen}
+          inert={!inspectorOpen || canvasOpen}
+          hidden={canvasOpen || (!inspectorOpen && !inlineInspector)}
+          className={`${canvasOpen ? "hidden" : inspectorClass} flex min-h-0 min-w-0 flex-col overflow-hidden bg-paper`}
         >
           <Inspector
             workbench={workbench}
@@ -257,6 +279,43 @@ export function App(): JSX.Element {
             }}
           />
         </aside>
+        {canvasMounted ? (
+          <div
+            id="canvas"
+            aria-label="画板"
+            hidden={!canvasOpen}
+            className={`${!canvasOpen ? "hidden" : canvasInline ? "col-start-3 row-start-1 flex min-w-0 border-l" : "fixed inset-0 z-40 flex"} min-h-0 flex-col bg-paper`}
+          >
+            <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-5">
+              <SectionLabel>画板</SectionLabel>
+              <Button
+                variant="ghost"
+                className="px-2 text-xs"
+                aria-label="关闭画板"
+                onClick={() => setCanvasOpen(false)}
+              >
+                <X size={14} aria-hidden="true" />
+                关闭
+              </Button>
+            </div>
+            <Suspense
+              fallback={
+                <p className="p-6 text-sm text-muted" role="status">
+                  正在加载画布…
+                </p>
+              }
+            >
+              <Canvas
+                sessionId={state.activeId}
+                revision={state.canvasRevision}
+                connected={state.connected}
+                open={canvasOpen}
+                expanded={canvasExpanded}
+                onToggleExpanded={() => setCanvasExpanded((expanded) => !expanded)}
+              />
+            </Suspense>
+          </div>
+        ) : null}
       </main>
 
       {state.notice === null ? (

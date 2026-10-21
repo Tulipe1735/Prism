@@ -6,11 +6,15 @@ import { extname, relative, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { MAX_ATTACHMENT_BYTES } from "../shared/attachments.ts";
+import { MAX_CANVAS_BYTES } from "../shared/canvas.ts";
 
 /** Prefix the browser uses for everything that belongs to the kernel. */
 export const KERNEL_PREFIX = "/kernel";
 /** Cap on proxied request bodies; the workbench sends small JSON documents. */
 const MAX_BODY_BYTES = 1_000_000;
+
+/** Chunk names end in a content hash, so their bytes never change. */
+const HASHED = /-[A-Z0-9]{8}\.(?:js|css)$/;
 
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -101,7 +105,10 @@ export async function startUiServer(
     response.writeHead(200, {
       "content-type": CONTENT_TYPES[extname(path)] ?? "application/octet-stream",
       "content-length": content.byteLength,
-      "cache-control": "no-store",
+      // Lazy chunks are over a megabyte; only hashed names may be cached.
+      "cache-control": HASHED.test(path)
+        ? "public, max-age=31536000, immutable"
+        : "no-store",
     });
     response.end(content);
   }
@@ -130,7 +137,9 @@ export async function startUiServer(
           request,
           /\/sessions\/[^/]+\/attachments$/.test(url.pathname)
             ? MAX_ATTACHMENT_BYTES
-            : MAX_BODY_BYTES,
+            : /\/sessions\/[^/]+\/canvas$/.test(url.pathname)
+              ? MAX_CANVAS_BYTES
+              : MAX_BODY_BYTES,
         ),
         signal: controller.signal,
       });
