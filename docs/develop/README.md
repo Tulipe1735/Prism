@@ -64,4 +64,16 @@ WSL 内核载荷。缓存位于 `.packaging/cache/`，均不纳入 Git。
 `Prism-<版本>-Setup-x64.exe`、同名 `.exe.blockmap`、`latest.yml` 和 `SHA256SUMS.txt`。
 `latest.yml` 与 blockmap 来自同一次构建；应用内更新使用它们。
 
+GitHub 上的 `Release Windows desktop`
+工作流可以直接从已推送的版本标签构建并发布，避免从本地上传大安装包：
+
+```bash
+gh workflow run release-windows.yml -f tag=v0.3.2
+gh run list --workflow release-windows.yml --limit 1
+gh run watch <运行编号> --exit-status
+```
+
+工作流使用 Ubuntu
+22.04 和 Wine，核对应用版本、内核版本及更新文件摘要后上传这四个发布文件。已有 Release 草稿中的说明保持不变；已公开的 Release 保留原有文件。
+
 本地更新通过正常安装程序完成，保留会话、配置和插件。安装前完成或取消现有任务，再退出旧版本；完成后核对安装版本、启动工作台并验证现有数据可读取。
