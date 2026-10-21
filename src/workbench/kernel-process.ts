@@ -37,7 +37,7 @@ export interface KernelLaunchOptions {
   dataDir?: string;
   port?: number;
   platform?: NodeJS.Platform;
-  /** WSL distribution owning the prepared runtime; required on Windows. */
+  /** Set only when launching a prepared WSL runtime from Windows. */
   distribution?: string;
   /** Node binary inside WSL, or the host node elsewhere. */
   node?: string;
@@ -76,7 +76,7 @@ export function resolveKernelEntry(projectRoot: string): KernelEntry {
 }
 
 /**
- * Windows uses a prepared Linux runtime in a selected WSL distribution.
+ * Launch on the host by default; a selected distribution explicitly uses WSL.
  */
 export function planKernelLaunch(options: KernelLaunchOptions): KernelLaunchPlan {
   const platform = options.platform ?? process.platform;
@@ -87,12 +87,8 @@ export function planKernelLaunch(options: KernelLaunchOptions): KernelLaunchPlan
     // Port 0 is the kernel default (a free port), so it is left out.
     ...(port === undefined || port === 0 ? [] : ["--port", String(port)]),
   ];
-  if (platform === "win32") {
-    if (
-      options.entry === undefined ||
-      options.node === undefined ||
-      options.distribution === undefined
-    )
+  if (platform === "win32" && options.distribution !== undefined) {
+    if (options.entry === undefined || options.node === undefined)
       throw new KernelLaunchError(
         "Windows needs a prepared WSL runtime. Start Prism and select a WSL distribution first.",
       );

@@ -29,6 +29,7 @@ describe("kernel config", () => {
       compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
       command: { timeoutMs: 120_000 },
       permissions: { scope: "workspace-write" },
+      creator: { enabled: false },
     });
   });
 
@@ -61,6 +62,7 @@ describe("kernel config", () => {
       compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
       command: { timeoutMs: 5_000 },
       permissions: { scope: "read-only" },
+      creator: { enabled: false },
     });
   });
 

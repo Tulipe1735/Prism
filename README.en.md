@@ -1,45 +1,104 @@
 # Prism
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Tulipe1735/Prism)
+
 English | [简体中文](README.md)
 
-Prism is a personal coding agent built for long-term use. A desktop workbench on Windows
-owns tasks, sessions, approvals, and artifacts; the agent works in WSL on your
-repository: reading code, editing files, running commands and tests, and verifying
-results.
+**Prism is an extensible personal agent workbench for Windows and WSL.**
 
-Prism runs its own task loop and ships with a browser tool, MCP, skills, web search, and
-cross-session memory. The default model is DeepSeek.
+Describe a task in the desktop workbench. The agent uses files, commands, browsers and
+external tools to carry it out, with visible execution history and results. Cordis
+powers the kernel. **Creator Mode** lets you request a capability in natural language,
+have the agent create and install a plugin, and use it without restarting.
 
-Install: [GitHub Releases](https://github.com/Tulipe1735/Prism/releases/latest)
+[Download for Windows](https://github.com/Tulipe1735/Prism/releases/latest) ·
+[Documentation](docs/README.md) · [Creator Mode](docs/guide/creator-mode.md) ·
+[Plugin development](docs/develop/plugins.md)
 
-Docs: [workbench](docs/workbench.md) · [kernel contract](docs/kernel-contract.md) ·
-[browser CLI](docs/browser-cli.md) · [architecture](docs/architecture.svg)
-
-## Status
-
-Download the Windows installer from
-[GitHub Releases](https://github.com/Tulipe1735/Prism/releases/latest). Install
-`Prism-<version>-Setup-x64.exe`, open Prism, choose an initialized WSL Linux
-distribution, and enter your model settings. The kernel and Node runtime ship with the
-app; no source checkout is required. See [installation and usage](docs/workbench.md) for
-the full steps.
-
-Prism iterates quickly; kernel interfaces and the UI may change between versions.
-
-## Run
-
-### Windows installer
+## Get started
 
 1. Download and install `Prism-<version>-Setup-x64.exe` from
    [Releases](https://github.com/Tulipe1735/Prism/releases/latest).
-2. Open Prism and choose an initialized WSL Linux distribution.
-3. Enter the model endpoint, name, and key, then choose a WSL workspace.
+2. Open Prism, select **native Windows** or an initialized **WSL distribution**, and
+   prepare the runtime.
+3. Configure your model endpoint, name and API key; choose a workspace in that
+   environment and start a conversation.
 
-Requires Windows x64 and an x86_64 WSL Linux distribution (Ubuntu recommended). The
-first browser download needs network access; if system dependencies are missing, follow
-the prompts in the preparation log.
+Native Windows mode needs neither WSL nor a separate Node installation. WSL mode uses
+the selected distribution's Linux toolchain. DeepSeek is the default model;
+OpenAI-compatible endpoints are configurable. The first browser download needs network
+access. See the [workbench guide](docs/guide/workbench.md) for installation, runtime
+selection, data locations and updates.
 
-### From source
+## Available today
+
+- **Development and file tasks**: read and edit files, search repositories, run commands
+  and tests, and inspect changes and artifacts.
+- **Browser operation**: observe pages, inspect target context, validate references,
+  perform actions and inspect input receipts. Supports Chromium, Firefox, WebKit and
+  takeover of a logged-in Chrome or Edge.
+- **Extensions**: create and hot-load local plugins with Creator Mode, connect external
+  tools through MCP, and load workflow instructions as skills.
+- **Continuous sessions**: persist and resume local history, cancel tasks, and compact
+  context.
+- **Visible execution**: streaming responses, tool calls, file changes, approvals and
+  settings in the desktop workbench.
+- **Windows and WSL**: run the same kernel in the chosen environment, with separate
+  workspaces, sessions and plugins.
+
+File and command tools follow read-only, workspace-write or full-access permission
+scopes. Writes outside the workspace require one-time approval. Plugins run trusted
+local code; MCP servers control their own capabilities. See
+[permissions](docs/guide/permissions.md).
+
+## Creator Mode: request a plugin
+
+Open **Settings → Creator Mode**, enable plugin authoring, and ask:
+
+> Create a text word-count plugin, install it, and verify it with Chinese and English
+> text.
+
+The agent can inspect the runtime, generate a JavaScript plugin, install it with
+`plugin_manager`, then discover and call its tools on the next model request. Plugins
+persist in the kernel's data directory and reload after restart. Settings provides
+enable, disable, reload and remove actions. A failed update restores the previous
+version.
+
+Creator Mode is off by default. Turning it off leaves enabled plugins running. This
+version supports kernel tools and events; DSH plugin compatibility depends on the
+required host interfaces. See [usage](docs/guide/creator-mode.md) and the
+[authoring contract](docs/develop/plugins.md).
+
+## Browser CLI for other agents
+
+The standalone `prism` browser-use CLI lets external agents plan and evaluate tasks
+while Prism observes the browser, validates references and executes individual actions.
+It needs no model key.
+
+```bash
+npm install -g @tulipe1735/prism
+prism --help
+```
+
+[Browser CLI guide](docs/guide/browser-cli.en.md) · [Agent skill](skills/prism/SKILL.md)
+
+## Direction
+
+Prism aims to combine browsers, application CLIs and application object interfaces so
+CLI agents can complete more real software tasks. Future work includes CLI-Anything
+integration, object-level operation of applications such as WPS, and Harness²-inspired
+refinement based on execution evidence. **Those integrations and automatic refinement
+are not implemented yet.** The workbench, built-in tools, MCP, skills, browser CLI and
+Creator Mode are available now.
+
+## Documentation and development
+
+- [Documentation index](docs/README.md)
+- [Run, verify and release from source](docs/develop/README.md)
+- [Plugin development](docs/develop/plugins.md)
+- [Architecture](docs/reference/architecture.md) ·
+  [Kernel HTTP/SSE contract](docs/reference/kernel.md)
+- [Cordis plugin lifecycle](docs/reference/plugins.md) · [Glossary](GLOSSARY.md)
 
 Requires Node.js ≥22.23.2 and pnpm:
 
@@ -49,86 +108,12 @@ pnpm build
 pnpm workbench
 ```
 
-`pnpm workbench` starts a kernel, prints its local URL, and serves the same UI in a
-browser for development and acceptance work. For the Electron entry, Windows packaging,
-and runtime preparation, see [workbench](docs/workbench.md).
+Source: [kernel](src/kernel) · [workbench](src/workbench) ·
+[browser CLI](src/interfaces/cli.ts)
 
-## Capabilities
+Plugin design and documentation organization draw on
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). The Creator Mode
+idea is discussed in the
+[DeepSeek Harness lecture slides](https://jyywiki.cn/GSE/2026/slides9.html).
 
-- **Desktop workbench**: workspaces, sessions, streaming chat, tool activity, code
-  changes, task artifacts, approvals, and settings. The UI uses React + Tailwind CSS,
-  Inter, neutral cool greys, and a blue accent. No built-in editor, file tree, or
-  interactive terminal.
-- **Full development loop**: read and write files, run commands and tests in a WSL
-  workspace, with verifiable results.
-- **Browser capability**: observation, target references, action validation, and input
-  receipts. The built-in agent uses it directly; the `prism` CLI exposes it to external
-  agents.
-- **MCP**: connect external tool servers, configured in [mcp.json](docs/mcp.md).
-- **Skills**: loaded on demand from directory conventions, described in
-  [skills](docs/skills.md).
-- **Web search**: built-in `web_search` and `web_fetch`, DeepSeek by default,
-  configurable.
-- **Cross-session memory**: session history is persisted, resumable, and compactable.
-- **Permission boundary**: three scopes (read-only / workspace-write / full access) with
-  out-of-scope approvals granted once; modeled after
-  [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
-- **Model**: DeepSeek API by default; any OpenAI-compatible endpoint can be configured.
-
-## Browser CLI
-
-`prism` is a browser-use CLI for external agents. It does not call a model; it observes
-the browser, validates action references, and executes one input at a time. Install it:
-
-```bash
-npm install -g @tulipe1735/prism
-prism --help
-```
-
-For usage and agent setup, see the [browser guide](docs/browser-cli.md). The agent skill
-is in [skills/prism](skills/prism/SKILL.md).
-
-## Architecture
-
-![Prism Agent system architecture](docs/architecture.svg)
-
-The Electron interface runs on Windows; the kernel runs in WSL. The two communicate over
-local HTTP/SSE, and the desktop starts the kernel through `wsl.exe`. See
-[ADR-0001](docs/adr/0001-windows-ui-wsl-execution.md).
-
-The kernel owns the model/tool loop, session context, permission checks and local
-storage. Its tools cover files and commands, browsers, web retrieval, MCP and skills.
-The `prism` browser CLI for external agents is a separate entry point.
-
-[Complete architecture and HTML source](docs/architecture.html) includes the system
-overview, kernel and tools, external browser CLI, and links to their implementation.
-Redrawn with [diagram-design](https://github.com/cathrynlavery/diagram-design), using
-Prism's blue accent and Inter typography.
-
-[Glossary](GLOSSARY.md) · [Requirements](docs/requirements-2026-10-18-coding-agent.md)
-
-Code: [workbench](src/workbench) · [kernel](src/kernel) ·
-[kernel browser](src/kernel/browser) · [browser CLI](src/interfaces/cli.ts)
-
-## Development
-
-```bash
-pnpm install
-pnpm typecheck
-pnpm test
-pnpm build
-```
-
-See [workbench](docs/workbench.md) for how to run and read the workbench, and
-[acceptance](docs/acceptance.md) for a first-version acceptance run with real tasks.
-
-The kernel starts headless, listens on `127.0.0.1` and prints its address as one JSON
-line (interface in [docs/kernel-contract.md](docs/kernel-contract.md)):
-
-```bash
-node --experimental-strip-types --disable-warning=ExperimentalWarning \
-  src/interfaces/kernel.ts [--port <n>] [--data-dir <path>]
-```
-
-MIT License. The README follows the structure of
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
+MIT License.

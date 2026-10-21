@@ -1,27 +1,84 @@
-import type { Tool } from "./tool.ts";
+import type { Tool, ToolContext, ToolResult } from "./tool.ts";
+import type { JsonValue } from "./types.ts";
 import { loadSkill, scanSkills } from "../skills/loader.ts";
 import { readString } from "./tool-support.ts";
 
 /** Tools the model may call, keyed by name. */
 export class ToolRegistry {
-  private readonly tools = new Map<string, Tool>();
+  private readonly tools = new Map<
+    string,
+    {
+      tool: Tool;
+      calls: Set<{ controller: AbortController; settled: Promise<void> }>;
+      dispose: () => Promise<void>;
+    }
+  >();
 
-  constructor(tools: Tool[] = []) {
-    for (const tool of tools) this.register(tool);
-  }
-
-  register(tool: Tool): void {
+  register(tool: Tool): () => Promise<void> {
     if (this.tools.has(tool.name))
       throw new Error(`Tool "${tool.name}" is already registered`);
-    this.tools.set(tool.name, tool);
+    let disposing: Promise<void> | undefined;
+    const entry = {
+      tool,
+      calls: new Set<{ controller: AbortController; settled: Promise<void> }>(),
+      dispose: (): Promise<void> => {
+        if (disposing !== undefined) return disposing;
+        if (this.tools.get(tool.name) === entry) this.tools.delete(tool.name);
+        for (const call of entry.calls) call.controller.abort();
+        disposing = Promise.all([...entry.calls].map((call) => call.settled)).then(
+          () => {},
+        );
+        return disposing;
+      },
+    };
+    this.tools.set(tool.name, entry);
+    return entry.dispose;
   }
 
   get(name: string): Tool | undefined {
-    return this.tools.get(name);
+    return this.tools.get(name)?.tool;
   }
 
   list(): Tool[] {
-    return [...this.tools.values()];
+    return [...this.tools.values()].map((entry) => entry.tool);
+  }
+
+  /** An unloading plugin withdraws its tools, cancels calls and awaits their cleanup. */
+  async execute(
+    tool: Tool,
+    args: JsonValue,
+    context: ToolContext,
+  ): Promise<ToolResult> {
+    const entry = this.tools.get(tool.name);
+    if (entry?.tool !== tool)
+      return { content: `Tool "${tool.name}" is no longer available.`, isError: true };
+    const controller = new AbortController();
+    const signal = AbortSignal.any([context.signal, controller.signal]);
+    const execution = Promise.resolve().then(() =>
+      signal.aborted
+        ? {
+            content: `Tool "${tool.name}" was cancelled before execution.`,
+            isError: true,
+          }
+        : tool.execute(args, { ...context, signal }),
+    );
+    const call = {
+      controller,
+      settled: execution.then(
+        () => {},
+        () => {},
+      ),
+    };
+    entry.calls.add(call);
+    try {
+      return await execution;
+    } finally {
+      entry.calls.delete(call);
+    }
+  }
+
+  async close(): Promise<void> {
+    await Promise.all([...this.tools.values()].map((entry) => entry.dispose()));
   }
 }
 

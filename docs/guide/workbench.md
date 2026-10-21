@@ -1,7 +1,7 @@
 # 工作台
 
 工作台是 Prism 的桌面界面：Electron 壳 + 本地 Web
-UI。它承担工作区选择、会话、聊天、工具执行过程、代码改动与产物查看、审批交互和设置展示；不直接访问文件系统、模型或会话日志，所有行为经[内核接口契约](kernel-contract.md)发生。
+UI。它承担工作区选择、会话、聊天、工具执行过程、代码改动与产物查看、审批交互和设置展示；不直接访问文件系统、模型或会话日志，所有行为经[内核接口契约](../reference/kernel.md)发生。
 
 ## 运行
 
@@ -10,21 +10,24 @@ UI。它承担工作区选择、会话、聊天、工具执行过程、代码改
 从 [GitHub Releases](https://github.com/Tulipe1735/Prism/releases/latest) 下载
 `Prism-<版本>-Setup-x64.exe`，按安装向导选择目录。安装程序会创建桌面与开始菜单快捷方式。
 
-需要 Windows x64，以及已完成首次用户设置的 x86_64 WSL
-Linux 发行版（推荐 Ubuntu）。没有 WSL 时，应用会显示安装说明。
+需要 Windows x64。可以直接原生运行；选择 WSL 模式时，另需完成首次用户设置的 x86_64 WSL
+Linux 发行版。
 
 首次打开 Prism：
 
-1. 选择 WSL 发行版，点击「准备并开始」。内核和 Node 随安装包提供，无需检出仓库或另装 Node。
+1. 选择 Windows，或选择 WSL 及发行版，点击「准备并开始」。两种模式都无需检出仓库或另装 Node。
 2. 默认同时下载 Chromium；也可以取消勾选，稍后按 `Alt`
    打开「运行环境」菜单，准备所需浏览器。
-3. 在自动展开的设置中填写模型端点、名称与 API 密钥，再选择 WSL 工作区，例如
-   `/home/you/projects/demo`。
+3. 在自动展开的设置中填写模型端点、名称与 API 密钥，再选择当前环境中的工作区：Windows 使用
+   `C:\Users\you\project`，WSL 使用 `/home/you/projects/demo`。
 
-发行版选择保存在 Windows 的 `%APPDATA%/Prism/desktop.json`；内核运行时保存在所选发行版的
-`~/.local/share/prism/runtime/`（遵循 `XDG_DATA_HOME`），会话和模型设置保存在
-`~/.prism/`。升级和卸载不会删除会话与设置。更换发行版时，退出 Prism 后删除
-`desktop.json`，再重新打开。
+运行模式与发行版选择保存在 Windows 的
+`%APPDATA%/Prism/desktop.json`。Windows 原生内核使用 Electron 自带的 Node 运行时，会话和模型设置默认位于
+`%USERPROFILE%/.prism/`；WSL 运行时保存在所选发行版的
+`~/.local/share/prism/runtime/`（遵循 `XDG_DATA_HOME`），会话和设置位于该发行版的
+`~/.prism/`。
+
+升级和卸载不会删除会话与设置。通过「运行环境 → 切换运行环境」重新选择模式或发行版；先完成或取消现有任务。各环境的数据保持独立。
 
 浏览器首次下载需要联网；Linux 缺少浏览器系统依赖时，按准备日志中的 Playwright 提示在所选发行版中安装。当前安装包没有代码签名，Windows 可能显示发布者未知。
 
@@ -51,8 +54,8 @@ v0.2.1 及更早版本需要手动安装本次新版一次，之后可使用左�
 
 ### 从源码运行
 
-产品入口是 Electron 工作台：它经 `wsl.exe`（Windows）或本地
-`node`（Linux 开发环境）拉起内核、起 UI 服务器、打开窗口；退出时先 `POST /shutdown`
+产品入口是 Electron 工作台：原生模式直接拉起内核，WSL 模式经 `wsl.exe`
+拉起所选发行版中的内核，然后启动 UI 服务器并打开窗口；退出时先 `POST /shutdown`
 再关闭 UI 服务器。
 
 ```bash
@@ -71,10 +74,10 @@ pnpm workbench --kernel http://127.0.0.1:41234      # 对着已有内核跑
 
 要点：
 
-- 跨平台的内核命令见 `src/workbench/kernel-process.ts`；Windows 先通过
-  `src/workbench/wsl-runtime.ts`
-  展开并校验随应用提供的 WSL 运行时，再启动内核。Windows 源码开发时，先在 WSL 中执行
-  `pnpm package:win` 准备 `.packaging/resources`。
+- 跨平台启动计划见 `src/workbench/kernel-process.ts`。原生模式使用
+  `src/workbench/native-runtime.ts`；WSL 模式使用 `src/workbench/wsl-runtime.ts`
+  展开并校验 Linux 运行时。Windows 源码开发可直接运行原生模式；测试 WSL 安装包准备时先执行
+  `pnpm package:win` 生成 `.packaging/resources`。
 - Electron 运行时由 `electron` 包在 `pnpm install`
   时下载；被环境拦住时（`pnpm approve-builds` 未批准或缺网）可在 `node_modules/electron`
   里手动 `node install.js`。
@@ -90,7 +93,8 @@ pnpm package:win
 ```
 
 输出为 `release/Prism-<版本>-Setup-x64.exe`。构建脚本下载并校验 Linux
-Node，打包内核与 Playwright，再用 electron-builder 生成 NSIS 安装包。Windows 端只携带工作台，WSL 端携带完整 Node 运行时；两端都不依赖源码目录。构建缓存位于
+Node，打包内核与 Playwright，再用 electron-builder 生成 NSIS 安装包。Windows 端携带工作台及原生内核，WSL 端携带相同内核与完整 Linux
+Node 运行时；两种模式都不依赖源码目录。构建缓存位于
 `.packaging/cache/`，构建内容与安装包目录已从版本控制中排除。
 
 发布 GitHub Release 时，必须一并上传安装程序、对应的 `.exe.blockmap`、`latest.yml`
@@ -103,6 +107,7 @@ Node 和 WSL 的本机上，可从 WSL 运行默认目录与显式目录的真�
 
 ```bash
 PRISM_WINDOWS_RUNTIME=1 pnpm exec vitest run tests/workbench/windows-runtime.integration.test.ts
+PRISM_WINDOWS_NATIVE=1 pnpm exec vitest run tests/kernel/windows-native.integration.test.ts
 ```
 
 ## 一个来源
@@ -121,7 +126,13 @@ Electron 工作台使用固定的 `prism://workbench`
 ## UI 结构
 
 前端使用 React + Tailwind
-CSS。界面以中性冷灰、细分隔线与蓝色强调为基础，正文和控件默认使用 Inter，中文回退到苹方或微软雅黑；左侧是工作区与会话，中间是任务对话，右侧是产物与设置。顶栏按钮可独立折叠左右面板，窄窗口使用浮层。折叠有 300ms 的宽度过渡，侧栏内容会保留 120ms 再隐藏；工具卡片的收起会先停留 40ms，再用 240ms 折起。
+CSS。界面以中性冷灰、细分隔线与蓝色强调为基础，中文使用思源宋体（Source Han Serif
+SC），英文使用 Inter，代码块、行内代码与等宽字段使用 JetBrains
+Mono。字体文件随应用打包，无需联网或预先安装；启动页和账号弹窗使用同一字体设置。
+
+左侧是工作区与会话，中间是任务对话，右侧是产物与设置。左右面板可独立折叠；左栏收起后默认显示 Logo，悬停 Logo 或通过键盘聚焦时显示展开按钮，触屏直接显示展开按钮。窄窗口使用浮层。任务运行时，发送按钮原位显示为蓝底白色停止图标，不显示文字。
+
+折叠有 300ms 的宽度过渡，侧栏内容会保留 120ms 再隐藏；工具卡片的收起会先停留 40ms，再用 240ms 折起。
 
 `src/workbench/ui/main.tsx` 挂载 React，`app.tsx` 组合各区域；`use-workbench.ts`
 管理内核连接和操作，继续复用 `client.ts`、`state.ts` 与
@@ -133,7 +144,7 @@ CSS。界面以中性冷灰、细分隔线与蓝色强调为基础，正文和�
 | 区域     | 内容                                                                                                     | 来源                                             |
 | -------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | 顶栏     | 内核连接、状态、版本、数据目录                                                                           | `kernel.status` 事件与 `/status`                 |
-| 工作区   | 输入或从最近使用中选一个 WSL 路径                                                                        | 本地记忆 + 会话列表中的工作区                    |
+| 工作区   | 选择当前环境中的目录或从最近使用中选择                                                                   | 本地记忆 + 会话列表中的工作区                    |
 | 会话列表 | 按工作区分组、新建、继续、重命名、删除、搜索                                                             | `/sessions*` 与 `session.updated`                |
 | 聊天     | 助手文本流式增量、工具卡片（参数、结果、diff）、压缩提示、手动「压缩上下文」                             | `message.delta`、`tool.*` 与 `GET /sessions/:id` |
 | 审批     | 逐次审批卡片：工具、理由、目标、影响，按钮只有「允许一次」与「拒绝」                                     | `approval.requested` 与 `/approvals/:requestId`  |
@@ -189,5 +200,5 @@ PRISM_ELECTRON_SMOKE=1 pnpm vitest run tests/workbench/electron.smoke.test.ts
 
 - 设置里模型（端点、名称、密钥）、浏览器引擎、搜索来源与端点、权限范围与浏览器动作审批都可写（`PUT /settings`）；`browser.endpoint`、上下文压缩阈值等启动期设置仍写在
   `<dataDir>/config.json`。
-- 没有原生目录选择器：工作区路径由用户输入或从最近使用中选择，因为工作台不接触文件系统。
+- Electron 使用原生目录选择器；普通浏览器入口仍由用户输入路径或从最近使用中选择。
 - 产物视图只包含本次会话的工具改动，不是仓库级 diff。

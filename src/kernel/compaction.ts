@@ -1,8 +1,9 @@
-import type { CompactionConfig, ModelConfig } from "./config.ts";
+import type { CompactionConfig } from "./config.ts";
+import type { Model } from "./context.ts";
 import type { ChatMessage } from "./model.ts";
 import type { SessionStore } from "./session-store.ts";
 import type { ContextMessage } from "./session.ts";
-import { streamChat, toModelMessages } from "./model.ts";
+import { toModelMessages } from "./model.ts";
 import { rebuildContext } from "./session.ts";
 
 /** Why a compaction ran. */
@@ -18,12 +19,10 @@ export interface CompactionOutcome {
 
 export interface CompactSessionOptions {
   store: SessionStore;
-  model: ModelConfig;
+  stream: Model["stream"];
   compaction: CompactionConfig;
   sessionId: string;
   signal?: AbortSignal;
-  /** Overridden in tests; defaults to the global fetch. */
-  fetchImpl?: typeof fetch;
 }
 
 /** Assistant or tool messages carry tool bookkeeping on top of their text. */
@@ -67,10 +66,9 @@ export async function compactSession(
 
   const summary = (
     await generateSummary({
-      model: options.model,
+      stream: options.stream,
       messages: messages.slice(0, keepFrom),
       ...(options.signal === undefined ? {} : { signal: options.signal }),
-      ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
     })
   ).trim();
   if (summary === "")
@@ -111,20 +109,17 @@ const SUMMARY_INSTRUCTION = [
 
 /** One model call without tools: the summary of the context being replaced. */
 async function generateSummary(input: {
-  model: ModelConfig;
+  stream: Model["stream"];
   messages: ContextMessage[];
   signal?: AbortSignal;
-  fetchImpl?: typeof fetch;
 }): Promise<string> {
   let summary = "";
-  for await (const event of streamChat({
-    model: input.model,
+  for await (const event of input.stream({
     messages: [
       { role: "system", content: SUMMARY_INSTRUCTION },
       ...toModelMessages(input.messages),
     ],
     signal: input.signal ?? new AbortController().signal,
-    ...(input.fetchImpl === undefined ? {} : { fetchImpl: input.fetchImpl }),
   })) {
     if (event.type === "text") summary += event.text;
   }

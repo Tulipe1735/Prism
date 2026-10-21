@@ -32,7 +32,7 @@ for (const directory of [runtime, resources, app]) {
   await rm(directory, { recursive: true, force: true });
   await mkdir(directory, { recursive: true });
 }
-console.log("Preparing the Linux kernel and its runtime…");
+console.log("Preparing the Cordis kernel for Windows and WSL…");
 await bundle({
   entryPoints: [join(root, "src/interfaces/kernel.ts")],
   outfile: join(runtime, "kernel.cjs"),
@@ -72,6 +72,10 @@ for (const [name, manifest] of [
     dereference: true,
   });
 }
+
+// The same kernel and Playwright packages run on Windows with Electron's Node
+// runtime. Keep them outside app.asar; no WSL or separate Node install is needed.
+await cp(runtime, join(resources, "native"), { recursive: true });
 
 const filename = `node-v${nodeVersion}-linux-x64.tar.xz`;
 const nodeUrl = `https://nodejs.org/dist/v${nodeVersion}/`;

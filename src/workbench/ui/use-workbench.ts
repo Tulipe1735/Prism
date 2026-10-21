@@ -137,7 +137,7 @@ export function useWorkbench(): Workbench {
   function openWorkspace(value: string): string | null {
     const workspace = value.trim();
     if (workspace === "") {
-      dispatch({ type: "notice", notice: "先填一个工作区路径（WSL 里的目录）。" });
+      dispatch({ type: "notice", notice: "先选择一个当前运行环境中的工作区目录。" });
       return null;
     }
     navigation.current += 1;

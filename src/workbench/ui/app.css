@@ -25,12 +25,57 @@
     U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+@font-face {
+  font-family: "Inter Variable";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("./assets/fonts/inter-latin-wght-italic.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF,
+    U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("./assets/fonts/inter-latin-ext-wght-italic.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Source Han Serif SC";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 250 900;
+  src: url("./assets/fonts/source-han-serif-sc-variable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url("./assets/fonts/jetbrains-mono-variable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url("./assets/fonts/jetbrains-mono-variable-italic.woff2") format("woff2");
+}
+
 @theme {
-  --font-sans:
-    "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Noto Sans CJK SC",
-    "Microsoft YaHei", sans-serif;
-  --font-mono: "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+  --font-sans: "Inter Variable", "Source Han Serif SC", serif;
+  --font-mono: "JetBrains Mono", "Source Han Serif SC", monospace;
   --color-paper: #ffffff;
   --color-surface: #f7f8fa;
   --color-ink: #1f2328;
@@ -105,6 +150,12 @@
   details:not([open]) > summary .disclosure {
     transition-delay: 40ms;
   }
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+  }
   pre {
     tab-size: 2;
   }
@@ -145,6 +196,20 @@
 }
 
 @layer components {
+  .sidebar-logo {
+    transition: opacity 150ms ease;
+  }
+  .sidebar-brand[data-collapsed="true"] .sidebar-toggle {
+    opacity: 0;
+  }
+  .sidebar-brand[data-collapsed="true"]:hover .sidebar-toggle,
+  .sidebar-brand[data-collapsed="true"] .sidebar-toggle:focus-visible {
+    opacity: 1;
+  }
+  .sidebar-brand[data-collapsed="true"]:hover .sidebar-logo,
+  .sidebar-brand[data-collapsed="true"]:has(:focus-visible) .sidebar-logo {
+    opacity: 0;
+  }
   .field {
     @apply w-full min-w-0 rounded-md border bg-paper px-3 py-2 text-[13px] text-ink placeholder:text-muted/70 focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none;
   }
@@ -170,6 +235,101 @@
   }
   .code-output {
     @apply max-h-80 overflow-auto whitespace-pre-wrap break-words bg-surface/70 p-4 font-mono text-xs leading-6 text-[#3a414b];
+  }
+  .workspace-create {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.9);
+    transition:
+      opacity 150ms ease,
+      transform 150ms var(--ease-out-quiet),
+      background-color 150ms ease;
+  }
+  .workspace-heading:hover .workspace-create,
+  .workspace-heading:focus-within .workspace-create {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1);
+  }
+  .markdown > :first-child {
+    margin-top: 0;
+  }
+  .markdown > :last-child {
+    margin-bottom: 0;
+  }
+  .markdown :where(p, ul, ol, pre, blockquote, table, hr) {
+    margin-block: 0.75em;
+  }
+  .markdown :where(h1, h2, h3, h4, h5, h6) {
+    margin-block: 1.25em 0.5em;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .markdown h1 {
+    font-size: 1.5em;
+  }
+  .markdown h2 {
+    font-size: 1.25em;
+  }
+  .markdown h3 {
+    font-size: 1.1em;
+  }
+  .markdown :where(ul, ol) {
+    padding-left: 1.5em;
+  }
+  .markdown ul {
+    list-style-type: disc;
+  }
+  .markdown ol {
+    list-style-type: decimal;
+  }
+  .markdown li > :where(ul, ol, p) {
+    margin-block: 0.25em;
+  }
+  .markdown a {
+    @apply text-accent underline underline-offset-2;
+  }
+  .markdown :not(pre) > code {
+    @apply rounded bg-surface px-1.5 py-0.5 font-mono text-[0.875em];
+  }
+  .markdown pre {
+    @apply overflow-x-auto rounded-lg border bg-surface p-4 font-mono text-xs leading-6 whitespace-pre;
+  }
+  .markdown blockquote {
+    @apply border-l-2 pl-4 text-muted;
+  }
+  .markdown table {
+    @apply block max-w-full overflow-x-auto border-collapse text-[13px];
+  }
+  .markdown :where(th, td) {
+    @apply border px-3 py-1.5;
+  }
+  .markdown th {
+    @apply bg-surface font-semibold;
+  }
+  .markdown .task-list-item {
+    list-style-type: none;
+  }
+  .markdown input[type="checkbox"] {
+    margin-right: 0.5em;
+  }
+  .markdown img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+@media (hover: none) {
+  .sidebar-brand[data-collapsed="true"] .sidebar-toggle {
+    opacity: 1;
+  }
+  .sidebar-brand[data-collapsed="true"] .sidebar-logo {
+    opacity: 0;
+  }
+  .workspace-create {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
   }
 }
 

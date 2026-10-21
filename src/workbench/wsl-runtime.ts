@@ -26,6 +26,23 @@ export async function listDistributions(): Promise<string[]> {
   return parseDistributions(await run("wsl.exe", ["--list", "--quiet"]));
 }
 
+/** Use the selected distribution's mounts instead of assuming a Windows drive mapping. */
+export async function convertWslPath(
+  distribution: string,
+  path: string,
+  format: "-u" | "-w",
+): Promise<string> {
+  const output = await run("wsl.exe", [
+    "--distribution",
+    distribution,
+    "--exec",
+    "wslpath",
+    format,
+    path,
+  ]);
+  return output.toString("utf8").replace(/\r?\n$/, "");
+}
+
 /** Arguments stay separate from shell code, including Windows paths and distro names. */
 export const PREPARE_RUNTIME_SCRIPT = `set -eu
 payload=$(wslpath -u "$1")

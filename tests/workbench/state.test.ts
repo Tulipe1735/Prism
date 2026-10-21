@@ -276,6 +276,23 @@ it("switches the inspector between artifacts and settings", () => {
   );
 });
 
+it("keeps known workspaces available for their first session and respects search", () => {
+  const state = {
+    ...emptyState("/home/demo/new"),
+    recents: ["/home/demo/empty", "/home/demo/new"],
+    sessions: [summary()],
+  };
+  expect(selectVisibleSessions(state)).toEqual([
+    { workspace: "/home/demo/app", sessions: [summary()] },
+    { workspace: "/home/demo/empty", sessions: [] },
+    { workspace: "/home/demo/new", sessions: [] },
+  ]);
+  expect(selectVisibleSessions({ ...state, search: "NEW" })).toEqual([
+    { workspace: "/home/demo/new", sessions: [] },
+  ]);
+  expect(selectVisibleSessions({ ...state, search: "missing" })).toEqual([]);
+});
+
 it("remembers recently used workspaces without duplicates", () => {
   let state = reduce(emptyState(), { type: "workspace", workspace: "/home/demo/app" });
   state = reduce(state, { type: "workspace", workspace: "/home/demo/other" });

@@ -120,6 +120,9 @@ it("groups sessions by workspace and provides keyboard accessible session button
   expect(html).toContain('aria-current="page"');
   expect(html).toContain('data-action="rename-session"');
   expect(html).toContain('data-action="delete-session"');
+  expect(html).toContain('data-workspace="/home/demo/app"');
+  expect(html).toContain('data-workspace="/home/demo/site"');
+  expect(html.match(/data-action="new-session"/g)).toHaveLength(2);
   state = reduce(state, {
     type: "edit",
     edit: { kind: "rename", sessionId: "session-1" },
@@ -171,6 +174,70 @@ it("renders untrusted message text, tool results and streaming updates as React 
   expect(html).toContain('class="add"');
   expect(html).toContain("+new");
   expect(html).toContain("working &lt;img src=x onerror=alert(1)&gt;");
+});
+
+it("renders assistant Markdown with nested lists, tables and code blocks", () => {
+  const state = openSession();
+  state.entries.push({
+    type: "message",
+    id: "markdown",
+    parentId: "entry-4",
+    timestamp: "2026-10-18T09:00:04.000Z",
+    role: "assistant",
+    content: [
+      "## 结果",
+      "",
+      "**完成**，查看 `src/app.ts` 和 [文档](https://example.com)。",
+      "",
+      "1. 修改代码",
+      "   - 检查结果",
+      "",
+      "> 已验证",
+      "",
+      "| 检查 | 结果 |",
+      "| --- | --- |",
+      "| 测试 | 通过 |",
+      "",
+      "- [x] 完成",
+      "",
+      "```ts",
+      "const value = '<script>';",
+      "```",
+    ].join("\n"),
+  });
+  const html = renderToStaticMarkup(<Timeline state={state} />);
+  for (const markup of [
+    "<h2>结果</h2>",
+    "<strong>完成</strong>",
+    "<code>src/app.ts</code>",
+    '<a href="https://example.com">文档</a>',
+    "<ol>",
+    "<ul>",
+    "<blockquote>",
+    "<table>",
+    '<input type="checkbox" disabled="" checked=""/>',
+    '<pre><code class="language-ts">',
+    "&lt;script&gt;",
+  ])
+    expect(html).toContain(markup);
+});
+
+it("keeps unsafe HTML and link protocols inert inside assistant Markdown", () => {
+  const state = openSession();
+  state.entries.push({
+    type: "message",
+    id: "unsafe-markdown",
+    parentId: "entry-4",
+    timestamp: "2026-10-18T09:00:04.000Z",
+    role: "assistant",
+    content:
+      "<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n\n[click](javascript:alert%281%29)",
+  });
+  const html = renderToStaticMarkup(<Timeline state={state} />);
+  expect(html).not.toContain("<script>");
+  expect(html).not.toContain("<img src=x");
+  expect(html).not.toContain('href="javascript:');
+  expect(html).toContain("&lt;script&gt;");
 });
 
 it("renders the approval facts and exactly the two one-time answers", () => {
@@ -231,6 +298,7 @@ it("renders editable kernel settings, effective scope and browser approval state
       browser: { engine: "chromium", actionsNeedApproval: false },
       search: { provider: "deepseek", baseUrl: "https://api.deepseek.com" },
       permissions: { scope: "workspace-write" },
+      creator: { enabled: false },
     },
   });
   const html = renderToStaticMarkup(<Settings workbench={workbench(state)} />);

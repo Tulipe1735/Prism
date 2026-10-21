@@ -1,13 +1,14 @@
 # 内核接口契约
 
-本文件冻结工作台（08）与权限审批（04）并行开发所依赖的内核接口：HTTP 端点、SSE 事件形状与启动方式。实现见
+内核可原生运行于 Windows，也可运行于 WSL；内置能力由
+[Cordis 插件](plugins.md)装配。本文件描述内核接口：HTTP 端点、SSE 事件形状与启动方式。实现见
 `src/kernel/`；事件类型定义见 `src/kernel/events.ts`（本文件不复制其 TypeScript 定义）。
 
-契约变更必须同时修改本文件与 `src/kernel/events.ts`，并通知依赖它的 ticket。
+接口变更必须同步更新本文件、相关类型定义与工作台调用方。
 
 ## 传输
 
-- 内核监听 `127.0.0.1` 的随机端口（可用 `--port` 固定），只服务本机客户端（ADR-0003）。
+- 内核监听 `127.0.0.1` 的随机端口（可用 `--port` 固定），只服务本机客户端。
 - HTTP 提供请求/应答；SSE 推送事件。工作台按事件渲染，不轮询。
 - 所有请求与应答均为 JSON（`content-type: application/json`），`/events` 除外。
 
@@ -30,13 +31,14 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
   "type": "kernel.ready",
   "url": "http://127.0.0.1:41234",
   "port": 41234,
-  "version": "0.1.6",
+  "version": "0.3.0",
   "dataDir": "/home/demo/.prism"
 }
 ```
 
-监听失败时写 stderr 并以退出码 1 结束。`POST /shutdown` 应答后内核发出
-`kernel.status: stopping`，关闭 SSE 连接并以退出码 0 结束。
+全部内置插件初始化完成后才监听端口。初始化或监听失败时释放已创建的插件与连接，写 stderr 并以退出码 1 结束。`POST /shutdown`
+应答后内核发出
+`kernel.status: stopping`，关闭 SSE 连接，等待任务日志与插件资源清理，然后以退出码 0 结束。
 
 ### 错误应答
 
@@ -52,6 +54,9 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | `SESSION_NOT_FOUND`  | 404  | 会话 id 不存在                         |
 | `APPROVAL_NOT_FOUND` | 404  | 审批请求不存在、已应答或已失效         |
 | `TASK_RUNNING`       | 409  | 该会话已有任务在运行，不能并发再发消息 |
+| `CREATOR_DISABLED`   | 403  | Creator Mode 未开启，拒绝安装插件      |
+| `PLUGIN_NOT_FOUND`   | 404  | 插件不存在                             |
+| `PLUGIN_FAILED`      | 422  | 插件加载或更新失败                     |
 | `INTERNAL_ERROR`     | 500  | 未预期错误；内核继续服务，不退出       |
 
 ## 端点
@@ -60,7 +65,9 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | ------ | ------------------------------------ | ----------------------- |
 | GET    | `/status`                            | 内核状态                |
 | GET    | `/settings`                          | 读取设置                |
-| PUT    | `/settings`                          | 修改设置（04）          |
+| PUT    | `/settings`                          | 修改设置                |
+| GET    | `/plugins`                           | 插件列表与加载状态      |
+| POST   | `/plugins`                           | 插件安装、检查与启停    |
 | GET    | `/sessions?workspace=<path>`         | 会话列表                |
 | POST   | `/sessions`                          | 新建会话                |
 | GET    | `/sessions/:id`                      | 继续会话（摘要 + 条目） |
@@ -78,13 +85,31 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 ```json
 {
   "status": "ready",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "dataDir": "/home/demo/.prism",
   "runningTasks": 0
 }
 ```
 
 `status` 取 `start` 时用的内核状态字面量：`starting` | `ready` | `stopping` | `error`。
+
+### GET /plugins 与 POST /plugins
+
+`GET /plugins` 返回 `{ "plugins": [...] }`。每项包括
+`name`、`description`、`enabled`、`state`、`tools`，加载失败时附带 `error`。 `state` 为
+`active`、`disabled` 或 `failed`。这里不返回源码。
+
+`POST /plugins` 要求 `Content-Type: application/json`，接受与模型工具 `plugin_manager`
+相同的动作：
+
+- `list`：返回摘要列表。
+- `inspect` + `name`：返回完整持久记录，包括 `source`。
+- `install` + `name`、`description`、`source`：创建或更新并立即启用；要求 Creator
+  Mode 已开启。
+- `enable`、`disable`、`reload`、`remove` + `name`：管理已有插件。
+
+响应为 `{ "result": ... }`：`inspect`
+返回记录，其余动作返回当前摘要列表。管理操作依次执行。失败更新恢复旧版本；启动时单个插件失败不会阻止内核服务。具体源码契约见[插件开发](../develop/plugins.md)。
 
 ### GET /settings
 
@@ -100,17 +125,20 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
   },
   "browser": { "engine": "chromium", "actionsNeedApproval": false },
   "search": { "provider": "deepseek" },
-  "permissions": { "scope": "workspace-write" }
+  "permissions": { "scope": "workspace-write" },
+  "creator": { "enabled": false }
 }
 ```
 
 - `permissions.scope` 取 `read-only` | `workspace-write` | `full-access`，默认
-  `workspace-write`（ADR-0005）；可用 `PUT /settings` 切换。
+  `workspace-write`；可用 `PUT /settings` 切换。
 - `browser.engine` 取 `chromium` | `firefox` | `webkit`；可用 `PUT /settings`
   切换，下一次 `browser_open` 使用新引擎。
-- `browser.actionsNeedApproval` 取布尔值，默认 `false`（US-30）：为 `true`
-  时每个浏览器动作都要一次审批。工作台入口由 08 消费本契约出卡片。
+- `browser.actionsNeedApproval` 取布尔值，默认 `false`：为 `true`
+  时每个浏览器动作都要一次审批。工作台入口由工作台消费本契约出卡片。
 - `search` 报告当前来源；配置了 `search.baseUrl` 时一并报告（缺省时省略该键）。
+- `creator.enabled` 默认 `false`；开启后向模型提供 `creator_inspect` 和
+  `plugin_manager`。关闭不会停用已安装插件。
 
 ### PUT /settings
 
@@ -137,6 +165,10 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 { "search": { "provider": "gateway", "baseUrl": "https://gateway.example.com" } }
 ```
 
+```json
+{ "creator": { "enabled": true } }
+```
+
 → 200，应答体与 `GET /settings` 相同，即修改后生效的全部设置。内核同时把修改合并进
 `<dataDir>/config.json`，下次启动沿用（未写过的字段保持原值）。
 
@@ -146,6 +178,7 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | `browser`     | `engine`、`actionsNeedApproval` | 下一次 `browser_open` / 动作判定 |
 | `model`       | `baseUrl`、`model`、`apiKey`    | 下一次模型请求                   |
 | `search`      | `provider`、`baseUrl`           | 下一次 `web_search`              |
+| `creator`     | `enabled`                       | 当前工具列表与下一次模型请求     |
 
 - `model.apiKey` 只写不回传：应答只带 `model.hasApiKey: true`。
 - 以上字段都必须是非空字符串（或枚举值）；`browser.endpoint` 与 `compaction`
@@ -255,8 +288,7 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 `POST /sessions/:id/approvals/:requestId`，请求体 `{ "approved": true }` → 200
 `{ "approved": true }`。
 
-- 每个 `requestId` 只接受一次应答；重复应答或未知 id 返回 404
-  `APPROVAL_NOT_FOUND`（ADR-0005：只允许一次，不记忆）。
+- 每个 `requestId` 只接受一次应答；重复应答或未知 id 返回 404 `APPROVAL_NOT_FOUND`。
 - 内核在应答后发 `approval.resolved`，且不再为该 `requestId` 发 `approval.requested`。
 - 请求的产生方是 04（权限范围与审批）：工具执行前经内核注册待审批请求，再触发
   `approval.requested`。02 提供端点与登记/应答机制。
@@ -276,11 +308,11 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | 浏览器动作     | 允许\*      | 允许\*            | 允许\*        |
 
 - 只读档是硬上限：它直接拒绝，不发审批请求（US-14 由用户切换档位，不由模型请求越权）。
-- 路径按解析后的字符串比较，不跟随符号链接，也没有 OS 级沙箱（ADR-0005）。工作区外写的审批只对本次调用生效，不复用（US-16）。
+- 路径按解析后的字符串比较，不跟随符号链接，也没有 OS 级沙箱。工作区外写的审批只对本次调用生效，不复用。
 - \* 浏览器动作不受三档范围约束（范围只管文件效果）：默认自动执行，仅在
   `browser.actionsNeedApproval` 为 `true` 时逐个审批。该开关与档位正交。
 - MCP 工具（09）不纳入三档范围：它们的 `Tool.effects` 为空，内核不判定。理由与边界见
-  `docs/permissions.md`。
+  `docs/guide/permissions.md`。
 
 `Tool.effects` 返回 0..n 个动作；同一次调用中重复的动作只判定一次、只请求一次审批。
 
@@ -352,7 +384,7 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"read_file"
 - `skill`：`{ "name": "<技能名>" }` 时返回该技能正文；省略 `name`
   时列出可用技能（名称、描述、来源）。技能发现与读取用
   `src/skills/loader.ts`，根目录优先级见
-  `docs/skills.md`。技能的名称与描述同时写入系统提示，供模型选择。
+  `docs/guide/skills.md`。技能的名称与描述同时写入系统提示，供模型选择。
 
 测试不经过生产注册表：`tests/kernel/harness.ts` 自己注册占位工具 `echo`
 驱动任务循环，内核出厂不包含它。

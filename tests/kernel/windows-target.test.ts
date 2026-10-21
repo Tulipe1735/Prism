@@ -2,7 +2,7 @@ import type { SessionSummary } from "../../src/kernel/session.ts";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { afterEach, beforeAll, expect, it } from "vitest";
-import { windowsInteropStatus } from "../../src/kernel/windows-command.ts";
+import { windowsCommandStatus } from "../../src/kernel/windows-command.ts";
 import { api, connectEvents, type KernelHarness, startTestKernel } from "./harness.ts";
 
 const harnesses: KernelHarness[] = [];
@@ -12,8 +12,8 @@ let windowsDir = "";
 const created: string[] = [];
 
 beforeAll(async () => {
-  const status = await windowsInteropStatus();
-  if (status.available) windowsDir = status.interop.spawnDir;
+  const status = await windowsCommandStatus();
+  if (status.available) windowsDir = status.runtime.spawnDir;
   else unavailable = status.reason;
 });
 

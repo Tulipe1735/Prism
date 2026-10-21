@@ -1,6 +1,6 @@
 /**
  * The browser CLI's evidence capture over CDP. `src/kernel/browser/evidence.ts`
- * is the kernel's port of the same semantics on top of Playwright (ADR-0006);
+ * is the kernel's port of the same semantics on top of Playwright;
  * the two differ where the drivers differ, so they are not merged.
  */
 import type { SnapshotAction } from "../shared/types.ts";

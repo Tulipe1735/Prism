@@ -14,6 +14,7 @@ import {
   launchKernel,
   type RunningKernelProcess,
 } from "../kernel-process.ts";
+import { installNativeBrowser, prepareNativeRuntime } from "../native-runtime.ts";
 import { type RunningUiServer, startUiServer } from "../ui-server.ts";
 import {
   installWslBrowser,
@@ -23,6 +24,7 @@ import {
 import { RENDERER_HOST, RENDERER_ORIGIN, RENDERER_SCHEME } from "./identity-config.ts";
 import { isRendererUrl, registerRenderer } from "./renderer.ts";
 import { createDesktopUpdates } from "./updates.ts";
+import { selectWorkspaceDirectory } from "./workspace.ts";
 
 let kernel: RunningKernelProcess | null = null;
 let ui: RunningUiServer | null = null;
@@ -36,6 +38,7 @@ let setup: DesktopSetupState = {
   phase: "checking",
   distributions: [],
   selected: "",
+  mode: "native",
   message: "正在检查运行环境…",
   detail: "",
 };
@@ -109,6 +112,12 @@ async function main(): Promise<void> {
     )
       throw new Error("此操作只能在 Prism 工作台中执行。");
   };
+  ipcMain.handle("prism:workspace:select", (event, currentPath: unknown) => {
+    requireWorkbench(event);
+    if (typeof currentPath !== "string") throw new Error("工作区路径必须是文本。");
+    if (kernel === null) throw new Error("请等待内核启动完成。");
+    return selectWorkspaceDirectory(window!, runtime?.distribution, currentPath);
+  });
   ipcMain.handle("prism:updates:read", (event) => {
     requireWorkbench(event);
     return updates.read();
@@ -143,13 +152,22 @@ async function main(): Promise<void> {
       },
       {
         label: "运行环境",
-        submenu: BROWSER_ENGINES.map((engine) => ({
-          label: `准备 ${engine} 浏览器…`,
-          enabled: process.platform === "win32",
-          click: () => {
-            void installBrowser(engine);
+        submenu: [
+          {
+            label: "切换运行环境…",
+            click: () => {
+              void changeEnvironment().catch(fail);
+            },
           },
-        })),
+          { type: "separator" },
+          ...BROWSER_ENGINES.map((engine) => ({
+            label: `准备 ${engine} 浏览器…`,
+            enabled: process.platform === "win32",
+            click: () => {
+              void installBrowser(engine);
+            },
+          })),
+        ],
       },
     ]),
   );
@@ -159,47 +177,76 @@ async function main(): Promise<void> {
   );
   ipcMain.handle("prism:setup:prepare", (event, choice: DesktopSetupChoice) => {
     if (event.sender !== window?.webContents || preparing || kernel !== null) return;
-    if (setup.distributions.length === 0) {
-      void initialize().catch(fail);
+    if (choice?.mode === "wsl" && choice.distribution === "") {
+      void initialize(false).catch(fail);
       return;
     }
     if (
-      typeof choice?.distribution !== "string" ||
-      !setup.distributions.includes(choice.distribution) ||
-      typeof choice.installBrowser !== "boolean"
+      (choice?.mode !== "native" && choice?.mode !== "wsl") ||
+      typeof choice.installBrowser !== "boolean" ||
+      (choice.mode === "wsl" && !setup.distributions.includes(choice.distribution))
     )
-      throw new Error("请选择列表中的 WSL 发行版。");
+      throw new Error("请选择可用的运行环境。");
     void prepare(choice).catch(fail);
   });
   await window.loadFile(join(uiRoot(), "startup.html"));
   if (process.platform === "win32") await initialize();
   else {
     update({ phase: "starting", message: "正在启动内核…" });
-    // Electron's executable becomes a Node runtime for the development kernel.
-    kernel = await launchKernel({
+    runtime = await prepareNativeRuntime({
       projectRoot: appRoot(),
       node: process.execPath,
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+      installBrowser: false,
+      onProgress: () => {},
     });
+    kernel = await launchKernel(runtime);
     await openWorkbench();
   }
 }
 
-async function initialize(): Promise<void> {
-  update({ phase: "checking", message: "正在检查 WSL 发行版…", detail: "" });
-  const distributions = await listDistributions();
+async function initialize(autoStart = true): Promise<void> {
+  update({ phase: "checking", message: "正在检查运行环境…", detail: "" });
+  // WSL is optional. Its absence must never prevent a native Windows launch.
+  const distributions = await listDistributions().catch((): string[] => []);
   const preferences = await readPreferences();
+  const available =
+    preferences?.mode === "native" ||
+    (preferences?.mode === "wsl" && distributions.includes(preferences.distribution));
   update({
     phase: "choose",
     distributions,
-    selected: distributions.includes(preferences?.distribution ?? "")
-      ? preferences!.distribution
-      : (distributions[0] ?? ""),
-    message:
-      distributions.length === 0 ? "需要先准备 WSL 环境" : "选择 Prism 的工作环境",
+    mode: preferences?.mode === "wsl" && available ? "wsl" : "native",
+    selected:
+      preferences?.mode === "wsl" && available
+        ? preferences.distribution
+        : (distributions[0] ?? ""),
+    message: "选择 Prism 的工作环境",
   });
-  if (preferences !== null && distributions.includes(preferences.distribution))
-    await prepare(preferences);
+  if (autoStart && preferences !== null && available) await prepare(preferences);
+}
+
+async function changeEnvironment(): Promise<void> {
+  if (window === null || preparing || stopping || installingBrowser) return;
+  if (kernel !== null) {
+    const status = (await fetch(`${kernel.url}/status`).then((response) =>
+      response.json(),
+    )) as { runningTasks: number };
+    if (status.runningTasks > 0) {
+      await dialog.showMessageBox(window, {
+        type: "info",
+        message: "请先完成或取消当前任务，再切换运行环境。",
+      });
+      return;
+    }
+  }
+  await ui?.close();
+  ui = null;
+  await kernel?.close();
+  kernel = null;
+  runtime = null;
+  await window.loadFile(join(uiRoot(), "startup.html"));
+  await initialize(false);
 }
 
 async function prepare(choice: DesktopSetupChoice): Promise<void> {
@@ -207,23 +254,37 @@ async function prepare(choice: DesktopSetupChoice): Promise<void> {
   preparing = true;
   update({
     phase: "preparing",
-    selected: choice.distribution,
+    mode: choice.mode,
+    selected: choice.mode === "wsl" ? choice.distribution : "",
     message: "正在准备内核运行环境…",
     detail: "",
   });
   try {
-    const options = await prepareWslRuntime({
-      resources: app.isPackaged
-        ? process.resourcesPath
-        : join(appRoot(), ".packaging/resources"),
-      distribution: choice.distribution,
+    const progress = {
       installBrowser: choice.installBrowser,
       ...(process.env.PRISM_DATA_DIR === undefined
         ? {}
         : { dataDir: process.env.PRISM_DATA_DIR }),
-      onProgress: (text) => update({ detail: (setup.detail + text).slice(-8000) }),
+      onProgress: (text: string) =>
+        update({ detail: (setup.detail + text).slice(-8000) }),
       signal: preparation.signal,
-    });
+    };
+    const options =
+      choice.mode === "wsl"
+        ? await prepareWslRuntime({
+            resources: app.isPackaged
+              ? process.resourcesPath
+              : join(appRoot(), ".packaging/resources"),
+            distribution: choice.distribution,
+            ...progress,
+          })
+        : await prepareNativeRuntime({
+            projectRoot: appRoot(),
+            ...(app.isPackaged ? { resources: process.resourcesPath } : {}),
+            node: process.execPath,
+            env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+            ...progress,
+          });
     runtime = options;
     if (stopping) return;
     update({ phase: "starting", message: "正在启动内核…" });
@@ -251,7 +312,7 @@ async function installBrowser(engine: BrowserEngine): Promise<void> {
   if (runtime === null) {
     await dialog.showMessageBox(window, {
       type: "info",
-      message: "请先完成 WSL 运行环境准备。",
+      message: "请先准备运行环境。",
     });
     return;
   }
@@ -259,7 +320,9 @@ async function installBrowser(engine: BrowserEngine): Promise<void> {
   window.setProgressBar(2);
   window.setTitle(`Prism · 正在准备 ${engine} 浏览器…`);
   try {
-    await installWslBrowser(runtime, engine);
+    if (runtime.distribution === undefined)
+      await installNativeBrowser(runtime, engine, { signal: preparation.signal });
+    else await installWslBrowser(runtime, engine);
     if (window !== null)
       await dialog.showMessageBox(window, {
         type: "info",
@@ -313,12 +376,23 @@ async function readPreferences(): Promise<DesktopSetupChoice | null> {
     if (
       typeof value === "object" &&
       value !== null &&
-      "distribution" in value &&
-      typeof value.distribution === "string" &&
+      "mode" in value &&
       "installBrowser" in value &&
       typeof value.installBrowser === "boolean"
-    )
-      return { distribution: value.distribution, installBrowser: value.installBrowser };
+    ) {
+      if (value.mode === "native")
+        return { mode: "native", installBrowser: value.installBrowser };
+      if (
+        value.mode === "wsl" &&
+        "distribution" in value &&
+        typeof value.distribution === "string"
+      )
+        return {
+          mode: "wsl",
+          distribution: value.distribution,
+          installBrowser: value.installBrowser,
+        };
+    }
   } catch {
     /* First start or invalid preferences: ask the user to choose again. */
   }

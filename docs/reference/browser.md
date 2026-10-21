@@ -5,7 +5,7 @@
 
 ## 单一驱动
 
-引擎决策见 [ADR-0006](adr/0006-browser-engine.md)：**只使用 Playwright 一种驱动**。
+内核只使用 Playwright 一种驱动。
 
 被拒绝的方案：Chromium 走裸 CDP、Firefox/WebKit 走 Playwright。拒绝原因：观察样本、目标引用、新鲜度校验与输入回执要维护两份实现，两份实现必然随浏览器更新漂移，而「引用是否仍然有效」这类语义一旦分叉，模型会收到相互矛盾的事实。
 
@@ -23,7 +23,8 @@
 | `tool.ts`     | 浏览器会话管理、目标引用、证据校验、动作校验、输入回执、动作后观察                                                                                |
 | `receipts.ts` | 回执的类型与读取；文件格式与原子写入由 CLI 共用（`src/shared/receipts.ts`）                                                                       |
 
-注册进内核（工具注册表与联调）由 `02-kernel-loop.md`、`12-verification.md` 完成。
+工具在 `src/kernel/browser-tools.ts` 中适配，由 `src/kernel/server.ts`
+注册进内核；集成检查见 `tests/kernel/end-to-end.test.ts`。
 
 ## 引擎与安装
 
@@ -67,7 +68,7 @@
 驱动任务循环；内核出厂不包含它。模型看到的只是注册表，新增工具无需改循环。
 
 - `browser_open` 与 `browser_act` 声明 `browser-action`
-  效果：审批开关打开时逐个走 04 的审批通道；`browser_observe`、`browser_context`、`browser_receipt`
+  效果：审批开关打开时逐个走 内核的审批通道；`browser_observe`、`browser_context`、`browser_receipt`
   是只读观察，不受档位与开关约束。
 - 审批卡片的「目标」用该会话最后一次观察到的页面 URL 加目标引用，例如
   `http://example.com/ (o_…:e2)`。
@@ -76,7 +77,7 @@
 
 ## 已知限制
 
-- 接管模式下，新建标签页由 Playwright 发起，Chromium 可能短暂把它切到前台；ADR-0006 拒绝裸 CDP，因此当前不提供「后台标签」开关。
+- 接管模式下，新建标签页由 Playwright 发起，Chromium 可能短暂把它切到前台；当前不提供「后台标签」开关。
 - `page.goto` 失败（DNS、超时）不阻止会话打开：浏览器错误页也是需要被观察的内容。
 - 打包：`snapshot.js`
   由构建复制到每个 bundle 旁边（`dist/snapshot.js`），模块先找 bundle 旁的副本、再找源码位置（`src/browser/snapshot.js`），两处都没有时以「找不到页面脚本，请先构建」报错而不是静默降级。

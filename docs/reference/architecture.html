@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Prism Agent 的完整架构：Windows 工作台、WSL 内核、任务循环、模型、工具、权限、会话与独立浏览器 CLI。"
+      content="Prism Agent 的完整架构：Windows 工作台、Windows / WSL 内核、任务循环、模型、工具、权限、会话与独立浏览器 CLI。"
     />
     <meta
       name="generator"
@@ -254,10 +254,10 @@
   <body>
     <main>
       <header>
-        <p class="eyebrow">PRISM · ARCHITECTURE · v0.2.3</p>
+        <p class="eyebrow">PRISM · ARCHITECTURE · v0.3.0</p>
         <h1>从任务到结果，Prism 怎样工作。</h1>
         <p class="lead">
-          Windows 桌面工作台承载交互，WSL 内核运行
+          Windows 桌面工作台承载交互，Windows / WSL 内核运行
           Agent。模型负责生成回复与工具调用，内核管理上下文、执行工具、检查权限并持久化过程。
         </p>
         <nav aria-label="架构视图">
@@ -276,7 +276,7 @@
           >
             <title id="prism-system-title">Prism Agent · 整体架构</title>
             <desc id="prism-system-desc">
-              Prism 的 Windows 工作台通过桌面服务连接 WSL
+              Prism 的 Windows 工作台通过桌面服务连接 Windows / WSL
               内核，内核管理任务循环、模型、工具、会话和权限审批，并接入身份与更新服务。
             </desc>
             <defs>
@@ -304,7 +304,8 @@
             <rect x="0" y="0" width="1280" height="720" fill="#ffffff" />
             <text x="40" y="57" class="diagram-title">Prism Agent · 整体架构</text>
             <text x="40" y="86" class="body">
-              从用户任务到模型调用、工具执行、结果落盘与界面反馈。基于 v0.2.3 当前实现。
+              从用户任务到模型调用、工具执行、结果落盘与界面反馈。Creator
+              扩展见架构参考。
             </text>
             <rect
               x="40"
@@ -327,7 +328,9 @@
               stroke="#e7e9ed"
               stroke-width="1"
             />
-            <text x="432" y="153" class="zone-label">WSL · Agent 内核与本地状态</text>
+            <text x="432" y="153" class="zone-label">
+              Windows / WSL · Cordis 内核与本地状态
+            </text>
             <rect
               x="936"
               y="128"
@@ -491,7 +494,7 @@
               />
               <text x="80" y="345" class="tag">MAIN / PRELOAD / UI SERVER</text>
               <text x="80" y="369" class="node-name">桌面服务</text>
-              <text x="80" y="391" class="body">准备 WSL 运行时并启动内核</text>
+              <text x="80" y="391" class="body">选择 Windows / WSL 并启动内核</text>
               <text x="80" y="411" class="body">界面资源与 /kernel 请求代理</text>
             </g>
             <g id="system-windows" data-node="system-windows">
@@ -508,7 +511,7 @@
               />
               <text x="80" y="505" class="tag">HOST COMMANDS</text>
               <text x="80" y="523" class="node-name">Windows 执行目标</text>
-              <text x="80" y="543" class="technical">WSL interop → cmd.exe</text>
+              <text x="80" y="543" class="technical">原生 / WSL interop → cmd.exe</text>
             </g>
             <g id="system-api" data-node="system-api">
               <rect x="440" y="168" width="448" height="64" rx="6" fill="#ffffff" />
@@ -540,7 +543,7 @@
                 stroke="#2563eb"
                 stroke-width="1.2"
               />
-              <text x="456" y="313" class="tag">KERNEL / LOOP / MODEL</text>
+              <text x="456" y="313" class="tag">CORDIS / TASKS / MODEL</text>
               <text x="456" y="337" class="node-name">Agent 任务循环</text>
               <text x="456" y="359" class="body">上下文 → 模型 → 工具</text>
               <text x="456" y="379" class="body">结果回流，直到任务结束</text>
@@ -574,14 +577,12 @@
                 stroke="#1f2328"
                 stroke-width="1.2"
               />
-              <text x="456" y="473" class="tag">TOOL REGISTRY</text>
+              <text x="456" y="473" class="tag">CORDIS PLUGINS / TOOLS</text>
               <text x="456" y="497" class="node-name">工具能力与扩展</text>
               <text x="456" y="519" class="body">
                 文件与命令 · Prism 浏览器 · 联网检索
               </text>
-              <text x="456" y="539" class="body">
-                MCP 客户端 · 技能加载（详见下一图）
-              </text>
+              <text x="456" y="539" class="body">MCP · 技能 · Creator 插件</text>
             </g>
             <g id="system-identity" data-node="system-identity">
               <rect x="952" y="168" width="264" height="64" rx="6" fill="#ffffff" />
@@ -633,7 +634,7 @@
               />
               <text x="968" y="473" class="tag">TOOL RESOURCES</text>
               <text x="968" y="497" class="node-name">浏览器、网络与 MCP</text>
-              <text x="968" y="519" class="body">浏览器在 WSL；MCP 可本地或远程</text>
+              <text x="968" y="519" class="body">浏览器随内核；MCP 可本地或远程</text>
               <text x="968" y="539" class="body">网页 · 搜索 API · 外部工具服务</text>
             </g>
             <line x1="40" y1="616" x2="1240" y2="616" stroke="#e7e9ed" />
@@ -688,7 +689,7 @@
             />
             <text x="1048" y="649" class="body">依赖服务</text>
             <text x="40" y="688" class="body">
-              桌面经 wsl.exe
+              桌面直接或经 wsl.exe
               启动内核；工具的同步返回沿原调用返回。图中的分区不代表操作系统沙箱。
             </text>
           </svg>
@@ -775,7 +776,7 @@
               stroke="#e7e9ed"
               stroke-width="1"
             />
-            <text x="800" y="153" class="zone-label">内核注册的工具</text>
+            <text x="800" y="153" class="zone-label">插件注册的工具</text>
             <path
               data-connection="模型返回的工具调用进入注册表"
               d="M296 208 H376"
@@ -958,7 +959,7 @@
               <text x="816" y="193" class="tag">FILES / RUN_COMMAND</text>
               <text x="816" y="217" class="node-name">文件与命令</text>
               <text x="816" y="239" class="body">
-                读写 · 目录 · glob / grep；命令默认在 WSL
+                读写 · 目录 · glob / grep；命令默认在当前环境
               </text>
             </g>
             <g id="tool-browser" data-node="tool-browser">
@@ -1093,13 +1094,13 @@
           <div class="note">
             <h3>执行和审批发生在内核</h3>
             <p>
-              权限范围为只读、工作区可写、完全访问。内核按工具声明的效果逐次检查；审批不长期记忆。命令默认在
-              WSL，显式选择 Windows 时经 interop 执行。
+              权限范围为只读、工作区可写、完全访问。内核按工具声明的效果逐次检查；审批不长期记忆。命令默认在当前环境；WSL
+              内核可显式选择 Windows，经 interop 执行。
             </p>
           </div>
         </div>
         <p class="caption">
-          浏览器默认在 WSL
+          浏览器默认在内核所在环境
           后台运行。工具先观察页面并返回引用，再校验引用与证据、执行单步输入并落盘回执。MCP
           默认没有服务器，技能通过工具按需加载。
         </p>
@@ -1296,16 +1297,21 @@
             <tbody>
               <tr>
                 <td>桌面工作台与宿主服务</td>
-                <td>Electron 窗口、preload IPC、WSL 准备、UI 服务代理。</td>
+                <td>
+                  Electron 窗口、preload IPC、Windows / WSL 选择与准备、UI 服务代理。
+                </td>
                 <td>
                   <a href="../src/workbench/electron/main.ts"><code>main.ts</code></a>
                 </td>
               </tr>
               <tr>
                 <td>内核 API 与预置能力</td>
-                <td>HTTP 路由、SSE、浏览器与联网工具注册、MCP 连接。</td>
+                <td>HTTP 路由、SSE 与工作台接口；能力通过 Cordis 插件装配。</td>
                 <td>
-                  <a href="../src/kernel/server.ts"><code>server.ts</code></a>
+                  <a href="../src/kernel/server.ts"><code>server.ts</code></a> ·
+                  <a href="../src/kernel/plugins/index.ts"
+                    ><code>plugins/index.ts</code></a
+                  >
                 </td>
               </tr>
               <tr>
@@ -1390,7 +1396,7 @@
         </p>
       </details>
       <footer>
-        基于 Prism v0.2.3 当前实现 · 2026-10-19 ·
+        基于 Prism v0.3.0 当前实现 · 2026-10-21 ·
         设计语法：diagram-design，cathrynlavery/diagram-design，MIT，550fd66。此 HTML
         为源文件；README 使用其整体架构 SVG 导出。
       </footer>

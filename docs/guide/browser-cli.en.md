@@ -70,7 +70,7 @@ For unknown or interrupted input, query
 only its historical receipt, without current refs.
 
 `prism <command> --help` shows arguments and examples. The complete agent instructions
-are in [skills/prism/SKILL.md](../skills/prism/SKILL.md).
+are in [skills/prism/SKILL.md](../../skills/prism/SKILL.md).
 
 ## Run from source
 

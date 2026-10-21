@@ -10,6 +10,8 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { PrismMark } from "./components.tsx";
 import { parseUnifiedDiff, toTimeline } from "./derive.ts";
 
@@ -126,11 +128,15 @@ function TimelineEntry({ step }: { step: TimelineStep }): JSX.Element {
       <div
         className={
           assistant
-            ? "text-sm leading-7 break-words whitespace-pre-wrap"
+            ? "markdown text-sm leading-7 break-words"
             : "rounded-lg bg-surface/80 px-4 py-3 text-sm leading-7 break-words whitespace-pre-wrap"
         }
       >
-        {step.content}
+        {assistant ? (
+          <Markdown remarkPlugins={[remarkGfm]}>{step.content}</Markdown>
+        ) : (
+          step.content
+        )}
         {step.streaming ? (
           <span
             aria-hidden="true"

@@ -40,12 +40,20 @@ it("launches the kernel through wsl.exe on Windows", () => {
   ]);
 });
 
-it("requires a prepared WSL runtime instead of using the Windows Electron executable", () => {
+it("requires a prepared runtime when explicitly selecting WSL", () => {
   expect(() =>
-    planKernelLaunch({ platform: "win32", dataDir: "/home/demo/.prism" }),
+    planKernelLaunch({
+      platform: "win32",
+      distribution: "Ubuntu",
+      dataDir: "/home/demo/.prism",
+    }),
   ).toThrow(KernelLaunchError);
   expect(() =>
-    planKernelLaunch({ platform: "win32", dataDir: "/home/demo/.prism" }),
+    planKernelLaunch({
+      platform: "win32",
+      distribution: "Ubuntu",
+      dataDir: "/home/demo/.prism",
+    }),
   ).toThrow(/prepared WSL runtime/);
 });
 
@@ -120,4 +128,25 @@ it("reports the kernel output when it cannot start", async () => {
   } finally {
     await rm(dataDir, { recursive: true, force: true });
   }
+});
+
+it("launches a native Windows kernel without requiring WSL", () => {
+  expect(
+    planKernelLaunch({
+      platform: "win32",
+      node: "C:\\Program Files\\Prism\\Prism.exe",
+      entry: {
+        path: "C:\\Program Files\\Prism\\resources\\runtime\\native\\kernel.cjs",
+        flags: [],
+      },
+      dataDir: "C:\\Users\\demo\\.prism",
+    }),
+  ).toEqual({
+    command: "C:\\Program Files\\Prism\\Prism.exe",
+    args: [
+      "C:\\Program Files\\Prism\\resources\\runtime\\native\\kernel.cjs",
+      "--data-dir",
+      "C:\\Users\\demo\\.prism",
+    ],
+  });
 });

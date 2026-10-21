@@ -65,6 +65,7 @@ it("reads the settings in effect without handing back the model key", async () =
     browser: { engine: "chromium", actionsNeedApproval: false },
     search: { provider: "deepseek" },
     permissions: { scope: "workspace-write" },
+    creator: { enabled: false },
   });
   expect(JSON.stringify(settings.body)).not.toContain("test-key");
   expect(workspace).not.toBe("");
@@ -73,9 +74,9 @@ it("reads the settings in effect without handing back the model key", async () =
 it("ships no echo placeholder in the production tool registry", async () => {
   const dataDir = await mkdtemp(join(tmpdir(), "prism-tools-"));
   const config = await loadConfig({ dataDir });
-  const kernel = new Kernel({ config });
+  const kernel = await Kernel.create({ config });
   try {
-    const names = kernel.tools.list().map((tool) => tool.name);
+    const names = kernel.ctx.tools.list().map((tool) => tool.name);
     expect(names).not.toContain("echo");
     expect(names).toEqual(
       expect.arrayContaining(["read_file", "write_file", "run_command", "skill"]),

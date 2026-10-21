@@ -2,14 +2,14 @@ export interface DesktopSetupState {
   phase: "checking" | "choose" | "preparing" | "starting" | "error";
   distributions: string[];
   selected: string;
+  mode: "native" | "wsl";
   message: string;
   detail: string;
 }
 
-export interface DesktopSetupChoice {
-  distribution: string;
-  installBrowser: boolean;
-}
+export type DesktopSetupChoice = { installBrowser: boolean } & (
+  { mode: "native" } | { mode: "wsl"; distribution: string }
+);
 
 export interface DesktopSetupApi {
   read: () => Promise<DesktopSetupState>;
@@ -37,6 +37,7 @@ export interface UpdateState {
 export interface DesktopApi {
   version: string;
   clerkPublishableKey: string;
+  selectWorkspace: (currentPath: string) => Promise<string | null>;
   updates: {
     read: () => Promise<UpdateState>;
     check: () => Promise<UpdateState>;

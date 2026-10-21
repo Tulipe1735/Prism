@@ -1,3 +1,4 @@
+import type { PluginSummary } from "../../kernel/creator.ts";
 import type { KernelEvent } from "../../kernel/events.ts";
 import type {
   KernelSettings,
@@ -67,6 +68,22 @@ export class KernelClient {
   /** Applies a settings change; the answer is the settings now in effect. */
   updateSettings(patch: SettingsPatch): Promise<KernelSettings> {
     return this.request<KernelSettings>("/settings", { method: "PUT", body: patch });
+  }
+
+  async plugins(): Promise<PluginSummary[]> {
+    const { plugins } = await this.request<{ plugins: PluginSummary[] }>("/plugins");
+    return plugins;
+  }
+
+  async managePlugin(
+    action: "enable" | "disable" | "reload" | "remove",
+    name: string,
+  ): Promise<PluginSummary[]> {
+    const { result } = await this.request<{ result: PluginSummary[] }>("/plugins", {
+      method: "POST",
+      body: { action, name },
+    });
+    return result;
   }
 
   async listSessions(workspace?: string): Promise<SessionSummary[]> {

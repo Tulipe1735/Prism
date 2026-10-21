@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld("prismSetup", setup);
 const desktop: DesktopApi = {
   version: VERSION,
   clerkPublishableKey: CLERK_PUBLISHABLE_KEY,
+  selectWorkspace: (currentPath) =>
+    ipcRenderer.invoke("prism:workspace:select", currentPath),
   updates: {
     read: () => ipcRenderer.invoke("prism:updates:read"),
     check: () => ipcRenderer.invoke("prism:updates:check"),

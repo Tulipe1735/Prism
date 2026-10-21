@@ -6,6 +6,7 @@ import { Check, Save } from "lucide-react";
 import { useState } from "react";
 import { BROWSER_ENGINES, PERMISSION_SCOPES } from "../../kernel/types.ts";
 import { Button, SCOPE_LABELS, SectionLabel } from "./components.tsx";
+import { CreatorSettings } from "./creator.tsx";
 
 export function Settings({ workbench }: { workbench: Workbench }): JSX.Element {
   const settings = workbench.state.settings;
@@ -114,6 +115,11 @@ export function Settings({ workbench }: { workbench: Workbench }): JSX.Element {
           。密钥只写入，不会返回界面。
         </p>
       </section>
+      <CreatorSettings
+        enabled={settings.creator.enabled}
+        update={update}
+        connected={workbench.state.connected}
+      />
     </fieldset>
   );
 }

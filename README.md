@@ -1,38 +1,82 @@
 # Prism
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Tulipe1735/Prism)
+
 [English](README.en.md) | 简体中文
 
-Prism 是一个长期自用的个人 coding
-agent。Windows 上的桌面工作台负责任务、会话、审批与产物；agent 在 WSL 中围绕你的仓库读代码、改文件、执行命令与测试，并核查结果。
+**Prism 是面向 Windows 和 WSL 的可扩展个人 Agent 工作台。**
 
-Prism 自己运行任务循环，内置浏览器能力、MCP、skills、联网检索与跨会话记忆，默认使用 DeepSeek。
+你在桌面工作台中提出任务，Agent 通过文件、命令、浏览器和外部工具推进工作，并留下可查看的执行过程与结果。内核采用 Cordis；开启
+**Creator Mode**
+后，可以直接用自然语言许愿新能力，让 Agent 创建、安装和验证插件，无需重启应用。
 
-安装：[GitHub Releases](https://github.com/Tulipe1735/Prism/releases/latest)
+[下载 Windows 安装版](https://github.com/Tulipe1735/Prism/releases/latest) ·
+[使用指南](docs/README.md) · [Creator Mode](docs/guide/creator-mode.md) ·
+[插件开发](docs/develop/plugins.md)
 
-文档：[工作台](docs/workbench.md) · [内核接口](docs/kernel-contract.md) ·
-[浏览器 CLI](docs/browser-cli.md) · [架构](docs/architecture.svg)
-
-## 状态
-
-Windows 安装版从 [GitHub Releases](https://github.com/Tulipe1735/Prism/releases/latest)
-下载。安装 `Prism-<版本>-Setup-x64.exe`
-后打开 Prism，选择已设置好的 WSL 发行版，再填写模型设置。内核与 Node 随应用提供，无需检出仓库。完整步骤见[安装与运行](docs/workbench.md)。
-
-Prism 仍在快速迭代，内核接口与界面可能随版本变化。
-
-## 运行
-
-### Windows 安装版
+## 开始使用
 
 1. 从 [Releases](https://github.com/Tulipe1735/Prism/releases/latest) 下载并安装
    `Prism-<版本>-Setup-x64.exe`。
-2. 打开 Prism，选择已设置好的 WSL 发行版。
-3. 填写模型端点、名称与密钥，然后选择 WSL 工作区。
+2. 打开 Prism，选择 **Windows 原生**或已设置好的 **WSL 发行版**，完成运行环境准备。
+3. 在设置中填写模型端点、名称和密钥，选择当前环境中的工作区，开始对话。
 
-需要 Windows x64 和 x86_64 WSL
-Linux 发行版（推荐 Ubuntu）。浏览器首次下载需要联网；缺少系统依赖时按准备日志的提示安装。
+Windows 原生模式无需 WSL，也无需另外安装 Node。WSL 模式使用所选发行版的 Linux 工具链。默认模型为 DeepSeek，可配置 OpenAI 兼容端点。首次下载浏览器需要联网。安装、运行环境切换、数据位置和更新方法见[工作台指南](docs/guide/workbench.md)。
 
-### 从源码运行
+## 现在能做什么
+
+- **开发与文件任务**：读取和编辑文件、搜索仓库、执行命令和测试，查看改动与产物。
+- **浏览器操作**：观察页面、获取目标上下文、校验目标引用、执行动作和检查输入回执；支持 Chromium、Firefox、WebKit，以及接管已登录的 Chrome
+  / Edge。
+- **按需扩展**：Creator
+  Mode 创建和热加载本地插件；MCP 接入外部工具；skills 提供按需读取的工作流说明。
+- **连续会话**：保留本地会话历史，支持恢复、取消任务和上下文压缩。
+- **可见的执行过程**：桌面工作台展示流式回复、工具调用、改动、审批和设置。
+- **Windows 与 WSL**：同一套内核运行在所选环境，工作区、会话和插件保存在该环境中。
+
+文件与命令工具按只读、工作区可写、完全访问三档权限执行；工作区外写入需要一次性审批。插件运行可信的本地代码，MCP 工具的能力由服务器自身控制。具体范围见[权限指南](docs/guide/permissions.md)。
+
+## Creator Mode：用对话许愿插件
+
+在 **设置 → Creator Mode** 开启“允许 Agent 创建和更新插件”，然后直接说：
+
+> 给我做一个统计文本字数的插件，安装后用一段中文和英文验证它。
+
+Agent 可以检查当前能力，生成 JavaScript 插件，调用 `plugin_manager`
+安装，再在下一轮直接调用新工具。插件保存在内核数据目录，重启后恢复。设置中可以查看、启用、停用、重载和移除插件；更新失败时恢复旧版本。
+
+Creator
+Mode 默认关闭。关闭后，已启用的插件继续工作。当前支持内核工具和事件插件；DSH 插件需要核对宿主接口，不能直接保证兼容。完整用法见[Creator Mode](docs/guide/creator-mode.md)，代码契约见[插件开发](docs/develop/plugins.md)。
+
+## 给其他 Agent 使用的浏览器 CLI
+
+Prism 还提供独立的 `prism` browser-use
+CLI：外部 Agent 负责规划和判断结果，CLI 负责观察浏览器、校验引用和执行单步动作，无需模型密钥。
+
+```bash
+npm install -g @tulipe1735/prism
+prism --help
+```
+
+[浏览器 CLI 指南](docs/guide/browser-cli.md) · [Agent skill](skills/prism/SKILL.md)
+
+## 发展方向
+
+Prism 希望让 CLI
+agent 结合浏览器、应用 CLI 和应用对象接口，覆盖更多真实的软件操作任务。后续探索包括 CLI-Anything 集成、WPS 等应用的对象级操作，以及借鉴 Harness²、根据执行证据改进 Harness。
+**这些集成和自动迭代尚未实现**；当前可使用的是工作台、内置工具、MCP、skills、浏览器 CLI 与 Creator
+Mode。
+
+## 文档与开发
+
+文档按使用指南、开发指南和接口参考组织：
+
+- [文档入口](docs/README.md)
+- [从源码运行、验证和发布](docs/develop/README.md)
+- [插件开发](docs/develop/plugins.md)
+- [架构](docs/reference/architecture.md) ·
+  [内核 HTTP/SSE 接口](docs/reference/kernel.md)
+- [Cordis 插件生命周期](docs/reference/plugins.md) · [领域词汇](GLOSSARY.md)
 
 需要 Node.js ≥22.23.2 和 pnpm：
 
@@ -42,74 +86,11 @@ pnpm build
 pnpm workbench
 ```
 
-`pnpm workbench`
-会自己拉起内核、打印本地 URL，适合开发与验收。Electron 桌面入口、Windows 打包与运行时准备见[工作台](docs/workbench.md)。
-
-## 能力
-
-- **桌面工作台**：工作区、会话、流式对话、工具过程、代码改动、任务产物、审批与设置。界面使用 React +
-  Tailwind CSS、Inter 字体、中性冷灰与蓝色强调；不含内置编辑器、文件树或交互终端。
-- **完整开发闭环**：在 WSL 工作区中读写文件、执行命令与测试，结果可核查。
-- **浏览器能力**：观察、目标引用、动作校验与输入回执。内置 agent 直接使用，同时通过
-  `prism` CLI 提供给外部 agent。
-- **MCP**：接入外部工具服务器，配置见 [MCP 客户端](docs/mcp.md)。
-- **Skills**：按目录约定按需加载，见 [skills](docs/skills.md)。
-- **联网检索**：内置 `web_search` 与 `web_fetch`，默认使用 DeepSeek，可配置其他来源。
-- **跨会话记忆**：会话历史持久化，可继续、可恢复、可压缩。
-- **权限边界**：三档范围（只读 / 工作区可写 / 完全访问）加越界审批，授权只生效一次；参考
-  [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的权限模型。
-- **模型**：默认 DeepSeek API，兼容任意 OpenAI 兼容端点。
-
-## 浏览器 CLI
-
-`prism` 是供外部 agent 使用的 browser-use
-CLI。它不调用模型，只负责观察浏览器、校验动作引用和执行单步输入。安装：
-
-```bash
-npm install -g @tulipe1735/prism
-prism --help
-```
-
-用法与 agent 接入步骤见[浏览器指南](docs/browser-cli.md)；agent skill 见
-[skills/prism](skills/prism/SKILL.md)。
-
-## 架构
-
-![Prism Agent 整体架构](docs/architecture.svg)
-
-Electron 界面运行在 Windows，内核运行在 WSL，两者通过本地 HTTP/SSE 通信，由桌面端通过
-`wsl.exe` 启动内核。运行边界见 [ADR-0001](docs/adr/0001-windows-ui-wsl-execution.md)。
-
-内核管理模型与工具调用循环、会话上下文、权限审批和本地存储，并注册文件与命令、浏览器、联网检索、MCP 和技能工具。外部 agent 使用的
-`prism` 浏览器 CLI 是独立入口。
-
-[完整架构图与 HTML 源文件](docs/architecture.html)包含整体架构、内核与工具能力、外部浏览器 CLI 三个视图及代码映射。图示使用
-[diagram-design](https://github.com/cathrynlavery/diagram-design)
-重绘，沿用 Prism 的蓝色与 Inter 字体。
-
-[领域词汇](GLOSSARY.md) · [首版需求](docs/requirements-2026-10-18-coding-agent.md)
-
-代码：[工作台](src/workbench) · [内核](src/kernel) · [内核浏览器](src/kernel/browser) ·
+源码入口：[内核](src/kernel) · [工作台](src/workbench) ·
 [浏览器 CLI](src/interfaces/cli.ts)
 
-## 开发
+插件设计与文档组织参考
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。Creator
+Mode 的出发点见[《DeepSeek Harness》课程幻灯片](https://jyywiki.cn/GSE/2026/slides9.html)。
 
-```bash
-pnpm install
-pnpm typecheck
-pnpm test
-pnpm build
-```
-
-工作台的运行方式与结构见[工作台](docs/workbench.md)；用真实任务验收的步骤见[首版验收](docs/acceptance.md)。
-
-内核可 headless 启动，监听 `127.0.0.1`
-并把地址写成一行 JSON 输出（接口见[内核接口契约](docs/kernel-contract.md)）：
-
-```bash
-node --experimental-strip-types --disable-warning=ExperimentalWarning \
-  src/interfaces/kernel.ts [--port <n>] [--data-dir <path>]
-```
-
-MIT License。README 的组织方式参考
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。
+MIT License。

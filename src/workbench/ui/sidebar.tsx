@@ -42,7 +42,7 @@ export function Sidebar({
     }
   }, [collapsed]);
 
-  async function create(): Promise<void> {
+  async function create(workspace = state.workspace): Promise<void> {
     if (creating) return;
     if (collapsed && state.workspace === "") {
       focusWorkspace.current = true;
@@ -51,7 +51,7 @@ export function Sidebar({
     }
     setCreating(true);
     try {
-      if (await workbench.newSession(state.workspace)) onNavigate();
+      if (await workbench.newSession(workspace)) onNavigate();
     } finally {
       setCreating(false);
     }
@@ -79,18 +79,8 @@ export function Sidebar({
             key={state.workspace}
             inputRef={workspaceInput}
             state={state}
-            onOpen={workbench.openWorkspace}
+            workbench={workbench}
           />
-          <Button
-            variant="primary"
-            className="mt-3.5 w-full justify-between"
-            onClick={() => void create()}
-            disabled={creating || !state.connected}
-            data-action="new-session"
-          >
-            {creating ? "正在创建…" : "新建会话"}
-            <Plus size={15} aria-hidden="true" />
-          </Button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col px-3 py-5">
           <h2 className="px-2 text-xs font-semibold tracking-[0.01em] text-muted">
@@ -134,13 +124,33 @@ export function Sidebar({
             ) : (
               groups.map((group) => (
                 <div key={group.workspace} className="group mb-4">
-                  <h3
-                    title={group.workspace}
-                    className="mb-1.5 flex items-center gap-2 truncate px-2 text-xs text-muted"
-                  >
-                    <FolderOpen size={13} aria-hidden="true" className="shrink-0" />
-                    {workspaceName(group.workspace)}
-                  </h3>
+                  <div className="workspace-heading mb-1.5 flex items-center gap-1 px-2 text-xs text-muted">
+                    <h3 className="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        title={group.workspace}
+                        onClick={() => workbench.openWorkspace(group.workspace)}
+                        className="flex w-full min-w-0 items-center gap-2 py-1.5 text-left hover:text-ink"
+                      >
+                        <FolderOpen size={13} aria-hidden="true" className="shrink-0" />
+                        <span className="truncate">
+                          {workspaceName(group.workspace)}
+                        </span>
+                      </button>
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      className="workspace-create size-7 min-h-7 px-0"
+                      data-action="new-session"
+                      data-workspace={group.workspace}
+                      aria-label={`在 ${workspaceName(group.workspace)} 中新建会话`}
+                      title="新建会话"
+                      disabled={creating || !state.connected}
+                      onClick={() => void create(group.workspace)}
+                    >
+                      <Plus size={15} aria-hidden="true" />
+                    </Button>
+                  </div>
                   {group.sessions.map((session) => (
                     <SessionRow
                       key={session.id}
@@ -170,24 +180,58 @@ export function Sidebar({
 function WorkspacePicker({
   state,
   inputRef,
-  onOpen,
+  workbench,
 }: {
   state: UiState;
   inputRef: RefObject<HTMLInputElement | null>;
-  onOpen: (value: string) => string | null;
+  workbench: Workbench;
 }): JSX.Element {
   const [path, setPath] = useState(state.workspace);
+  const [browsing, setBrowsing] = useState(false);
+  const desktop = typeof window === "undefined" ? undefined : window.prismDesktop;
+
+  async function browse(): Promise<void> {
+    if (desktop === undefined || browsing) return;
+    setBrowsing(true);
+    try {
+      const selected = await desktop.selectWorkspace(path);
+      if (selected !== null) {
+        setPath(selected);
+        workbench.openWorkspace(selected);
+      }
+    } catch (error) {
+      workbench.dispatch({
+        type: "notice",
+        notice: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBrowsing(false);
+    }
+  }
+
   return (
     <form
       className="mt-3"
       onSubmit={(event) => {
         event.preventDefault();
-        onOpen(path);
+        workbench.openWorkspace(path);
       }}
     >
       <label htmlFor="workspace-input" className="mb-2 block text-[13px] font-semibold">
         {state.workspace === "" ? "选择你的工作区" : workspaceName(state.workspace)}
       </label>
+      {desktop === undefined ? null : (
+        <Button
+          className="mb-2 w-full justify-start"
+          data-action="browse-workspace"
+          onClick={() => void browse()}
+          disabled={browsing}
+          aria-busy={browsing}
+        >
+          <FolderOpen size={15} aria-hidden="true" />
+          {browsing ? "正在选择…" : "选择文件夹…"}
+        </Button>
+      )}
       <div className="flex items-center gap-2">
         <input
           ref={inputRef}

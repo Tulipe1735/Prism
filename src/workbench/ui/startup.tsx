@@ -19,9 +19,11 @@ function Startup(): JSX.Element {
     phase: "checking",
     distributions: [],
     selected: "",
+    mode: "native",
     message: "正在检查运行环境…",
     detail: "",
   });
+  const [mode, setMode] = useState<"native" | "wsl">("native");
   const [distribution, setDistribution] = useState("");
   const [browser, setBrowser] = useState(true);
   const busy =
@@ -34,6 +36,7 @@ function Startup(): JSX.Element {
       if (active) {
         setState(next);
         setDistribution(next.selected);
+        setMode(next.mode);
       }
     };
     const stop = window.prismSetup.subscribe(receive);
@@ -55,17 +58,37 @@ function Startup(): JSX.Element {
           {state.message}
         </h1>
         <p className="mt-4 text-sm leading-7 text-muted">
-          Prism 在 Windows 展示工作台，在 WSL 中运行任务。内核与 Node
-          随应用提供，会话与设置保存在所选发行版的用户目录。
+          可以直接在 Windows 中运行，也可以选择 WSL 开发环境。
+          会话与设置保存在所选环境的用户目录。
         </p>
-        {state.distributions.length > 0 ? (
-          <form
-            className="mt-8 space-y-5 border-y py-6"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void window.prismSetup.prepare({ distribution, installBrowser: browser });
-            }}
-          >
+        <form
+          className="mt-8 space-y-5 border-y py-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void window.prismSetup.prepare(
+              mode === "native"
+                ? { mode, installBrowser: browser }
+                : { mode, distribution, installBrowser: browser },
+            );
+          }}
+        >
+          <label className="block text-[13px] font-medium">
+            运行环境
+            <select
+              id="runtime-mode"
+              className="field mt-2 text-sm"
+              value={mode}
+              disabled={busy}
+              onChange={(event) => {
+                setMode(event.target.value === "wsl" ? "wsl" : "native");
+                if (distribution === "") setDistribution(state.distributions[0] ?? "");
+              }}
+            >
+              <option value="native">Windows</option>
+              <option value="wsl">WSL</option>
+            </select>
+          </label>
+          {mode === "wsl" && state.distributions.length > 0 ? (
             <label className="block text-[13px] font-medium">
               WSL 发行版
               <select
@@ -82,66 +105,60 @@ function Startup(): JSX.Element {
                 ))}
               </select>
             </label>
-            <label className="flex items-start gap-3 text-[13px] leading-6 text-muted">
-              <input
-                type="checkbox"
-                checked={browser}
-                disabled={busy}
-                onChange={(event) => setBrowser(event.target.checked)}
-                className="mt-1.5 accent-accent"
-              />
-              <span>
-                同时准备 Chromium 浏览器
-                <span className="block text-[13px] text-muted">
-                  首次准备需要联网。也可以稍后通过工作台菜单安装浏览器。
-                </span>
-              </span>
-            </label>
-            <Button
-              id="prepare"
-              type="submit"
-              variant="primary"
-              disabled={busy || distribution === ""}
-              className="w-full justify-between"
-            >
-              {busy ? "正在准备…" : state.phase === "error" ? "重试" : "准备并开始"}
-              {busy ? (
-                <LoaderCircle className="animate-spin" size={14} aria-hidden="true" />
-              ) : (
-                <ArrowUpRight size={15} aria-hidden="true" />
-              )}
-            </Button>
-          </form>
-        ) : busy ? (
-          <p className="mt-8 flex items-center gap-3 text-[13px] text-muted">
-            <LoaderCircle size={15} className="animate-spin" />
-            {state.message}
-          </p>
-        ) : (
-          <div className="mt-8 space-y-4 border-y py-6">
+          ) : null}
+          {mode === "wsl" && state.distributions.length === 0 && !busy ? (
             <p className="text-sm leading-7">
-              请先安装并启动一个 WSL Linux 发行版，完成 Linux
-              用户的首次设置，然后返回这里继续。
+              未找到 WSL 发行版。可以直接使用 Windows，或先安装并启动 WSL 后重新检查。
             </p>
-            <div className="flex gap-3">
-              <Button onClick={() => void window.prismSetup.openWslGuide()}>
-                查看 WSL 安装说明
-                <ArrowUpRight size={13} />
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() =>
-                  void window.prismSetup.prepare({
-                    distribution: "",
-                    installBrowser: browser,
-                  })
-                }
-              >
-                重新检查 WSL
-              </Button>
-            </div>
+          ) : null}
+          <label className="flex items-start gap-3 text-[13px] leading-6 text-muted">
+            <input
+              type="checkbox"
+              checked={browser}
+              disabled={busy}
+              onChange={(event) => setBrowser(event.target.checked)}
+              className="mt-1.5 accent-accent"
+            />
+            <span>
+              同时准备 Chromium 浏览器
+              <span className="block text-[13px] text-muted">
+                首次准备需要联网。也可以稍后通过工作台菜单安装浏览器。
+              </span>
+            </span>
+          </label>
+          <Button
+            id="prepare"
+            type="submit"
+            variant="primary"
+            disabled={busy || (mode === "wsl" && distribution === "")}
+            className="w-full justify-between"
+          >
+            {busy ? "正在准备…" : state.phase === "error" ? "重试" : "准备并开始"}
+            {busy ? (
+              <LoaderCircle className="animate-spin" size={14} aria-hidden="true" />
+            ) : (
+              <ArrowUpRight size={15} aria-hidden="true" />
+            )}
+          </Button>
+        </form>
+        {mode === "wsl" && state.distributions.length === 0 && !busy ? (
+          <div className="mt-4 flex gap-3">
+            <Button onClick={() => void window.prismSetup.openWslGuide()}>
+              查看 WSL 安装说明
+            </Button>
+            <Button
+              onClick={() =>
+                void window.prismSetup.prepare({
+                  mode: "wsl",
+                  distribution: "",
+                  installBrowser: browser,
+                })
+              }
+            >
+              重新检查 WSL
+            </Button>
           </div>
-        )}
+        ) : null}
         {state.phase === "error" ? (
           <p
             role="alert"

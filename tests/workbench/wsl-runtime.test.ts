@@ -7,6 +7,7 @@ import process from "node:process";
 import { promisify } from "node:util";
 import { afterEach, expect, it } from "vitest";
 import {
+  convertWslPath,
   parseDistributions,
   PREPARE_RUNTIME_SCRIPT,
   prepareWslRuntime,
@@ -26,6 +27,25 @@ async function temporary(): Promise<string> {
   directories.push(directory);
   return directory;
 }
+
+it.runIf(process.env.PRISM_WINDOWS_RUNTIME === "1")(
+  "round trips a workspace path through the selected real WSL distribution",
+  async () => {
+    const workspace = join(await temporary(), "项目 with spaces ' quotes");
+    await mkdir(workspace);
+    const distribution = process.env.WSL_DISTRO_NAME ?? "Ubuntu";
+    const windowsPath = await convertWslPath(distribution, workspace, "-w");
+    expect(windowsPath).toMatch(/^\\\\wsl[.$]/);
+    expect(await convertWslPath(distribution, windowsPath, "-u")).toBe(workspace);
+    await expect(
+      convertWslPath(
+        distribution,
+        "\\\\wsl.localhost\\Prism-missing-distro\\home",
+        "-u",
+      ),
+    ).rejects.toThrow();
+  },
+);
 
 it("decodes Windows WSL output and excludes Docker's internal distributions", () => {
   expect(

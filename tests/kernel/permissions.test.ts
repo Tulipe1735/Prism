@@ -151,7 +151,7 @@ it("asks once for a write outside the workspace and asks again for the next one"
   );
   expect(await readFile(outside, "utf8")).toBe("hello");
 
-  // The same write again: the approval is never remembered (ADR-0005).
+  // The same write again: the approval is never remembered.
   const second = await events.waitFor((event) => event.type === "approval.requested");
   if (second.type !== "approval.requested")
     throw new Error("Expected an approval request");

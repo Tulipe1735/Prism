@@ -27,7 +27,7 @@ export interface ProcessSpec {
 /**
  * Runs one process and settles when it is gone. Timeout and task cancellation
  * end the whole process tree, not just the shell; each execution target says
- * how, because ending a Windows process works differently (ADR-0002).
+ * how, because ending a Windows process works differently.
  */
 export function runProcess(
   build: (output: OutputBuffer) => ProcessSpec,

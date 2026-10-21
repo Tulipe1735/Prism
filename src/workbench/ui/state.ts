@@ -235,7 +235,14 @@ function reduceEvent(state: UiState, event: KernelEvent): UiState {
 
 /** The sidebar list: grouped by workspace, filtered by the search box. */
 export function selectVisibleSessions(state: UiState): SessionGroup[] {
-  return groupSessions(searchSessions(state.sessions, state.search));
+  const groups = groupSessions(searchSessions(state.sessions, state.search));
+  const grouped = new Set(groups.map((group) => group.workspace));
+  const query = state.search.trim().toLocaleLowerCase();
+  for (const workspace of selectKnownWorkspaces(state)) {
+    if (!grouped.has(workspace) && workspace.toLocaleLowerCase().includes(query))
+      groups.push({ workspace, sessions: [] });
+  }
+  return groups;
 }
 
 /** Workspaces the user can pick without typing: sessions plus recent picks. */

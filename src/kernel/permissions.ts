@@ -41,7 +41,7 @@ export interface PermissionSettings {
  * scope the user switches mid-task applies to the next action; the workspace
  * comes from the session, because one kernel serves sessions in many
  * workspaces. Paths are compared as written: v1 has no OS sandbox and does not
- * follow symlinks (ADR-0005).
+ * follow symlinks.
  */
 export class PermissionPolicy {
   scope: PermissionScope;

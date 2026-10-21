@@ -51,9 +51,9 @@ export class ModelError extends Error {
 }
 
 /**
- * Streams one chat completion from an OpenAI-compatible endpoint. No retries:
- * a failure reaches the task loop, which reports it honestly instead of
- * pretending the model replied.
+ * 从兼容 OpenAI API 的端点流式获取一次聊天补全结果。
+ * 不进行重试：如果请求失败，错误会直接传递给任务循环，
+ * 由任务循环如实报告，而不是假装模型已成功返回响应。
  */
 export async function* streamChat(
   options: StreamChatOptions,
@@ -162,6 +162,7 @@ function chatCompletionsUrl(model: ModelConfig): string {
   return `${model.baseUrl.replace(/\/+$/, "")}/chat/completions`;
 }
 
+// 内部消息 -> API消息格式
 function wireMessage(message: ChatMessage): Record<string, unknown> {
   if (message.role === "tool")
     return { role: "tool", tool_call_id: message.toolCallId, content: message.content };

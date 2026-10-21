@@ -5,15 +5,12 @@ import type { InstructionRoots } from "./instructions.ts";
 import type { Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
 import type { BrowserEngine, PermissionScope } from "./types.ts";
+import type { WebFetchOverrides } from "./web-tools.ts";
 import { Buffer } from "node:buffer";
 import { createServer } from "node:http";
-import { join } from "node:path";
-import { loadMcpConfig } from "../mcp/config.ts";
-import { McpHost } from "../mcp/host.ts";
-import { createBrowserTools } from "./browser-tools.ts";
+import { KernelError } from "./errors.ts";
 import {
   Kernel,
-  KernelError,
   type KernelSettings,
   type KernelStatusReport,
   type SettingsPatch,
@@ -25,7 +22,6 @@ import {
   isPermissionScope,
   PERMISSION_SCOPES,
 } from "./types.ts";
-import { createWebTools, type WebFetchOverrides } from "./web-tools.ts";
 
 /** Cap on request bodies; the workbench sends small JSON documents. */
 const MAX_BODY_BYTES = 1_000_000;
@@ -56,34 +52,9 @@ export interface RunningKernel {
 export async function startKernel(
   options: KernelServerOptions,
 ): Promise<RunningKernel> {
-  // The preset capabilities join the registry before the kernel serves anything.
-  // Both read their settings per use, so `PUT /settings` applies without a restart.
-  const browser = createBrowserTools({
-    directory: join(options.config.dataDir, "browser"),
-    engine: () => ({
-      engine: options.config.browser.engine,
-      ...(options.config.browser.endpoint === undefined
-        ? {}
-        : { endpoint: options.config.browser.endpoint }),
-    }),
-  });
-  const web = createWebTools({
-    // The search source shares the model's DeepSeek key unless it sets its own.
-    search: () => ({
-      provider: options.config.search.provider,
-      apiKey: options.config.search.apiKey ?? options.config.model.apiKey,
-      ...(options.config.search.baseUrl === undefined
-        ? {}
-        : { baseUrl: options.config.search.baseUrl }),
-    }),
-    ...(options.webFetch === undefined ? {} : { fetch: options.webFetch }),
-  });
-  const mcp = await connectMcpServers(options.config.dataDir);
-  const kernel = new Kernel({
-    ...options,
-    tools: [...browser.tools, ...web, ...mcp.tools, ...(options.tools ?? [])],
-  });
+  const kernel = await Kernel.create(options);
   const clients = new Set<ServerResponse>();
+  // 订阅内核产生的事件，然后把这些事件通过 SSE 推送给所有已连接的客户端。
   const unsubscribe = kernel.subscribe((event) => {
     for (const client of clients) writeEvent(client, event);
   });
@@ -115,8 +86,6 @@ export async function startKernel(
     for (const client of clients) client.end();
     clients.clear();
     await kernel.close();
-    await browser.close();
-    await mcp.close();
     const draining = new Promise<void>((resolve) => server.close(() => resolve()));
     server.closeAllConnections();
     await draining;
@@ -154,6 +123,23 @@ export async function startKernel(
     if (segments[0] === "events" && segments.length === 1 && method === "GET") {
       openStream(response);
       return;
+    }
+    if (segments[0] === "plugins" && segments.length === 1) {
+      if (method === "GET") {
+        sendJson(response, 200, { plugins: kernel.ctx.creator.list() });
+        return;
+      }
+      if (method === "POST") {
+        if (!request.headers["content-type"]?.startsWith("application/json"))
+          throw new KernelError(
+            "INVALID_REQUEST",
+            "Plugin requests require application/json.",
+          );
+        sendJson(response, 200, {
+          result: await kernel.ctx.creator.manage(await readJson(request)),
+        });
+        return;
+      }
     }
     if (segments[0] === "shutdown" && segments.length === 1 && method === "POST") {
       sendJson(response, 202, { stopping: true });
@@ -198,6 +184,7 @@ export async function startKernel(
         });
         return;
       }
+      // 收到 POST /sessions/:id/messages 请求时，内核会调用 sendMessage 方法将消息发送到指定的会话中，并返回一个 entryId，表示消息在会话日志中的唯一标识。
       if (segments[2] === "messages" && segments.length === 3 && method === "POST") {
         const body = await readJson(request);
         const entryId = await kernel.sendMessage(sessionId, requireText(body, "text"));
@@ -260,6 +247,9 @@ export async function startKernel(
       server.off("error", reject);
       resolve();
     });
+  }).catch(async (error: unknown) => {
+    await stop();
+    throw error;
   });
   const address = server.address();
   if (address === null || typeof address === "string") {
@@ -277,25 +267,6 @@ export async function startKernel(
 function writeEvent(response: ServerResponse, event: KernelEvent): void {
   if (response.writableEnded) return;
   response.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
-}
-
-/**
- * Connects the servers from `<dataDir>/mcp.json`, which ships absent (zero
- * servers). A missing file means zero servers; a malformed file or an
- * unreachable server is reported on stderr and never stops the kernel or the
- * other servers (US-34).
- */
-async function connectMcpServers(dataDir: string): Promise<McpHost> {
-  const config = await loadMcpConfig(dataDir).catch((error: unknown) => {
-    console.error(
-      `MCP configuration could not be read: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return { servers: {} };
-  });
-  const host = await McpHost.connect(config);
-  for (const failure of host.failures)
-    console.error(`MCP server "${failure.server}" is unavailable: ${failure.message}`);
-  return host;
 }
 
 function sendJson(response: ServerResponse, status: number, body: unknown): void {
@@ -327,6 +298,9 @@ function classify(error: unknown): { status: number; code: string } {
         SESSION_NOT_FOUND: 404,
         APPROVAL_NOT_FOUND: 404,
         TASK_RUNNING: 409,
+        CREATOR_DISABLED: 403,
+        PLUGIN_NOT_FOUND: 404,
+        PLUGIN_FAILED: 422,
       }[error.code],
       code: error.code,
     };
@@ -388,8 +362,13 @@ function requireBoolean(body: unknown, key: string): boolean {
  * change are accepted; a key it cannot change is refused instead of dropped.
  */
 function parseSettingsPatch(body: unknown): SettingsPatch {
-  requireKnownKeys(body, ["permissions", "browser", "model", "search"]);
+  requireKnownKeys(body, ["permissions", "browser", "model", "search", "creator"]);
   const patch: SettingsPatch = {};
+  const creator = field(body, "creator");
+  if (creator !== undefined) {
+    requireKnownKeys(creator, ["enabled"]);
+    patch.creator = { enabled: requireBoolean(creator, "enabled") };
+  }
 
   const permissions = field(body, "permissions");
   if (permissions !== undefined) {

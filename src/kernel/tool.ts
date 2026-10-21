@@ -27,7 +27,7 @@ export interface ToolContext {
   signal: AbortSignal;
   /**
    * Asks the user to approve one action that leaves the permission scope. The
-   * answer holds for this call only (ADR-0005); the kernel never caches it.
+   * answer holds for this call only; the kernel never caches it.
    */
   requestApproval: (request: ApprovalRequest) => Promise<boolean>;
   /**

@@ -2,7 +2,7 @@
  * MCP server configuration.
  *
  * The kernel reads one configuration file per data directory: `<dataDir>/mcp.json`.
- * See `docs/mcp.md` for the file format and the default location (`~/.prism/mcp.json`).
+ * See `docs/guide/mcp.md` for the file format and the default location (`~/.prism/mcp.json`).
  * Prism ships without any configured server: a missing file means zero servers.
  */
 import { readFile } from "node:fs/promises";

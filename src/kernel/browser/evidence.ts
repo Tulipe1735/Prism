@@ -2,7 +2,7 @@
  * The kernel's evidence capture: snapshot, target context, relations and public
  * state in one synchronous page sample, read through the Playwright page of
  * `./session.ts`. `src/browser/evidence.ts` is the browser CLI's port of the
- * same semantics over CDP (ADR-0006); the two differ where the drivers differ,
+ * same semantics over CDP; the two differ where the drivers differ,
  * so they are not merged.
  */
 import type {

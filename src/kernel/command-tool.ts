@@ -1,6 +1,7 @@
 import type { ShellOutcome } from "./shell.ts";
 import type { Tool, ToolResult } from "./tool.ts";
 import { spawn } from "node:child_process";
+import process from "node:process";
 import { StringDecoder } from "node:string_decoder";
 import { killProcessGroup, runProcess } from "./shell.ts";
 import {
@@ -16,12 +17,12 @@ export interface CommandToolOptions {
   timeoutMs: number;
 }
 
-/** Runs shell commands in the WSL environment or on the Windows side (ADR-0002). */
+/** Uses the host shell, with Windows interop available to the WSL kernel. */
 export function createCommandTool(options: CommandToolOptions): Tool {
   return {
     name: "run_command",
     description:
-      'Runs a shell command and returns merged output, the exit code and the duration. The command runs in the workspace unless cwd says otherwise. The "wsl" environment runs it in the kernel\'s own shell; the "windows" environment runs it in cmd.exe on Windows through WSL interop.',
+      "Runs a shell command and returns merged output, the exit code and the duration. Defaults to the kernel environment: cmd.exe on Windows, /bin/sh in WSL. A WSL kernel can also run Windows commands through interop. The command runs in the workspace unless cwd says otherwise.",
     parameters: {
       type: "object",
       properties: {
@@ -30,7 +31,7 @@ export function createCommandTool(options: CommandToolOptions): Tool {
           type: "string",
           enum: ["wsl", "windows"],
           description:
-            'Execution target; defaults to "wsl". "windows" needs WSL interop.',
+            "Execution target; defaults to the kernel environment. To use a WSL workspace from Windows, start the workbench in WSL mode.",
         },
         cwd: {
           type: "string",
@@ -58,6 +59,12 @@ export function createCommandTool(options: CommandToolOptions): Tool {
       if (environment !== "wsl" && environment !== "windows")
         return {
           content: `Unknown environment "${environment}"; valid values are "wsl" and "windows".`,
+          isError: true,
+        };
+      if (environment === "wsl" && process.platform === "win32")
+        return {
+          content:
+            "This kernel runs natively on Windows. Select WSL in the workbench's runtime menu to run tasks in a WSL workspace.",
           isError: true,
         };
 

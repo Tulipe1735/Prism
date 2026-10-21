@@ -1,7 +1,7 @@
 # 联网检索：`web_search` 与 `web_fetch`
 
-实现位置：[`src/web`](../src/web)；测试：[`tests/web`](../tests/web)。两者都是只读网络访问，不写工作区；内核工具注册在
-[`src/kernel/web-tools.ts`](../src/kernel/web-tools.ts)，形状见文末「内核工具形态」。
+实现位置：[`src/web`](../../src/web)；测试：[`tests/web`](../../tests/web)。两者都是只读网络访问，不写工作区；内核工具注册在
+[`src/kernel/web-tools.ts`](../../src/kernel/web-tools.ts)，形状见文末「内核工具形态」。
 
 ## `web_search`
 
@@ -26,7 +26,7 @@ DeepSeek 有公开可用的 Search API，2026-10-18 依据官方文档核实：
 
 ### 配置
 
-配置类型为 [`WebSearchConfig`](../src/web/search.ts)：
+配置类型为 [`WebSearchConfig`](../../src/web/search.ts)：
 
 | 键          | 默认                       | 说明                                                                                                        |
 | ----------- | -------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -67,10 +67,11 @@ const results = await provider.search({ query: "playwright firefox", count: 5 })
 
 要接入协议不同的来源时：
 
-1. 实现 [`SearchProvider`](../src/web/search.ts)：`name` 与
+1. 实现 [`SearchProvider`](../../src/web/search.ts)：`name` 与
    `search(request) => Promise<SearchResult[]>`。
 2. 把实例直接交给消费方（工具层只用 `SearchProvider` 接口，不识别具体来源）。
-3. 若要按配置名选择，则把该来源注册进 [`createSearchProvider`](../src/web/search.ts)。
+3. 若要按配置名选择，则把该来源注册进
+   [`createSearchProvider`](../../src/web/search.ts)。
 
 Brave、Tavily、自建聚合搜索都可以用这个方式接入；`web_fetch`
 无需改动。任何来源都能在测试中用 `fetchImpl` 假响应离线验证。

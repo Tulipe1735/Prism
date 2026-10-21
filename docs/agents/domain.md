@@ -5,7 +5,7 @@ This is a single-context project.
 ## Before exploring, read these
 
 - `GLOSSARY.md` at the project root
-- Relevant architectural decisions under `docs/adr/`
+- Relevant current interfaces under `docs/reference/`
 
 If either location does not exist, proceed silently. Domain documentation is created
 lazily when terms or decisions are actually resolved.
@@ -19,7 +19,8 @@ avoids.
 If a needed concept is absent, reconsider whether it belongs to the domain or record the
 gap for a later domain-modeling session.
 
-## Flag ADR conflicts
+## Keep the current contract aligned
 
-If proposed work contradicts an existing ADR, surface the conflict explicitly instead of
-silently overriding the decision.
+When changing behavior, update its guide, reference and affected callers together. Do
+not recreate historical ADRs or requirements snapshots; current behavior belongs in the
+relevant guide or reference.

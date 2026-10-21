@@ -1,6 +1,6 @@
 import type { Tool } from "../../src/kernel/tool.ts";
 import { existsSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { type Browser, chromium, type Page } from "playwright";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type RunningUiServer, startUiServer } from "../../src/workbench/ui-server.ts";
@@ -104,6 +104,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
         "timeline.tsx",
         "inspector.tsx",
         "settings.tsx",
+        "creator.tsx",
         "components.tsx",
         "account.tsx",
         "account-menu.tsx",
@@ -121,6 +122,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
 
       await page.fill("#workspace-input", harness.workspace);
       await page.click('[data-action="use-workspace"]');
+      await page.locator(".workspace-heading").hover();
       await page.click('[data-action="new-session"]');
       await page.waitForSelector("#chat-header strong");
 
@@ -164,7 +166,10 @@ describe.runIf(enabled)("workbench in a real browser", () => {
           timeout: 10_000,
         },
       );
-      await page.waitForSelector("#task-state >> text=空闲", { timeout: 10_000 });
+      await page.waitForSelector("#cancel", { state: "detached", timeout: 10_000 });
+      expect(await page.locator("#task-state").getAttribute("title")).toBe(
+        harness.workspace,
+      );
       expect(await page.locator("#timeline").textContent()).toContain("全部完成。");
       expect(await modelInput.inputValue()).toBe("unsaved-model-draft");
       expect(await editDetails.getAttribute("open")).toBeNull();
@@ -252,10 +257,13 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     expect(await page.locator("#message").isDisabled()).toBe(true);
 
     await page.getByRole("button", { name: "切换会话导航" }).click();
-    await page.click('[data-action="new-session"]');
-    await page.waitForSelector("#notice >> text=先填一个工作区路径");
+    await page.click('[data-action="use-workspace"]');
+    await page.waitForSelector(
+      "#notice >> text=先选择一个当前运行环境中的工作区目录。",
+    );
     await page.fill("#workspace-input", harness.workspace);
     await page.press("#workspace-input", "Enter");
+    await page.locator(".workspace-heading").hover();
     await page.click('[data-action="new-session"]');
     await page.waitForSelector("#chat-header strong");
     // The overlay folds 120ms after the session opens; wait for the rail.
@@ -346,6 +354,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     await page.waitForFunction('document.activeElement?.id === "workspace-input"');
     await page.fill("#workspace-input", harness.workspace);
     await page.press("#workspace-input", "Enter");
+    await page.locator(".workspace-heading").hover();
     await page.click('[data-action="new-session"]');
     await page.waitForSelector("#chat-header strong");
     const firstId = await page
@@ -388,6 +397,223 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     expect(sessions.every((session) => session.workspace === harness.workspace)).toBe(
       true,
     );
+    expect(errors).toEqual([]);
+  });
+
+  it("creates a session in the hovered workspace and renders Markdown without widening the chat", async () => {
+    const markdown = [
+      "## 修改结果",
+      "",
+      "**完成**，查看 `src/app.ts`。",
+      "",
+      "1. 修改代码",
+      "   - 检查结果",
+      "",
+      "> 验证通过",
+      "",
+      "| 检查 | 结果 |",
+      "| --- | --- |",
+      "| 测试 | 通过 |",
+      "",
+      "```ts",
+      `const value = '${"long-value-".repeat(20)}';`,
+      "```",
+    ].join("\n");
+    harness = await startTestKernel({ answers: [{ text: [markdown] }] });
+    const other = join(harness.workspace, "another-project");
+    await harness.kernel.kernel.createSession({
+      workspace: harness.workspace,
+      title: "已有会话",
+    });
+    await harness.kernel.kernel.createSession({
+      workspace: other,
+      title: "另一个项目",
+    });
+    ui = await startUiServer({ kernelUrl: harness.kernel.url, uiRoot: UI_ROOT });
+    page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
+    await page.goto(ui.url);
+    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    await page.waitForSelector('[data-action="new-session"]');
+    await page.fill("#workspace-input", harness.workspace);
+    await page.click('[data-action="use-workspace"]');
+    const create = page.locator(
+      `[data-action="new-session"][data-workspace="${other}"]`,
+    );
+    const heading = page.locator(".workspace-heading").filter({ has: create });
+    const opacity = (): Promise<string> =>
+      create.evaluate(
+        (element) =>
+          element.ownerDocument.defaultView!.getComputedStyle(element).opacity,
+      );
+    expect(await opacity()).toBe("0");
+    await heading.hover();
+    await page.waitForFunction(
+      `getComputedStyle(document.querySelector('[data-workspace="${other}"]')).opacity === '1'`,
+    );
+    await page.mouse.move(700, 500);
+    await page.waitForFunction(
+      `getComputedStyle(document.querySelector('[data-workspace="${other}"]')).opacity === '0'`,
+    );
+    await heading.getByRole("button", { name: "another-project", exact: true }).focus();
+    await page.waitForFunction(
+      `getComputedStyle(document.querySelector('[data-workspace="${other}"]')).opacity === '1'`,
+    );
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector("#chat-header strong");
+    expect(await page.locator("#task-state").textContent()).toContain(
+      "another-project",
+    );
+    expect(
+      (await harness.kernel.kernel.listSessions()).filter((s) => s.workspace === other),
+    ).toHaveLength(2);
+
+    await page.fill("#message", "显示修改结果");
+    await page.click("#send");
+    await page.waitForSelector(".markdown h2");
+    expect(await page.locator(".markdown strong").textContent()).toBe("完成");
+    expect(await page.locator(".markdown ol ul li").textContent()).toBe("检查结果");
+    expect(await page.locator(".markdown table td").first().textContent()).toBe("测试");
+    expect(await page.locator(".markdown pre code").getAttribute("class")).toBe(
+      "language-ts",
+    );
+    expect(
+      await page
+        .locator(".markdown pre")
+        .evaluate((element) => element.scrollWidth > element.clientWidth),
+    ).toBe(true);
+    await page.screenshot({ path: "/tmp/prism-workbench-fixes.png" });
+    for (const width of [390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 920 });
+      expect(
+        await page.evaluate("document.documentElement.scrollWidth <= innerWidth"),
+      ).toBe(true);
+    }
+  });
+
+  it("uses the native folder selection, preserves cancellation and reports picker errors", async () => {
+    harness = await startTestKernel();
+    ui = await startUiServer({ kernelUrl: harness.kernel.url, uiRoot: UI_ROOT });
+    page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
+    await page.addInitScript(`
+      let selections = [${JSON.stringify(harness.workspace)}, null, new Error('无法选择文件夹')];
+      window.prismDesktop = {
+        version: '0.2.3', clerkPublishableKey: '',
+        selectWorkspace: async (path) => {
+          window.__lastPickerPath = path;
+          const selected = selections.shift();
+          if (selected instanceof Error) throw selected;
+          return selected;
+        },
+        updates: {
+          read: async () => ({ phase: 'idle', version: '0.2.3' }),
+          subscribe: () => () => {},
+        },
+      };
+    `);
+    await page.goto(ui.url);
+    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    const browse = page.getByRole("button", { name: "选择文件夹…", exact: true });
+    await browse.click();
+    expect(await page.locator("#workspace-input").inputValue()).toBe(harness.workspace);
+    expect(await page.locator("#task-state").textContent()).toContain(
+      basename(harness.workspace),
+    );
+    expect(await page.locator('[data-action="new-session"]').count()).toBe(1);
+    expect(await page.evaluate("window.__lastPickerPath")).toBe("");
+    await browse.click();
+    expect(await page.evaluate("window.__lastPickerPath")).toBe(harness.workspace);
+    expect(await page.locator("#workspace-input").inputValue()).toBe(harness.workspace);
+    await browse.click();
+    await page.waitForSelector("#notice >> text=无法选择文件夹");
+    expect(await page.locator("#workspace-input").inputValue()).toBe(harness.workspace);
+  });
+
+  it("creates a plugin from a wish and manages its lifecycle from settings", async () => {
+    const source = `export const inject = ['tools'];
+export function apply(ctx) {
+  ctx.effect(() => ctx.tools.register({
+    name: 'wish_length', description: 'Count text code points.',
+    parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+    async execute(args) { return { content: String(Array.from(args.text).length) }; }
+  }));
+}`;
+    harness = await startTestKernel({
+      answers: [
+        {
+          toolCalls: [
+            { id: "creator-inspect", name: "creator_inspect", arguments: "{}" },
+          ],
+        },
+        {
+          toolCalls: [
+            {
+              id: "creator-install",
+              name: "plugin_manager",
+              arguments: JSON.stringify({
+                action: "install",
+                name: "text-length",
+                description: "统计文本长度",
+                source,
+              }),
+            },
+          ],
+        },
+        {
+          toolCalls: [
+            {
+              id: "creator-verify",
+              name: "wish_length",
+              arguments: JSON.stringify({ text: "你好 Agent" }),
+            },
+          ],
+        },
+        { text: ["插件已安装并验证，结果为 8。"] },
+      ],
+    });
+    ui = await startUiServer({ kernelUrl: harness.kernel.url, uiRoot: UI_ROOT });
+    page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(ui.url);
+    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    await page.click('[data-view="settings"]');
+    const toggle = page.locator('[data-action="toggle-creator"]');
+    expect(await toggle.getAttribute("aria-pressed")).toBe("false");
+    await toggle.click();
+    await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("true");
+    await page.fill("#workspace-input", harness.workspace);
+    await page.click('[data-action="use-workspace"]');
+    await page.locator(".workspace-heading").hover();
+    await page.click('[data-action="new-session"]');
+    await page.waitForSelector("#chat-header strong");
+    await page.fill("#message", "做一个文本长度插件，并用你好 Agent验证。");
+    await page.click("#send");
+    await page.waitForSelector(
+      '.tool[data-call="creator-verify"] .state[data-state="ok"]',
+    );
+    await page.waitForSelector("#cancel", { state: "detached" });
+    await page.click('[data-view="settings"]');
+    const section = page.locator('[data-section="creator"]');
+    await section.getByRole("button", { name: "刷新", exact: true }).click();
+    const plugin = page.locator('[data-plugin="text-length"]');
+    await plugin.waitFor();
+    expect(await plugin.textContent()).toContain("wish_length");
+    await plugin.locator('[data-action="plugin-toggle"]').click();
+    await plugin.getByText("已停用", { exact: true }).waitFor();
+    await plugin.locator('[data-action="plugin-toggle"]').click();
+    await plugin.getByText("已启用", { exact: true }).waitFor();
+    await plugin.locator('[data-action="plugin-reload"]').click();
+    await expect
+      .poll(() => plugin.locator('[data-action="plugin-reload"]').isEnabled())
+      .toBe(true);
+    await page.screenshot({ path: "/tmp/prism-creator-mode.png" });
+    await toggle.click();
+    await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(harness.kernel.kernel.ctx.tools.get("wish_length")).toBeDefined();
+    await plugin.locator('[data-action="plugin-remove"]').click();
+    await plugin.waitFor({ state: "detached" });
+    expect(harness.kernel.kernel.ctx.tools.get("wish_length")).toBeUndefined();
     expect(errors).toEqual([]);
   });
 

@@ -7,7 +7,7 @@ import { startKernel } from "../kernel/server.ts";
 import { parsePort } from "../shared/args.ts";
 import { VERSION } from "../shared/version.ts";
 
-const HELP = `Prism kernel ${VERSION} — task loop, tools and sessions over local HTTP/SSE
+const HELP = `Prism kernel ${VERSION} — Cordis plugins, tasks and sessions on Windows or WSL
 
 Usage: kernel [--port <n>] [--data-dir <path>]
 
@@ -16,7 +16,7 @@ Usage: kernel [--port <n>] [--data-dir <path>]
                     PRISM_DATA_DIR or ~/.prism.
 
 The kernel prints one JSON line with its URL when it is listening, then serves
-the interface described in docs/kernel-contract.md until POST /shutdown.
+the interface described in docs/reference/kernel.md until POST /shutdown.
 `;
 
 async function main(): Promise<void> {

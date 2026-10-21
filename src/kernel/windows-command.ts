@@ -40,8 +40,8 @@ const COMMAND_VARIABLE = "PRISM_WINDOWS_COMMAND";
 /** Reads the console code page plus a directory Windows commands can start in. */
 const PROBE = "chcp & echo prism-temp:%TEMP%";
 
-/** What the kernel needs to run Windows commands through WSL interop. */
-export interface WindowsInterop {
+/** What the kernel needs to run cmd.exe natively or through WSL interop. */
+export interface WindowsCommandRuntime {
   /** Program that runs Windows commands. */
   command: string;
   /** Linux directory the program starts in, so cmd.exe never starts in a UNC path. */
@@ -50,29 +50,40 @@ export interface WindowsInterop {
   encoding: string;
 }
 
-export type WindowsInteropStatus =
-  { available: true; interop: WindowsInterop } | { available: false; reason: string };
+export type WindowsCommandStatus =
+  | { available: true; runtime: WindowsCommandRuntime }
+  | { available: false; reason: string };
 
 /**
- * Checks that Windows commands can run (ADR-0002). The check runs on every
+ * Checks that Windows commands can run. The check runs on every
  * call: interop can be switched off between commands, and the answer has to be
  * an explicit error, never a silent fallback.
  */
-export async function windowsInteropStatus(): Promise<WindowsInteropStatus> {
+export async function windowsCommandStatus(): Promise<WindowsCommandStatus> {
   const probe = await capture("cmd.exe", ["/d", "/s", "/c", PROBE], tmpdir());
-  if (probe.error !== undefined)
+  const problem =
+    probe.error ??
+    (probe.code === 0
+      ? undefined
+      : `exit code ${probe.code}: ${probe.out.toString("utf8").trim()}`);
+  if (problem !== undefined)
     return {
       available: false,
       reason:
-        `The Windows environment needs WSL interop, but cmd.exe did not start: ${probe.error}. ` +
-        "Check that interop is enabled in /etc/wsl.conf and that the Windows directories are on PATH.",
+        process.platform === "win32"
+          ? `Could not start cmd.exe: ${problem}. Check the Windows system PATH.`
+          : `The Windows environment needs WSL interop, but cmd.exe did not start: ${problem}. ` +
+            "Check that interop is enabled in /etc/wsl.conf and that the Windows directories are on PATH.",
     };
 
   const text = probe.out.toString("latin1");
-  const spawnDir = (await convert("-u", markedLine(text, "prism-temp:"))) ?? tmpdir();
+  const spawnDir =
+    process.platform === "win32"
+      ? tmpdir()
+      : ((await convert("-u", markedLine(text, "prism-temp:"))) ?? tmpdir());
   return {
     available: true,
-    interop: {
+    runtime: {
       command: "cmd.exe",
       spawnDir,
       encoding: encodingFor(codePage(text)),
@@ -91,39 +102,47 @@ export async function runWindowsCommand(options: {
   timeoutMs: number;
   signal: AbortSignal;
 }): Promise<ShellOutcome> {
-  const status = await windowsInteropStatus();
+  const status = await windowsCommandStatus();
   if (!status.available) return emptyOutcome(status.reason);
   if (/[\r\n]/.test(options.command))
     return emptyOutcome(
       'The Windows target runs one cmd.exe command line, and cmd drops the lines after the first one. Join the steps with "&" or run them as separate commands.',
     );
-  const windowsCwd = await convert("-w", options.cwd);
+  const native = process.platform === "win32";
+  const windowsCwd = native ? options.cwd : await convert("-w", options.cwd);
   if (windowsCwd === null)
     return emptyOutcome(
       `Could not convert the working directory ${options.cwd} to a Windows path.`,
     );
 
-  const { interop } = status;
+  const { runtime } = status;
   const marker = `prism${randomUUID().replaceAll("-", "")}`;
   return runProcess((output) => {
     const raw = { stdout: [] as Buffer[], stderr: [] as Buffer[] };
     const kept = { stdout: 0, stderr: 0 };
     return {
       start: () =>
-        spawn(
-          interop.command,
-          ["/d", "/s", "/c", `set ${marker}=1 & %${COMMAND_VARIABLE}%`],
-          {
-            cwd: interop.spawnDir,
-            env: {
-              ...process.env,
-              [COMMAND_VARIABLE]: `pushd "${windowsCwd}" && ${options.command}`,
-              WSLENV: passedThrough(process.env.WSLENV, COMMAND_VARIABLE),
-            },
-            detached: true,
-            stdio: ["ignore", "pipe", "pipe"],
-          },
-        ),
+        native
+          ? spawn(`pushd "${windowsCwd}" && ${options.command}`, {
+              cwd: runtime.spawnDir,
+              shell: runtime.command,
+              windowsHide: true,
+              stdio: ["ignore", "pipe", "pipe"],
+            })
+          : spawn(
+              runtime.command,
+              ["/d", "/s", "/c", `set ${marker}=1 & %${COMMAND_VARIABLE}%`],
+              {
+                cwd: runtime.spawnDir,
+                env: {
+                  ...process.env,
+                  [COMMAND_VARIABLE]: `pushd "${windowsCwd}" && ${options.command}`,
+                  WSLENV: passedThrough(process.env.WSLENV, COMMAND_VARIABLE),
+                },
+                detached: true,
+                stdio: ["ignore", "pipe", "pipe"],
+              },
+            ),
       onData: (stream, chunk) => {
         const room = RAW_LIMIT - kept[stream];
         if (room <= 0) return;
@@ -131,13 +150,23 @@ export async function runWindowsCommand(options: {
         kept[stream] += chunk.length;
       },
       onEnd: () => {
-        output.append(decode(raw.stdout, interop.encoding));
-        output.append(decode(raw.stderr, interop.encoding));
+        output.append(decode(raw.stdout, runtime.encoding));
+        output.append(decode(raw.stderr, runtime.encoding));
       },
       // The Linux side cannot signal the Windows process tree; ask Windows to
       // end it, then drop the interop process that hosted it.
       stop: (child) => {
-        void endWindowsTree(interop, marker).finally(() => killProcessGroup(child));
+        if (native) {
+          if (child.pid !== undefined)
+            void capture(
+              "taskkill.exe",
+              ["/f", "/t", "/pid", String(child.pid)],
+              runtime.spawnDir,
+              KILL_TIMEOUT_MS,
+            );
+        } else {
+          void endWindowsTree(runtime, marker).finally(() => killProcessGroup(child));
+        }
       },
     };
   }, options);
@@ -148,7 +177,10 @@ export async function runWindowsCommand(options: {
  * Windows pid, so the shell is found again by the marker in its command line
  * and ended with `taskkill /t`, which covers the children it spawned.
  */
-async function endWindowsTree(interop: WindowsInterop, marker: string): Promise<void> {
+async function endWindowsTree(
+  interop: WindowsCommandRuntime,
+  marker: string,
+): Promise<void> {
   const query =
     "Get-CimInstance Win32_Process -Filter \"Name='cmd.exe'\" | " +
     `Where-Object { $_.CommandLine -like '*${marker}=1*' } | ForEach-Object { $_.ProcessId }`;
@@ -183,7 +215,11 @@ function capture(
 ): Promise<Captured> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
-    const child = spawn(file, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(file, args, {
+      cwd,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let settled = false;
     let timer: NodeJS.Timeout | undefined;
     const finish = (result: Captured): void => {

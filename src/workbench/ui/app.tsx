@@ -86,11 +86,15 @@ export function App(): JSX.Element {
       </a>
       <header id="topbar" className="flex min-w-0 items-center border-b">
         <div
+          id="sidebar-brand"
+          data-collapsed={!navigationVisible}
           style={{ width: navigationWidth }}
-          className={`flex h-full shrink-0 items-center border-r bg-surface transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${navigationWidth === 64 ? "justify-center" : "gap-2.5 px-5"}`}
+          className={`sidebar-brand relative flex h-full shrink-0 items-center border-r bg-surface transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${navigationWidth === 64 ? "justify-center" : "gap-2.5 px-5"}`}
           aria-label="Prism"
         >
-          <PrismMark />
+          <PrismMark
+            className={`sidebar-logo ${navigationVisible && navigationWidth === 64 ? "invisible" : ""}`}
+          />
           {navigationWidth > 64 ? (
             <span
               id="wordmark"
@@ -99,8 +103,6 @@ export function App(): JSX.Element {
               Prism
             </span>
           ) : null}
-        </div>
-        <div className="flex min-w-0 flex-1 items-center gap-2.5 px-3 md:px-5">
           <button
             ref={navigationButton}
             type="button"
@@ -112,7 +114,7 @@ export function App(): JSX.Element {
               if (navigationVisible) setNavigationOpen(false);
               else expandNavigation();
             }}
-            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface hover:text-ink"
+            className="sidebar-toggle absolute right-4 flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-[opacity,background-color,color] duration-150 hover:bg-ink/5 hover:text-ink"
           >
             {navigationVisible ? (
               <PanelLeftClose size={16} aria-hidden="true" />
@@ -120,6 +122,8 @@ export function App(): JSX.Element {
               <PanelLeftOpen size={16} aria-hidden="true" />
             )}
           </button>
+        </div>
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 px-3 md:px-5">
           <div className="hidden min-w-0 items-center gap-1.5 text-[13px] sm:flex">
             <span className="text-muted">工作台</span>
             <ChevronRight size={13} className="text-muted/60" aria-hidden="true" />
@@ -411,11 +415,19 @@ function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
             <Button
               id="cancel"
               data-action="cancel"
+              variant="primary"
               disabled={!state.taskRunning || !state.connected}
+              className="size-9 min-h-9 rounded-full border-accent bg-accent px-0 text-white hover:border-[#1d4ed8] hover:bg-[#1d4ed8]"
+              aria-label="停止任务"
+              title="停止任务"
               onClick={() => void workbench.cancel()}
             >
-              <Square size={9} fill="currentColor" aria-hidden="true" />
-              取消任务
+              <Square
+                size={12}
+                fill="currentColor"
+                strokeWidth={0}
+                aria-hidden="true"
+              />
             </Button>
           ) : (
             <Button
@@ -433,15 +445,19 @@ function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
         </div>
       </form>
       <div className="mx-auto mt-2.5 flex max-w-3xl items-center justify-between gap-3 text-xs text-muted">
-        <span id="task-state" role="status" className="flex items-center gap-1.5">
+        <span
+          id="task-state"
+          role="status"
+          title={state.workspace}
+          className="flex min-w-0 items-center gap-1.5"
+        >
           <span
-            className={`size-1 rounded-full ${busy ? "animate-pulse bg-accent" : "bg-muted/40"}`}
+            className={`size-1 shrink-0 rounded-full ${busy ? "animate-pulse bg-accent" : "bg-muted/40"}`}
           />
-          {state.session === null
-            ? "准备好，开始下一件事。"
-            : busy
-              ? "任务运行中…"
-              : "空闲 · 随时开始"}
+          <span className="truncate">
+            {state.workspace === "" ? "尚未选择工作区" : workspaceName(state.workspace)}
+            {busy ? " · 任务运行中…" : ""}
+          </span>
         </span>
         <span className="hidden sm:inline">
           <kbd className="rounded border border-line bg-surface px-1.5 py-0.5 font-mono text-[11px]">

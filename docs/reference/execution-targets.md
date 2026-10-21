@@ -1,20 +1,33 @@
-# 执行目标：WSL 与 Windows
+# 执行目标：Windows 与 WSL
 
-内核在 WSL 中运行，命令工具带 `environment`
-参数：`"wsl"`（默认）在内核自己这一侧执行，`"windows"` 经 WSL
-interop 在 Windows 的 cmd.exe 中执行（[ADR-0002](adr/0002-execution-targets.md)）。本文件记录两者的边界与限制，供实现与使用参考。
+桌面启动时选择 Windows 原生或 WSL，同一套 Cordis 内核在所选环境运行。一个桌面实例仅有一个内核；文件工具直接使用该环境的路径，命令工具默认使用该环境的 shell。
 
-## 两个目标
+| 内核运行环境 | 默认命令目标 | shell     | 工作区路径示例                     |
+| ------------ | ------------ | --------- | ---------------------------------- |
+| Windows 原生 | `windows`    | cmd.exe   | `C:\Users\you\project` 或 UNC 目录 |
+| WSL          | `wsl`        | `/bin/sh` | `/home/you/project`                |
 
-| 目标      | 命令在哪里运行                | 工作目录                     | 文件可见性                                         |
-| --------- | ----------------------------- | ---------------------------- | -------------------------------------------------- |
-| `wsl`     | 内核自身的 shell（`/bin/sh`） | WSL 路径                     | WSL 文件系统                                       |
-| `windows` | Windows 的 `cmd.exe`          | WSL 路径经 `wslpath -w` 转换 | 经 `/mnt/<盘>` 或 `\\wsl.localhost\<发行版>\` 共享 |
+## Windows 原生
 
-需要在 Windows 上完成的事（Windows 专有工具、Windows 侧构建、`tasklist`/`taskkill`
-之类系统命令）才选 `windows`；其余仍用 WSL，因为跨边界访问是次等环境。
+Windows 原生模式无需 WSL。安装版使用 Electron 自带的 Node 运行时，内核与 Playwright 资源位于安装目录的
+`resources/runtime/native/`。文件读写、会话、模型、MCP、skills、搜索与浏览器均在 Windows 环境运行。
 
-## Windows 目标怎么工作
+命令的工作目录使用 Windows 路径；对 UNC 工作区使用
+`pushd`，避免 cmd.exe 自动切换到系统目录。输出按 UTF-8 或实际控制台代码页解码；超时与取消通过
+`taskkill /f /t /pid`
+结束进程树。命令支持 cmd.exe 环境变量展开。一条调用只接受一行命令，多步命令用 `&`
+或独立调用表达。
+
+在原生内核中指定 `environment: "wsl"`
+会返回明确错误；需要操作 WSL 项目时，通过工作台「运行环境 → 切换运行环境」选择发行版。切换前必须完成或取消正在运行的任务。
+
+## WSL 模式
+
+WSL 模式保留独立的 Linux 运行时。`run_command` 的 `environment` 参数默认
+`"wsl"`，显式选择 `"windows"`
+时通过 interop 调用 Windows 程序。Windows 原生与 WSL 分别保存各自环境中的会话、配置和浏览器构建，不迁移或复制数据。
+
+## WSL 内核调用 Windows 命令
 
 - **可用性**：每次调用先探测 `cmd.exe`
   能否启动。不可用时命令以明确错误结束，**不会静默退回 WSL 执行**；错误里给出 interop 与 PATH 的检查方向。

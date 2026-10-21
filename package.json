@@ -1,7 +1,7 @@
 {
   "name": "@tulipe1735/prism",
-  "version": "0.2.3",
-  "description": "Personal coding agent: Windows desktop workbench, agent execution in WSL.",
+  "version": "0.3.0",
+  "description": "Extensible personal agent workbench for Windows and WSL, powered by Cordis. Creator Mode builds and hot-loads plugins from natural-language requests; browser automation is also available as a standalone CLI.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,7 +24,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
+    "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test",
     "start": "node dist/cli.js",
     "test": "vitest run --exclude '.scratch/**'",
     "typecheck": "tsc --noEmit && tsc -p src/workbench/ui/tsconfig.json --noEmit",
@@ -41,6 +41,7 @@
     "@modelcontextprotocol/sdk": "1.30.0",
     "@radix-ui/react-dropdown-menu": "2.2.1",
     "chrome-remote-interface": "0.34.0",
+    "cordis": "4.0.0-rc.11",
     "electron-store": "8.2.0",
     "electron-updater": "6.8.9",
     "html-to-text": "^10.0.1",
@@ -48,13 +49,14 @@
     "playwright": "^1.64.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.7.0",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@antfu/eslint-config": "4.0.1",
-    "@fontsource-variable/inter": "^5.3.0",
     "@tailwindcss/cli": "^4.3.3",
     "@types/chrome-remote-interface": "0.34.0",
     "@types/html-to-text": "^9.0.4",

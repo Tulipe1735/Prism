@@ -53,8 +53,7 @@ export function AccountProvider({ children }: { children: ReactNode }): JSX.Elem
           colorPrimary: "#1f2328",
           colorBackground: "#ffffff",
           colorForeground: "#1f2328",
-          fontFamily:
-            '"Inter Variable", Inter, "Segoe UI", "Microsoft YaHei", sans-serif',
+          fontFamily: "var(--font-sans)",
           borderRadius: "6px",
         },
       }}

@@ -1,7 +1,6 @@
 # Prism 领域术语
 
-本词表统一 Prism coding
-agent、工作台与浏览器工具的领域语言。能力范围与实现状态由[首版需求](docs/requirements-2026-10-18-coding-agent.md)和验收结果说明。
+本词表统一 Prism 个人 Agent、工作台、插件与浏览器工具的领域语言。当前范围见[产品说明](README.md)与[文档](docs/README.md)。
 
 ## Language
 
@@ -9,8 +8,7 @@ agent、工作台与浏览器工具的领域语言。能力范围与实现状态
 
 **Prism**:
 
-本项目的个人 coding
-agent，通过 Windows 桌面工作台在用户的机器上推进开发任务，内核在 WSL 中执行。
+本项目的可扩展个人 Agent 工作台，在用户选择的 Windows 或 WSL 环境中推进软件操作和开发任务。
 
 _Avoid_: 专用研究助手、模型本身、仅指某一个聊天机器人
 
@@ -28,8 +26,7 @@ _Avoid_: 代码编辑器、终端、内核本身
 
 **内核（Kernel）**:
 
-在 WSL 中运行 Prism 任务循环与工具执行的进程，由工作台通过 `wsl.exe`
-启动，经本地接口通信。
+在所选 Windows 或 WSL 环境中运行 Prism 任务循环与工具执行的进程，由工作台启动，经本地接口通信。
 
 _Avoid_: 模型、模型 API、桌面界面
 
@@ -98,6 +95,18 @@ _Avoid_: 登录权限、账号角色
 _Avoid_: 长期授权、记住本次批准
 
 ### 能力与任务
+
+**Creator Mode**:
+
+允许用户通过对话让 Prism 创建、安装和验证可复用插件的工作模式。
+
+_Avoid_: 自动 Harness 评估、DSH 插件兼容模式、插件市场
+
+**Prism 插件（Prism Plugin）**:
+
+向 Prism 提供工具、服务或事件行为的可独立启停扩展，其注册与资源随插件生命周期管理。
+
+_Avoid_: 技能、MCP 服务器、任意网页脚本
 
 **预置能力（Preset Capability）**:
 

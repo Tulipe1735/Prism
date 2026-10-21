@@ -61,6 +61,7 @@ export interface PrismConfig {
   compaction: CompactionConfig;
   command: CommandConfig;
   permissions: PermissionsConfig;
+  creator: { enabled: boolean };
 }
 
 export interface PrismConfigOverrides {
@@ -78,6 +79,7 @@ export interface ConfigPatch {
   browser?: Partial<Pick<BrowserConfig, "engine" | "actionsNeedApproval">>;
   search?: Partial<Pick<SearchConfig, "provider" | "baseUrl">>;
   permissions?: { scope?: PermissionScope };
+  creator?: { enabled: boolean };
 }
 
 const DEFAULTS = {
@@ -87,6 +89,7 @@ const DEFAULTS = {
   compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
   command: { timeoutMs: 120_000 },
   permissions: { scope: "workspace-write" },
+  creator: { enabled: false },
 } as const;
 
 const configFileSchema = z
@@ -136,6 +139,7 @@ const configFileSchema = z
       .partial()
       .strict()
       .optional(),
+    creator: z.object({ enabled: z.boolean() }).strict().optional(),
   })
   .strict();
 
@@ -171,6 +175,7 @@ export async function loadConfig(
     },
     command: { ...DEFAULTS.command, ...file.command, ...options.overrides?.command },
     permissions: { ...DEFAULTS.permissions, ...file.permissions },
+    creator: { ...DEFAULTS.creator, ...file.creator },
   };
 }
 
@@ -193,6 +198,8 @@ export async function saveConfigPatch(
     merged.search = { ...asRecord(existing.search), ...patch.search };
   if (patch.permissions !== undefined)
     merged.permissions = { ...asRecord(existing.permissions), ...patch.permissions };
+  if (patch.creator !== undefined)
+    merged.creator = { ...asRecord(existing.creator), ...patch.creator };
   const result = configFileSchema.safeParse(merged);
   if (!result.success)
     throw new ConfigError(`${path} is invalid: ${result.error.message}`);

@@ -66,7 +66,7 @@ prism session close --session <session>
 调查；同 request-id 的原样回放只返回历史回执，不返回当前观察引用。
 
 `prism <命令> --help` 显示参数与示例。供外部 agent 使用的完整说明在
-[skills/prism/SKILL.md](../skills/prism/SKILL.md)。
+[skills/prism/SKILL.md](../../skills/prism/SKILL.md)。
 
 ## 从源码运行
 
