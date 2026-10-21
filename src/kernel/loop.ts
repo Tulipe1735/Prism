@@ -17,7 +17,7 @@ import { rebuildContext } from "./session.ts";
 /** Tool output longer than this is cut before it reaches the model and the log. */
 export const TOOL_RESULT_LIMIT = 8_000;
 /** Model rounds one task may take before the kernel stops it. */
-export const MAX_MODEL_ROUNDS = 25;
+export const MAX_MODEL_ROUNDS = 100;
 
 export const TRUNCATION_NOTICE = `\n[result truncated after ${TOOL_RESULT_LIMIT} characters]`;
 export const CANCELLED_RESULT = "Task cancelled before this tool ran.";

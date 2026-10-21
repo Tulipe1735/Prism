@@ -404,7 +404,7 @@ it("reports a tool the kernel does not have instead of failing the task", async 
 });
 
 it("stops after the round limit and says so instead of looping forever", async () => {
-  const work = Array.from({ length: 25 }, (_value, index) => ({
+  const work = Array.from({ length: 100 }, (_value, index) => ({
     toolCalls: [{ id: `call_${index}`, name: "echo", arguments: '{"text":"again"}' }],
   }));
   const { kernel, workspace, dataDir } = await start({ answers: work });
@@ -416,11 +416,11 @@ it("stops after the round limit and says so instead of looping forever", async (
     body: { text: "keep going" },
   });
   await events.waitFor(
-    (event) => event.type === "session.updated" && event.session.entryCount === 52,
+    (event) => event.type === "session.updated" && event.session.entryCount === 202,
   );
   const entries = await readLog(dataDir, session.id);
   expect(entries.at(-1)).toMatchObject({ role: "system" });
-  expect((entries.at(-1) as { content: string }).content).toContain("25 model rounds");
+  expect((entries.at(-1) as { content: string }).content).toContain("100 model rounds");
   events.close();
 });
 
