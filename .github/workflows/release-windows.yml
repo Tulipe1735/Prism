@@ -18,10 +18,10 @@ jobs:
     env:
       RELEASE_TAG: ${{ inputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.23.2
       - name: Enable pnpm
@@ -47,6 +47,8 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      - name: Install browser used by integration tests
+        run: pnpm exec playwright install --with-deps chromium
       - name: Verify source
         run: |
           pnpm typecheck
