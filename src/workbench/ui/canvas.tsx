@@ -8,6 +8,7 @@ import type { JSX } from "react";
 import type { CanvasScene } from "../../shared/canvas.ts";
 import {
   CaptureUpdateAction,
+  convertToExcalidrawElements,
   Excalidraw,
   exportToBlob,
   exportToSvg,
@@ -35,7 +36,7 @@ function loadStyles(): Promise<void> {
   styles ??= new Promise((resolve, reject) => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "excalidraw.css";
+    link.href = "excalidraw/excalidraw.css";
     link.onload = () => resolve();
     link.onerror = () => {
       styles = undefined;
@@ -92,6 +93,31 @@ function fingerprint(
   return `${getSceneVersion(elements)}:${state.viewBackgroundColor}:${state.gridSize}:${state.gridModeEnabled}`;
 }
 
+/** Construct programmatic text with the SDK before restore filters zero sizes. */
+function restoreScene(
+  scene: Parameters<typeof restore>[0],
+): ReturnType<typeof restore> {
+  const elements = (scene?.elements ?? []).map((element) => {
+    if (
+      element.type !== "text" ||
+      element.isDeleted ||
+      (element.width > 0 &&
+        element.height > 0 &&
+        element.fontSize &&
+        element.fontFamily)
+    )
+      return element;
+    const measured = convertToExcalidrawElements([element], {
+      regenerateIds: false,
+    })[0]!;
+    return { ...measured, x: element.x, y: element.y };
+  });
+  return restore({ ...scene, elements }, null, null, {
+    repairBindings: true,
+    refreshDimensions: true,
+  });
+}
+
 function download(blob: Blob, name: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -113,15 +139,7 @@ function CanvasEditor(props: CanvasProps & { sessionId: string }): JSX.Element {
     () =>
       document.scene === null
         ? null
-        : restore(
-            document.scene as unknown as Parameters<typeof restore>[0],
-            null,
-            null,
-            {
-              repairBindings: true,
-              refreshDimensions: true,
-            },
-          ),
+        : restoreScene(document.scene as unknown as Parameters<typeof restore>[0]),
     [document.scene],
   );
 
@@ -176,7 +194,11 @@ function CanvasEditor(props: CanvasProps & { sessionId: string }): JSX.Element {
     if (api === null) return;
     const name = `画布-${props.sessionId.slice(0, 8)}.${format}`;
     const elements = api.getSceneElements();
-    const appState = { ...api.getAppState(), exportBackground: true };
+    const appState = {
+      ...api.getAppState(),
+      exportBackground: true,
+      exportEmbedScene: true,
+    };
     const files = api.getFiles();
     if (format === "excalidraw") {
       download(
@@ -199,7 +221,8 @@ function CanvasEditor(props: CanvasProps & { sessionId: string }): JSX.Element {
   async function importScene(file: File): Promise<void> {
     if (api === null) return;
     if (file.size > MAX_CANVAS_BYTES) throw new Error("画布文件不能超过 20 MB。");
-    const imported = await loadFromBlob(file, null, null);
+    const imported = restoreScene(await loadFromBlob(file, null, null));
+    signature.current = "";
     api.addFiles(Object.values(imported.files ?? {}));
     api.updateScene({ ...imported, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
     api.scrollToContent(undefined, { fitToContent: true });
@@ -267,7 +290,7 @@ function CanvasEditor(props: CanvasProps & { sessionId: string }): JSX.Element {
       {(actionError ?? document.error) ? (
         <div
           role="alert"
-          className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2 text-xs text-danger"
+          className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2 text-xs text-red-700"
         >
           <span>{actionError ?? document.error}</span>
           {document.status === "conflict" ? (

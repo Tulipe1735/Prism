@@ -5,15 +5,18 @@ import { ChevronRight, FileCode2, Files, X } from "lucide-react";
 import { useMemo } from "react";
 import { Button, SCOPE_LABELS, SectionLabel, workspaceName } from "./components.tsx";
 import { toArtifacts } from "./derive.ts";
+import { Plugins } from "./plugins.tsx";
 import { Settings } from "./settings.tsx";
 import { Diff } from "./timeline.tsx";
 
 export function Inspector({
   workbench,
   onClose,
+  onLaunchCanvas,
 }: {
   workbench: Workbench;
   onClose: () => void;
+  onLaunchCanvas: () => void;
 }): JSX.Element {
   const { state, dispatch } = workbench;
   const artifacts = useMemo(() => toArtifacts(state.entries), [state.entries]);
@@ -28,6 +31,7 @@ export function Inspector({
           {(
             [
               ["artifacts", "产物"],
+              ["plugins", "插件"],
               ["settings", "设置"],
             ] as const
           ).map(([view, label]) => (
@@ -114,6 +118,11 @@ export function Inspector({
         <div id="settings" hidden={state.view !== "settings"}>
           <Settings workbench={workbench} />
         </div>
+        {state.view === "plugins" ? (
+          <div id="plugins">
+            <Plugins workbench={workbench} onLaunchCanvas={onLaunchCanvas} />
+          </div>
+        ) : null}
       </div>
       {state.approvals.length > 0 ? (
         <div className="border-t px-5 py-2.5 text-xs text-muted">

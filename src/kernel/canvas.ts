@@ -33,6 +33,8 @@ const elementSchema = z
     width: z.number().nonnegative().optional(),
     height: z.number().nonnegative().optional(),
     text: z.string().optional(),
+    points: z.array(z.tuple([z.number(), z.number()])).optional(),
+    fontSize: z.number().positive().optional(),
     isDeleted: z.boolean().optional(),
     version: z.number().int().nonnegative().optional(),
   })
@@ -51,6 +53,10 @@ const saveSchema = z.object({
 });
 const updateSchema = z.object({
   revision: z.number().int().nonnegative(),
+  backgroundColor: z
+    .string()
+    .regex(/^#(?:[\da-f]{3}|[\da-f]{6})$/i)
+    .optional(),
   elements: z
     .array(elementSchema.partial().required({ id: true }))
     .max(100)
@@ -111,11 +117,16 @@ export class CanvasStore {
     });
   }
 
-  update(sessionId: string, input: unknown): Promise<CanvasDocument> {
+  update(
+    sessionId: string,
+    input: unknown,
+    signal?: AbortSignal,
+  ): Promise<CanvasDocument> {
     const parsed = updateSchema.safeParse(input);
     if (!parsed.success) throw new KernelError("INVALID_REQUEST", parsed.error.message);
     return this.enqueue(sessionId, async () => {
       const current = await this.load(sessionId);
+      signal?.throwIfAborted();
       this.checkRevision(current, parsed.data.revision);
       const elements = new Map(current.scene.elements.map((item) => [item.id, item]));
       for (const patch of parsed.data.elements) {
@@ -123,6 +134,9 @@ export class CanvasStore {
         const element = elementSchema.safeParse({
           ...previous,
           ...patch,
+          ...(typeof patch.text === "string" && patch.originalText === undefined
+            ? { originalText: patch.text }
+            : {}),
           version: Number(previous?.version ?? 0) + 1,
           versionNonce: randomInt(0x7fff_ffff),
           updated: Date.now(),
@@ -141,10 +155,23 @@ export class CanvasStore {
             versionNonce: randomInt(0x7fff_ffff),
           });
       }
-      return this.commit(sessionId, current.revision + 1, {
-        ...current.scene,
-        elements: [...elements.values()],
-      });
+      return this.commit(
+        sessionId,
+        current.revision + 1,
+        {
+          ...current.scene,
+          elements: [...elements.values()],
+          appState: {
+            ...current.scene.appState,
+            ...(parsed.data.backgroundColor === undefined
+              ? {}
+              : {
+                  viewBackgroundColor: parsed.data.backgroundColor,
+                }),
+          },
+        },
+        signal,
+      );
     });
   }
 
@@ -183,10 +210,21 @@ export class CanvasStore {
     sessionId: string,
     revision: number,
     scene: CanvasScene,
+    signal?: AbortSignal,
   ): Promise<CanvasDocument> {
     const parsed = sceneSchema.safeParse(scene);
     if (!parsed.success) throw new KernelError("INVALID_REQUEST", parsed.error.message);
     const elements = parsed.data.elements.map(withoutUnmeasuredSize);
+    for (const element of elements) {
+      if (
+        ["arrow", "line", "freedraw"].includes(String(element.type)) &&
+        !Array.isArray(element.points)
+      )
+        throw new KernelError(
+          "INVALID_REQUEST",
+          "箭头、线条和自由绘图需要 points 坐标数组。",
+        );
+    }
     const ids = elements.map((element) => element.id);
     if (new Set(ids).size !== ids.length)
       throw new KernelError("INVALID_REQUEST", "画布中存在重复的元素 ID。");
@@ -197,7 +235,8 @@ export class CanvasStore {
     await mkdir(this.directory, { recursive: true });
     const temporary = join(this.directory, `${sessionId}.${randomUUID()}.tmp`);
     try {
-      await writeFile(temporary, content, { flag: "wx" });
+      await writeFile(temporary, content, { flag: "wx", signal });
+      signal?.throwIfAborted();
       await rename(temporary, join(this.directory, `${sessionId}.json`));
     } finally {
       await rm(temporary, { force: true });
@@ -238,7 +277,7 @@ export function createCanvasTools(store: CanvasStore): Tool[] {
         const page = z
           .object({
             offset: z.number().int().nonnegative().default(0),
-            limit: z.number().int().min(1).max(50).default(20),
+            limit: z.number().int().min(1).max(50).default(10),
           })
           .parse(args);
         const { revision, scene } = await store.read(context.sessionId);
@@ -246,6 +285,7 @@ export function createCanvasTools(store: CanvasStore): Tool[] {
         return {
           content: JSON.stringify({
             revision,
+            backgroundColor: scene.appState.viewBackgroundColor,
             total: elements.length,
             elements: elements.slice(page.offset, page.offset + page.limit),
             nextOffset:
@@ -264,6 +304,10 @@ export function createCanvasTools(store: CanvasStore): Tool[] {
         type: "object",
         properties: {
           revision: { type: "integer", minimum: 0 },
+          backgroundColor: {
+            type: "string",
+            description: "Canvas background as a hex color, for example #ffffff.",
+          },
           elements: {
             type: "array",
             maxItems: 100,
@@ -284,7 +328,7 @@ export function createCanvasTools(store: CanvasStore): Tool[] {
       ],
       async execute(args, context) {
         context.signal.throwIfAborted();
-        const document = await store.update(context.sessionId, args);
+        const document = await store.update(context.sessionId, args, context.signal);
         return {
           content: JSON.stringify({
             revision: document.revision,

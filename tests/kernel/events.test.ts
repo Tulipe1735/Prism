@@ -15,6 +15,7 @@ function category(event: KernelEvent): string {
     case "approval.resolved":
       return "approval";
     case "canvas.updated":
+      return "canvas";
     case "session.updated":
       return "session";
     case "session.compacted":
@@ -51,6 +52,7 @@ describe("kernel events", () => {
         impact: "Edits a system file owned by root",
       },
       { type: "approval.resolved", sessionId: "s1", requestId: "a1", approved: false },
+      { type: "canvas.updated", sessionId: "s1", revision: 1 },
       {
         type: "session.updated",
         session: {
@@ -83,6 +85,7 @@ describe("kernel events", () => {
       "tool",
       "approval",
       "approval",
+      "canvas",
       "session",
       "compaction",
       "kernel",

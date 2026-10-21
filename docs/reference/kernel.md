@@ -54,6 +54,7 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | `SESSION_NOT_FOUND`  | 404  | 会话 id 不存在                         |
 | `APPROVAL_NOT_FOUND` | 404  | 审批请求不存在、已应答或已失效         |
 | `TASK_RUNNING`       | 409  | 该会话已有任务在运行，不能并发再发消息 |
+| `CANVAS_CONFLICT`    | 409  | 画布版本已更新，拒绝覆盖新版本         |
 | `CREATOR_DISABLED`   | 403  | Creator Mode 未开启，拒绝安装插件      |
 | `PLUGIN_NOT_FOUND`   | 404  | 插件不存在                             |
 | `PLUGIN_FAILED`      | 422  | 插件加载或更新失败                     |
@@ -73,6 +74,8 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | GET    | `/sessions/:id`                           | 继续会话（摘要 + 条目） |
 | PATCH  | `/sessions/:id`                           | 重命名会话（title）     |
 | DELETE | `/sessions/:id`                           | 删除会话                |
+| GET    | `/sessions/:id/canvas`                    | 读取会话画布            |
+| PUT    | `/sessions/:id/canvas`                    | 按版本保存会话画布      |
 | POST   | `/sessions/:id/messages`                  | 发送用户消息            |
 | POST   | `/sessions/:id/attachments?name=<文件名>` | 上传会话附件            |
 | POST   | `/terminals`                              | 打开工作区终端          |
@@ -223,7 +226,31 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
   `{ "session": <摘要> }`，并发 `session.updated`。会话有运行中的任务时返回 409
   `TASK_RUNNING`（日志正在被追加，重写头部不安全）；条目不受影响。
 - `DELETE /sessions/:id` → 200
-  `{ "deleted": true }`；若该会话有任务在运行，先取消再删除，同时删除该会话上传的附件。
+  `{ "deleted": true }`；若该会话有任务在运行，先取消再删除，同时删除该会话上传的附件和画布。
+
+### 会话画布
+
+`GET /sessions/:id/canvas` 返回
+`{ "revision": 0, "scene": ... }`。尚未绘图时返回空场景，读取不会创建文件。`scene`
+为 Excalidraw v2 JSON，包含
+`type`、`version`、`source`、`elements`、`appState`、`files`。
+
+`PUT /sessions/:id/canvas` 接受
+`{ "revision": <已读取的版本>, "scene": <完整场景> }`，成功返回 200 和新的画布文档，版本加一。过期版本返回 409
+`CANVAS_CONFLICT`，不写入。请求和持久文档最多 20
+MiB、10,000 个元素；无效元素和重复 ID 返回 400。画布保存于
+`<dataDir>/canvases/<sessionId>.json`，原子写入完成后才发 `canvas.updated`。
+
+内置 `excalidraw` 插件提供两个工具，均从调用上下文取得会话标识：
+
+- `excalidraw_read`：返回 `revision`、`total`、`elements` 和 `nextOffset`。支持 `offset`
+  和 `limit` 分页，默认 10 个元素，最多 50 个。不返回图片字节或已删除元素。
+- `excalidraw_update`：接受 `revision`、`elements`、可选的画布背景
+  `backgroundColor`（十六进制颜色）和 `deleteIds`。已有 ID 只合并指定字段；新元素需要
+  `id`、`type`、`x`、`y`。每次最多更新 100 个、删除 100 个元素。修改复用现有命令效果的权限判定：只读模式拒绝，其他范围允许；不会执行外部命令。
+
+UI 和 Agent 共用版本检查。工作台通过既有 SSE 连接收到 `canvas.updated`
+后重读场景，重连后也重读。UI 保留尚未保存的草稿；冲突时先导出草稿，再明确载入最新版本。使用说明见[画布指南](../guide/canvas.md)。
 
 ### 发送消息
 
@@ -374,7 +401,7 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"read_file"
 - 不重放历史事件：重连后工作台用 `GET /sessions/:id` 取回状态。事件只用于增量。
 - 事件不带 `id:`，客户端不需要 `Last-Event-ID`。
 
-事件类型（定义见 `src/kernel/events.ts`，共 9 种）：
+事件类型（定义见 `src/kernel/events.ts`，共 10 种）：
 
 | 类型                 | 载荷（除 `type` 外）                                           | 语义                                                     |
 | -------------------- | -------------------------------------------------------------- | -------------------------------------------------------- |
@@ -385,6 +412,7 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"read_file"
 | `approval.requested` | `sessionId`, `requestId`, `tool`, `reason`, `target`, `impact` | 需要用户逐次审批                                         |
 | `approval.resolved`  | `sessionId`, `requestId`, `approved`                           | 审批已应答                                               |
 | `session.updated`    | `session`（会话摘要）                                          | 会话日志已变化，含最后 `entryCount`/`leafId`             |
+| `canvas.updated`     | `sessionId`, `revision`                                        | 会话画布的新版本已落盘，客户端可重读                     |
 | `session.compacted`  | `sessionId`, `entryId`, `reason`                               | 已写入 `compaction` 条目；`reason` 为 `auto` 或 `manual` |
 | `kernel.status`      | `status`, `version`, `dataDir`                                 | 连接建立时与状态切换时                                   |
 

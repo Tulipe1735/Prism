@@ -20,6 +20,7 @@ Prism 直接采用 `cordis@4.0.0-rc.11`。`Kernel.create()`
 | browser                 | Playwright 浏览器工具与连接                     |
 | web                     | `web_search` 与 `web_fetch`                     |
 | mcp                     | 配置中的 MCP 连接及其工具                       |
+| excalidraw              | 会话画布、版本检查、Agent 读写工具和更新事件    |
 | tasks                   | 会话任务互斥、任务循环、取消与关闭等待          |
 | creator                 | 运行时检查、插件安装、持久化、启停和失败恢复    |
 

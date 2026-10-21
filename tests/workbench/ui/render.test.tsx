@@ -253,7 +253,11 @@ it("renders the approval facts and exactly the two one-time answers", () => {
 
 it("renders touched files and their bounded diff in the inspector", () => {
   const html = renderToStaticMarkup(
-    <Inspector workbench={workbench(openSession())} onClose={() => {}} />,
+    <Inspector
+      workbench={workbench(openSession())}
+      onClose={() => {}}
+      onLaunchCanvas={() => {}}
+    />,
   );
   expect(html).toContain("src/app.ts");
   expect(html).toContain("+1");
@@ -261,7 +265,11 @@ it("renders touched files and their bounded diff in the inspector", () => {
   expect(html).toContain('class="add"');
   expect(
     renderToStaticMarkup(
-      <Inspector workbench={workbench(emptyState())} onClose={() => {}} />,
+      <Inspector
+        workbench={workbench(emptyState())}
+        onClose={() => {}}
+        onLaunchCanvas={() => {}}
+      />,
     ),
   ).toContain("还没有文件改动");
 });

@@ -19,7 +19,7 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup --config tsup.config.ts --sourcemap && pnpm build:ui:css && node -e \"const fs=require('node:fs');for(const file of ['index.html','startup.html'])fs.copyFileSync('src/workbench/ui/'+file,'dist/workbench-ui/'+file);fs.cpSync('src/workbench/ui/assets','dist/workbench-ui/assets',{recursive:true});fs.copyFileSync('node_modules/@excalidraw/excalidraw/dist/prod/index.css','dist/workbench-ui/excalidraw.css');fs.cpSync('node_modules/@excalidraw/excalidraw/dist/prod/fonts','dist/workbench-ui/excalidraw/fonts',{recursive:true});fs.copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup --config tsup.config.ts --sourcemap && pnpm build:ui:css && node -e \"const fs=require('node:fs');for(const file of ['index.html','startup.html'])fs.copyFileSync('src/workbench/ui/'+file,'dist/workbench-ui/'+file);fs.cpSync('src/workbench/ui/assets','dist/workbench-ui/assets',{recursive:true});fs.cpSync('node_modules/@excalidraw/excalidraw/dist/prod/fonts','dist/workbench-ui/excalidraw/fonts',{recursive:true});fs.copyFileSync('node_modules/@excalidraw/excalidraw/dist/prod/index.css','dist/workbench-ui/excalidraw/excalidraw.css');fs.copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
     "build:ui:css": "tailwindcss -i src/workbench/ui/app.css -o dist/workbench-ui/app.css --minify",
     "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/interfaces/cli.ts",
     "format": "prettier --write .",

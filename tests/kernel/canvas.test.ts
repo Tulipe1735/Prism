@@ -105,6 +105,7 @@ it("rejects simultaneous stale saves and invalid scenes without overwriting vali
   for (const scene of [
     { ...emptyCanvasScene(), elements: [box, box] },
     { ...emptyCanvasScene(), elements: [{ ...box, x: "invalid" }] },
+    { ...emptyCanvasScene(), elements: [{ ...box, type: "arrow" }] },
   ]) {
     expect(
       (
@@ -150,6 +151,7 @@ it("lets the agent read, add, patch and delete canvas elements, with plugin clea
             name: "excalidraw_update",
             arguments: JSON.stringify({
               revision: 1,
+              backgroundColor: "#f8f9fa",
               elements: [
                 { id: "node", backgroundColor: "#a5d8ff" },
                 {
@@ -185,6 +187,7 @@ it("lets the agent read, add, patch and delete canvas elements, with plugin clea
   expect(document).toMatchObject({
     revision: 3,
     scene: {
+      appState: { viewBackgroundColor: "#f8f9fa" },
       elements: [
         { id: "node", isDeleted: true, backgroundColor: "#a5d8ff" },
         { id: "label", text: "开始" },
@@ -244,4 +247,36 @@ it("proxies scenes with embedded images larger than the ordinary request limit",
   };
   await client.saveCanvas(session.id, 0, scene);
   expect((await client.readCanvas(session.id)).scene.files).toEqual(scene.files);
+});
+
+it("cleans up partial registration when a canvas tool name collides", async () => {
+  harness = await startTestKernel();
+  const ctx = harness.kernel.kernel.ctx;
+  await [...ctx.registry.get(canvas)!.fibers][0]!.dispose();
+  const blocker = ctx.tools.register({
+    name: "excalidraw_update",
+    description: "Reserve a tool name for this test.",
+    parameters: { type: "object", properties: {} },
+    execute: async () => ({ content: "reserved" }),
+  });
+  try {
+    await expect(ctx.plugin(canvas)).rejects.toThrow("already registered");
+    expect(ctx.tools.get("excalidraw_read")).toBeUndefined();
+    expect(ctx.get("canvas")).toBeUndefined();
+  } finally {
+    await blocker();
+  }
+});
+
+it("cancels a queued agent change before committing it", async () => {
+  harness = await startTestKernel();
+  const session = await harness.kernel.kernel.createSession({
+    workspace: harness.workspace,
+  });
+  const store = harness.kernel.kernel.ctx.canvas;
+  const signal = AbortSignal.abort();
+  await expect(
+    store.update(session.id, { revision: 0, elements: [box] }, signal),
+  ).rejects.toThrow();
+  expect((await store.read(session.id)).revision).toBe(0);
 });

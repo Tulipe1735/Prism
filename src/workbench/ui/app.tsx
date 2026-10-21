@@ -10,7 +10,6 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
-  PenLine,
   ShieldCheck,
   X,
 } from "lucide-react";
@@ -137,23 +136,9 @@ export function App(): JSX.Element {
             </span>
           </div>
           <button
-            type="button"
-            data-action="canvas"
-            aria-label="打开画板"
-            aria-pressed={canvasOpen}
-            title="画板"
-            onClick={() => {
-              setCanvasMounted(true);
-              setCanvasOpen(true);
-            }}
-            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface hover:text-ink"
-          >
-            <PenLine size={16} aria-hidden="true" />
-          </button>
-          <button
             ref={inspectorButton}
             type="button"
-            aria-label="切换产物与设置"
+            aria-label="切换右侧栏"
             aria-controls="inspector"
             aria-expanded={inspectorOpen}
             title={inspectorOpen ? "折叠右侧栏" : "展开右侧栏"}
@@ -265,7 +250,7 @@ export function App(): JSX.Element {
         </section>
         <aside
           id="inspector"
-          aria-label="产物与设置"
+          aria-label="产物、插件与设置"
           aria-hidden={!inspectorOpen || canvasOpen}
           inert={!inspectorOpen || canvasOpen}
           hidden={canvasOpen || (!inspectorOpen && !inlineInspector)}
@@ -273,6 +258,10 @@ export function App(): JSX.Element {
         >
           <Inspector
             workbench={workbench}
+            onLaunchCanvas={() => {
+              setCanvasMounted(true);
+              setCanvasOpen(true);
+            }}
             onClose={() => {
               setInspectorOpen(false);
               inspectorButton.current?.focus();
@@ -292,7 +281,10 @@ export function App(): JSX.Element {
                 variant="ghost"
                 className="px-2 text-xs"
                 aria-label="关闭画板"
-                onClick={() => setCanvasOpen(false)}
+                onClick={() => {
+                  setCanvasOpen(false);
+                  setInspectorOpen(true);
+                }}
               >
                 <X size={14} aria-hidden="true" />
                 关闭

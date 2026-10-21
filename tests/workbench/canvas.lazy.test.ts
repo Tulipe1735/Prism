@@ -30,6 +30,7 @@ describe.runIf(enabled)("lazy canvas", () => {
   let sessionId: string;
   let client: KernelClient;
   const errors: string[] = [];
+  const missingFonts: string[] = [];
   let markSlowAssetDone = (): void => {};
 
   /** The kernel holds an endless SSE stream open, so `networkidle` never fires. */
@@ -51,6 +52,13 @@ describe.runIf(enabled)("lazy canvas", () => {
 
   const named = (needle: string): Transfer[] =>
     transfers.filter((item) => item.name.includes(needle));
+
+  async function launchCanvas(): Promise<void> {
+    if (!(await page.locator("#inspector").isVisible()))
+      await page.getByRole("button", { name: "切换右侧栏" }).click();
+    await page.click('[data-view="plugins"]');
+    await page.getByRole("button", { name: "启动 Excalidraw", exact: true }).click();
+  }
 
   beforeAll(async () => {
     browser = await chromium.launch();
@@ -102,6 +110,8 @@ describe.runIf(enabled)("lazy canvas", () => {
     page.on("pageerror", (error) => errors.push(error.message));
     client = new KernelClient({ baseUrl: harness.kernel.url });
     page.on("response", (response) => {
+      if (response.url().includes(".woff2") && response.status() >= 400)
+        missingFonts.push(response.url());
       const bytes = Number(response.headers()["content-length"] ?? "0");
       const name = response.url().split("/").pop() ?? response.url();
       if (name === SLOW_ASSET) markSlowAssetDone();
@@ -116,12 +126,18 @@ describe.runIf(enabled)("lazy canvas", () => {
     await browser?.close();
   });
 
-  it("downloads Excalidraw only after the canvas opens", async () => {
+  it("launches Excalidraw from the right plugins panel and downloads it only on launch", async () => {
     await page.goto(ui.url);
     await page.waitForSelector("#composer");
     await settle();
 
     report("first load");
+    expect(named("canvas-")).toHaveLength(0);
+    expect(named("excalidraw.css")).toHaveLength(0);
+    await page.click('[data-view="plugins"]');
+    const launch = page.getByRole("button", { name: "启动 Excalidraw", exact: true });
+    expect(await launch.isDisabled()).toBe(true);
+    expect(await page.locator('#topbar [data-action="launch-plugin"]').count()).toBe(0);
     expect(named("canvas-")).toHaveLength(0);
     expect(named("excalidraw.css")).toHaveLength(0);
 
@@ -132,8 +148,10 @@ describe.runIf(enabled)("lazy canvas", () => {
     await page.waitForSelector("#chat-header strong");
     sessionId = (await client.listSessions())[0]!.id;
 
+    expect(await launch.isEnabled()).toBe(true);
+    await page.screenshot({ path: ".scratch/canvas-plugin-launcher.png" });
     transfers = [];
-    await page.click('[data-action="canvas"]');
+    await launchCanvas();
     await page.waitForSelector(".excalidraw", { timeout: 30_000 });
     await page.waitForTimeout(1_000);
 
@@ -181,7 +199,7 @@ describe.runIf(enabled)("lazy canvas", () => {
     // Draw text through Excalidraw's real keyboard and pointer interactions.
     await page.locator(".excalidraw").click({ position: { x: 350, y: 260 } });
     await page.keyboard.press("t");
-    await page.locator(".excalidraw").click({ position: { x: 300, y: 300 } });
+    await page.locator(".excalidraw").click({ position: { x: 550, y: 500 } });
     await page.waitForSelector("textarea.excalidraw-wysiwyg");
     await page.keyboard.type("手动备注");
     await page.keyboard.press("Escape");
@@ -197,7 +215,8 @@ describe.runIf(enabled)("lazy canvas", () => {
       .toBe("saved");
     await page.getByRole("button", { name: "关闭画板", exact: true }).click();
     expect(await page.locator("#canvas").isVisible()).toBe(false);
-    await page.click('[data-action="canvas"]');
+    expect(await page.locator("#plugins").isVisible()).toBe(true);
+    await launchCanvas();
     expect(await page.locator("[data-canvas-status]").textContent()).toContain(
       "3 个元素",
     );
@@ -222,7 +241,19 @@ describe.runIf(enabled)("lazy canvas", () => {
       const content = await readFile((await file.path())!);
       if (format === ".excalidraw")
         expect(JSON.parse(content.toString()).elements).toEqual(
-          expect.arrayContaining([expect.objectContaining({ text: "手动备注" })]),
+          expect.arrayContaining([
+            expect.objectContaining({ text: "手动备注" }),
+            expect.objectContaining({
+              id: "label",
+              text: "会话画布",
+              width: expect.any(Number),
+            }),
+            expect.objectContaining({
+              id: "agent-note",
+              text: "Agent 已修改",
+              width: expect.any(Number),
+            }),
+          ]),
         );
       else if (format === "SVG") expect(content.toString()).toContain("<svg");
       else
@@ -232,11 +263,119 @@ describe.runIf(enabled)("lazy canvas", () => {
     }
     await page.reload();
     await page.click(`[data-action="open-session"][data-session="${sessionId}"]`);
-    await page.click('[data-action="canvas"]');
+    await launchCanvas();
     await expect
       .poll(() => page.locator("[data-canvas-status]").textContent())
       .toContain("4 个元素");
     await page.screenshot({ path: ".scratch/canvas-agent.png" });
     expect(errors).toEqual([]);
+    expect(missingFonts).toEqual([]);
   }, 60_000);
+
+  it("keeps a conflicting user draft and exports it before loading an agent's newer scene", async () => {
+    await expect
+      .poll(() => page.locator("[data-canvas-status]").getAttribute("data-save-state"))
+      .toBe("saved");
+    let release = (): void => {};
+    let arrived = (): void => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const received = new Promise<void>((resolve) => {
+      arrived = resolve;
+    });
+    let intercept = true;
+    await page.route("**/kernel/sessions/*/canvas", async (route) => {
+      if (route.request().method() === "PUT" && intercept) {
+        intercept = false;
+        arrived();
+        await held;
+      }
+      await route.continue();
+    });
+    try {
+      const current = await client.readCanvas(sessionId);
+      const draft = {
+        ...current.scene,
+        elements: current.scene.elements.map((element) =>
+          element.id === "label"
+            ? { ...element, text: "本地草稿", originalText: "本地草稿" }
+            : element,
+        ),
+      };
+      await page.locator('input[aria-label="导入画布文件"]').setInputFiles({
+        name: "草稿.excalidraw",
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify(draft)),
+      });
+      await received;
+      await harness.kernel.kernel.ctx.canvas.update(sessionId, {
+        revision: current.revision,
+        elements: [{ id: "agent-note", text: "服务器更新" }],
+      });
+      release();
+      await expect
+        .poll(() =>
+          page.locator("[data-canvas-status]").getAttribute("data-save-state"),
+        )
+        .toBe("conflict");
+      const saved = await client.readCanvas(sessionId);
+      expect(saved.scene.elements).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "label", text: "会话画布" }),
+          expect.objectContaining({ id: "agent-note", text: "服务器更新" }),
+        ]),
+      );
+      // Reload the workbench to exercise recovery from its local unsaved draft.
+      page.once("dialog", (dialog) => void dialog.accept());
+      await page.reload();
+      await page.click(`[data-action="open-session"][data-session="${sessionId}"]`);
+      await launchCanvas();
+      await expect
+        .poll(() =>
+          page.locator("[data-canvas-status]").getAttribute("data-save-state"),
+        )
+        .toBe("conflict");
+      const downloaded = page.waitForEvent("download");
+      await page.getByRole("button", { name: "导出当前草稿并读取最新画布" }).click();
+      const file = await downloaded;
+      const exported = JSON.parse(await readFile((await file.path())!, "utf8"));
+      expect(exported.elements).toEqual(
+        expect.arrayContaining([expect.objectContaining({ text: "本地草稿" })]),
+      );
+      await expect
+        .poll(() =>
+          page.locator("[data-canvas-status]").getAttribute("data-save-state"),
+        )
+        .toBe("saved");
+      expect((await client.readCanvas(sessionId)).scene.elements).toEqual(
+        saved.scene.elements,
+      );
+      expect(errors).toEqual([]);
+    } finally {
+      release();
+      await page.unrouteAll({ behavior: "wait" });
+    }
+  }, 30_000);
+
+  it("launches from the plugin card and returns to the plugins panel in a narrow window", async () => {
+    await page.getByRole("button", { name: "关闭画板", exact: true }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await launchCanvas();
+    await expect
+      .poll(() => page.locator("[data-canvas-status]").textContent())
+      .toContain("4 个元素");
+    expect(await page.locator("#canvas").isVisible()).toBe(true);
+    const width = await page.locator("html").evaluate((node) => node.scrollWidth);
+    expect(width).toBeLessThanOrEqual(390);
+    await page.getByRole("button", { name: "关闭画板", exact: true }).click();
+    expect(await page.locator("#plugins").isVisible()).toBe(true);
+    expect(
+      await page
+        .getByRole("button", { name: "启动 Excalidraw", exact: true })
+        .isVisible(),
+    ).toBe(true);
+    await page.screenshot({ path: ".scratch/canvas-plugin-narrow.png" });
+    expect(errors).toEqual([]);
+  });
 });

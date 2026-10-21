@@ -78,7 +78,7 @@ effects: (args) => [{ kind: "file-write", path: args.path }];
 ```
 
 命令效果为 `{ kind: 'command', command }`；浏览器动作为
-`{ kind: 'browser-action', action, target }`。插件管理的修改动作按命令权限处理，只读模式拒绝这些动作；用户仍可从设置中管理插件。插件代码运行在内核进程，权限声明不构成沙箱。不要把不可信源码作为插件执行。
+`{ kind: 'browser-action', action, target }`。插件管理的修改动作按命令权限处理，只读模式拒绝这些动作；用户仍可从右侧插件栏管理插件。插件代码运行在内核进程，权限声明不构成沙箱。不要把不可信源码作为插件执行。
 
 ## 资源与服务
 

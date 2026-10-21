@@ -41,6 +41,8 @@ selection, data locations and updates.
   tools through MCP, and load workflow instructions as skills.
 - **Continuous sessions**: persist and resume local history, cancel tasks, and compact
   context.
+- **Shared canvas**: [Excalidraw](docs/guide/canvas.md) supports manual drawing and
+  agent edits, session autosave, and editable file, SVG and PNG export.
 - **Visible execution**: streaming responses, tool calls, file changes, approvals and
   settings in the desktop workbench.
 - **Windows and WSL**: run the same kernel in the chosen environment, with separate
@@ -60,9 +62,9 @@ Open **Settings → Creator Mode**, enable plugin authoring, and ask:
 
 The agent can inspect the runtime, generate a JavaScript plugin, install it with
 `plugin_manager`, then discover and call its tools on the next model request. Plugins
-persist in the kernel's data directory and reload after restart. Settings provides
-enable, disable, reload and remove actions. A failed update restores the previous
-version.
+persist in the kernel's data directory and reload after restart. The right-hand Plugins
+tab launches Excalidraw and provides enable, disable, reload and remove actions for
+custom plugins. A failed update restores the previous version.
 
 Creator Mode is off by default. Turning it off leaves enabled plugins running. This
 version supports kernel tools and events; DSH plugin compatibility depends on the
