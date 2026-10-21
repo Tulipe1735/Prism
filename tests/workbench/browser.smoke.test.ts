@@ -389,7 +389,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     );
     await page.fill("#message", "尚未发送的任务草稿");
 
-    await page.getByRole("button", { name: "切换右侧栏" }).click();
+    await page.getByRole("button", { name: "切换产物与设置" }).click();
     await page.click('[data-view="settings"]');
     await page.waitForSelector('#settings input[name="model"]');
     const model = page.locator('#settings input[name="model"]');
@@ -426,7 +426,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     await page.waitForSelector('[data-kernel-status="ready"]');
 
     const navigation = page.getByRole("button", { name: "切换会话导航" });
-    const inspector = page.getByRole("button", { name: "切换右侧栏" });
+    const inspector = page.getByRole("button", { name: "切换产物与设置" });
     const compactCreate = page.getByRole("button", { name: "新建会话", exact: true });
     const chatWidth = async (): Promise<number> =>
       (await page.locator("#chat").boundingBox())!.width;
@@ -644,7 +644,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     expect(await page.locator("#workspace-input").inputValue()).toBe(harness.workspace);
   });
 
-  it("creates a plugin from a wish and manages its lifecycle from the plugins panel", async () => {
+  it("creates a plugin from a wish and manages its lifecycle from settings", async () => {
     const source = `export const inject = ['tools'];
 export function apply(ctx) {
   ctx.effect(() => ctx.tools.register({
@@ -708,8 +708,8 @@ export function apply(ctx) {
       '.tool[data-call="creator-verify"] .state[data-state="ok"]',
     );
     await page.waitForSelector("#cancel", { state: "detached" });
-    await page.click('[data-view="plugins"]');
-    const section = page.locator('[data-section="plugins"]');
+    await page.click('[data-view="settings"]');
+    const section = page.locator('[data-section="creator"]');
     await section.getByRole("button", { name: "刷新", exact: true }).click();
     const plugin = page.locator('[data-plugin="text-length"]');
     await plugin.waitFor();
@@ -723,11 +723,9 @@ export function apply(ctx) {
       .poll(() => plugin.locator('[data-action="plugin-reload"]').isEnabled())
       .toBe(true);
     await page.screenshot({ path: "/tmp/prism-creator-mode.png" });
-    await page.click('[data-view="settings"]');
     await toggle.click();
     await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("false");
     expect(harness.kernel.kernel.ctx.tools.get("wish_length")).toBeDefined();
-    await page.click('[data-view="plugins"]');
     await plugin.locator('[data-action="plugin-remove"]').click();
     await plugin.waitFor({ state: "detached" });
     expect(harness.kernel.kernel.ctx.tools.get("wish_length")).toBeUndefined();

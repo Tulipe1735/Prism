@@ -1,6 +1,6 @@
 {
   "name": "@tulipe1735/prism",
-  "version": "0.3.4",
+  "version": "0.3.3",
   "description": "Extensible personal agent workbench for Windows and WSL, powered by Cordis. Creator Mode builds and hot-loads plugins from natural-language requests; browser automation is also available as a standalone CLI.",
   "license": "MIT",
   "repository": {
@@ -19,7 +19,7 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup --config tsup.config.ts --sourcemap && pnpm build:ui:css && node -e \"const fs=require('node:fs');for(const file of ['index.html','startup.html'])fs.copyFileSync('src/workbench/ui/'+file,'dist/workbench-ui/'+file);fs.cpSync('src/workbench/ui/assets','dist/workbench-ui/assets',{recursive:true});fs.cpSync('node_modules/@excalidraw/excalidraw/dist/prod/fonts','dist/workbench-ui/excalidraw/fonts',{recursive:true});fs.copyFileSync('node_modules/@excalidraw/excalidraw/dist/prod/index.css','dist/workbench-ui/excalidraw/excalidraw.css');fs.copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup --config tsup.config.ts --sourcemap --no-splitting && pnpm build:ui:css && node -e \"const fs=require('node:fs');for(const file of ['index.html','startup.html'])fs.copyFileSync('src/workbench/ui/'+file,'dist/workbench-ui/'+file);fs.cpSync('src/workbench/ui/assets','dist/workbench-ui/assets',{recursive:true});fs.copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
     "build:ui:css": "tailwindcss -i src/workbench/ui/app.css -o dist/workbench-ui/app.css --minify",
     "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/interfaces/cli.ts",
     "format": "prettier --write .",
@@ -39,7 +39,6 @@
   "dependencies": {
     "@clerk/electron": "0.1.1",
     "@clerk/localizations": "4.23.0",
-    "@excalidraw/excalidraw": "^0.18.1",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@radix-ui/react-dropdown-menu": "2.2.1",
     "@xterm/addon-fit": "0.11.0",

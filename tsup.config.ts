@@ -5,8 +5,6 @@ export default defineConfig([
     target: "node22",
     platform: "node",
     format: ["esm"],
-    // The packaged kernel ships as single files, so keep node targets whole.
-    splitting: false,
     removeNodeProtocol: false,
     entry: {
       cli: "src/interfaces/cli.ts",
@@ -24,7 +22,6 @@ export default defineConfig([
     target: "node22",
     platform: "node",
     format: ["cjs"],
-    splitting: false,
     external: ["electron"],
     noExternal: [/^(?!electron$).+/],
     outExtension: () => ({ js: ".cjs" }),
@@ -44,13 +41,6 @@ export default defineConfig([
     target: "es2022",
     tsconfig: "src/workbench/ui/tsconfig.json",
     noExternal: [/.*/],
-    // The workbench lazy-loads heavy views, so the browser target emits chunks.
-    splitting: true,
-    // `@excalidraw/excalidraw/index.css` is exported only under the
-    // "production" condition, which esbuild does not select on its own.
-    esbuildOptions: (options) => {
-      options.conditions = ["production", ...(options.conditions ?? [])];
-    },
     define: { "process.env.NODE_ENV": '"production"' },
     minify: true,
   },
@@ -59,7 +49,6 @@ export default defineConfig([
     platform: "node",
     target: "node22",
     format: ["cjs"],
-    splitting: false,
     external: ["electron"],
     noExternal: [/^(?!electron$).+/],
     outExtension: () => ({ js: ".cjs" }),

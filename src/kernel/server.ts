@@ -8,7 +8,6 @@ import type { BrowserEngine, PermissionScope } from "./types.ts";
 import type { WebFetchOverrides } from "./web-tools.ts";
 import { Buffer } from "node:buffer";
 import { createServer } from "node:http";
-import { MAX_CANVAS_BYTES } from "../shared/canvas.ts";
 import { KernelError } from "./errors.ts";
 import {
   Kernel,
@@ -233,17 +232,6 @@ export async function startKernel(
     }
     if (segments[0] === "sessions" && segments.length >= 2) {
       const sessionId = decodeURIComponent(segments[1] as string);
-      if (segments.length === 3 && segments[2] === "canvas") {
-        if (method === "GET") {
-          sendJson(response, 200, await kernel.ctx.canvas.read(sessionId));
-          return;
-        }
-        if (method === "PUT") {
-          const body = await readJson(request, MAX_CANVAS_BYTES);
-          sendJson(response, 200, await kernel.ctx.canvas.save(sessionId, body));
-          return;
-        }
-      }
       if (segments.length === 3 && segments[2] === "attachments" && method === "POST") {
         await kernel.readSession(sessionId);
         const name = url.searchParams.get("name") ?? "";
@@ -390,7 +378,6 @@ function classify(error: unknown): { status: number; code: string } {
         SESSION_NOT_FOUND: 404,
         APPROVAL_NOT_FOUND: 404,
         TASK_RUNNING: 409,
-        CANVAS_CONFLICT: 409,
         CREATOR_DISABLED: 403,
         PLUGIN_NOT_FOUND: 404,
         PLUGIN_FAILED: 422,
@@ -407,14 +394,11 @@ function classify(error: unknown): { status: number; code: string } {
   return { status: 500, code: "INTERNAL_ERROR" };
 }
 
-async function readJson(
-  request: IncomingMessage,
-  limit = MAX_BODY_BYTES,
-): Promise<unknown> {
+async function readJson(request: IncomingMessage): Promise<unknown> {
   let raw = "";
   for await (const chunk of request) {
     raw += chunk.toString();
-    if (Buffer.byteLength(raw) > limit)
+    if (Buffer.byteLength(raw) > MAX_BODY_BYTES)
       throw new KernelError("INVALID_REQUEST", "Request body is too large");
   }
   if (raw.trim() === "") return {};

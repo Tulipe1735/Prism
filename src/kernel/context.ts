@@ -2,7 +2,6 @@ import type { Context } from "cordis";
 import type { SkillScan } from "../skills/loader.ts";
 import type { Approvals } from "./approvals.ts";
 import type { Attachments } from "./attachments.ts";
-import type { CanvasStore } from "./canvas.ts";
 import type { CompactionOutcome, CompactionReason } from "./compaction.ts";
 import type { PrismConfig } from "./config.ts";
 import type { Creator } from "./creator.ts";
@@ -45,7 +44,6 @@ declare module "cordis" {
     tasks: Tasks;
     attachments: Attachments;
     terminals: WorkspaceTerminals;
-    canvas: CanvasStore;
   }
 
   interface Events {

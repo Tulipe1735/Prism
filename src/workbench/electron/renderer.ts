@@ -1,6 +1,9 @@
 import { net, protocol } from "electron";
-import { rendererContentSecurityPolicy } from "./content-security-policy.ts";
-import { RENDERER_HOST, RENDERER_SCHEME } from "./identity-config.ts";
+import {
+  CLERK_FRONTEND_HOST,
+  RENDERER_HOST,
+  RENDERER_SCHEME,
+} from "./identity-config.ts";
 
 export function isRendererUrl(value: string): boolean {
   try {
@@ -36,7 +39,18 @@ export function registerRenderer(getUiUrl: () => string | undefined): void {
     const responseHeaders = new Headers(upstream.headers);
     responseHeaders.set(
       "Content-Security-Policy",
-      rendererContentSecurityPolicy(url.pathname),
+      [
+        "default-src 'self'",
+        `script-src 'self' 'unsafe-inline' https://${CLERK_FRONTEND_HOST} https://challenges.cloudflare.com https://*.protect.clerk.com`,
+        `connect-src 'self' https://${CLERK_FRONTEND_HOST} https://*.protect.clerk.com:* https://clerk-telemetry.com https://*.clerk-telemetry.com`,
+        "img-src 'self' https://img.clerk.com data:",
+        "style-src 'self' 'unsafe-inline'",
+        "worker-src 'self' blob:",
+        "frame-src 'self' https://challenges.cloudflare.com https://*.protect.clerk.com",
+        "form-action 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+      ].join("; "),
     );
     return new Response(upstream.body, {
       status: upstream.status,

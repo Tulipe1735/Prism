@@ -1,7 +1,6 @@
 import type { KernelOptions } from "../kernel.ts";
 import process from "node:process";
 import { Context } from "cordis";
-import { canvas } from "../canvas.ts";
 import { creator } from "../creator.ts";
 import { Tasks } from "../tasks.ts";
 import * as capabilities from "./capabilities.ts";
@@ -59,7 +58,6 @@ export async function createContext(options: KernelOptions): Promise<Context> {
       ctx.plugin(capabilities.web, options),
       ctx.plugin(capabilities.mcp),
       ctx.plugin(capabilities.extraTools, options),
-      ctx.plugin(canvas),
     ]);
     await ctx.plugin(tasks, options);
     await ctx.plugin(creator);

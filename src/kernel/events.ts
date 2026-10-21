@@ -37,7 +37,6 @@ export type KernelEvent =
       approved: boolean;
     }
   | { type: "session.updated"; session: SessionSummary }
-  | { type: "canvas.updated"; sessionId: string; revision: number }
   | {
       type: "session.compacted";
       sessionId: string;

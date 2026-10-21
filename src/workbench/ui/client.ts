@@ -7,7 +7,6 @@ import type {
 } from "../../kernel/kernel.ts";
 import type { Attachment, SessionEntry, SessionSummary } from "../../kernel/session.ts";
 import type { TerminalEvent } from "../../kernel/terminal.ts";
-import type { CanvasDocument, CanvasScene } from "../../shared/canvas.ts";
 import { readSseData } from "../../shared/sse.ts";
 
 export type { SettingsPatch };
@@ -112,21 +111,6 @@ export class KernelClient {
     return this.request<SessionLogPayload>(
       `/sessions/${encodeURIComponent(sessionId)}`,
     );
-  }
-
-  readCanvas(sessionId: string): Promise<CanvasDocument> {
-    return this.request(`/sessions/${encodeURIComponent(sessionId)}/canvas`);
-  }
-
-  saveCanvas(
-    sessionId: string,
-    revision: number,
-    scene: CanvasScene,
-  ): Promise<CanvasDocument> {
-    return this.request(`/sessions/${encodeURIComponent(sessionId)}/canvas`, {
-      method: "PUT",
-      body: { revision, scene },
-    });
   }
 
   async renameSession(sessionId: string, title: string): Promise<SessionSummary> {

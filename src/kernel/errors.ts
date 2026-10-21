@@ -3,7 +3,6 @@ export type KernelErrorCode =
   | "SESSION_NOT_FOUND"
   | "APPROVAL_NOT_FOUND"
   | "TASK_RUNNING"
-  | "CANVAS_CONFLICT"
   | "CREATOR_DISABLED"
   | "PLUGIN_NOT_FOUND"
   | "PLUGIN_FAILED";
