@@ -85,7 +85,10 @@ pnpm workbench --kernel http://127.0.0.1:41234      # 对着已有内核跑
 
 ### 构建 Windows 安装包
 
-在 Windows 中使用 Node.js ≥22.23.2 和 pnpm（Linux / WSL 构建还需要 Wine）：
+构建需要 Node.js
+≥22.23.2、pnpm 和 C++ 编译工具。Windows 构建还需要可用的 WSL 发行版，其中已安装 Linux
+Node/npm、Python、make 和 C++ 编译器，用于生成 Linux 终端模块；Linux /
+WSL 构建还需要 Wine。安装版用户无需这些构建工具。
 
 ```bash
 pnpm install --frozen-lockfile
@@ -93,7 +96,7 @@ pnpm package:win
 ```
 
 输出为 `release/Prism-<版本>-Setup-x64.exe`。构建脚本下载并校验 Linux
-Node，打包内核与 Playwright，再用 electron-builder 生成 NSIS 安装包。Windows 端携带工作台及原生内核，WSL 端携带相同内核与完整 Linux
+Node，打包内核、Playwright 与 node-pty，再用 electron-builder 生成 NSIS 安装包。终端的原生模块与 ConPTY 辅助文件随运行时交付，不需要用户自行编译。Windows 端携带工作台及原生内核，WSL 端携带相同内核与完整 Linux
 Node 运行时；两种模式都不依赖源码目录。构建缓存位于
 `.packaging/cache/`，构建内容与安装包目录已从版本控制中排除。
 
@@ -108,6 +111,7 @@ Node 和 WSL 的本机上，可从 WSL 运行默认目录与显式目录的真�
 ```bash
 PRISM_WINDOWS_RUNTIME=1 pnpm exec vitest run tests/workbench/windows-runtime.integration.test.ts
 PRISM_WINDOWS_NATIVE=1 pnpm exec vitest run tests/kernel/windows-native.integration.test.ts
+PRISM_WINDOWS_NATIVE=1 pnpm exec vitest run tests/workbench/terminal.windows.test.ts
 ```
 
 ## 一个来源
@@ -130,11 +134,19 @@ CSS。界面以中性冷灰、细分隔线与蓝色强调为基础，中文使�
 SC），英文使用 Inter，代码块、行内代码与等宽字段使用 JetBrains
 Mono。字体文件随应用打包，无需联网或预先安装；启动页和账号弹窗使用同一字体设置。
 
-左侧是工作区与会话，中间是任务对话，右侧是产物与设置。左右面板可独立折叠；左栏收起后默认显示 Logo，悬停 Logo 或通过键盘聚焦时显示展开按钮，触屏直接显示展开按钮。窄窗口使用浮层。任务运行时，发送按钮原位显示为蓝底白色停止图标，不显示文字。
+左侧是工作区与会话，中间是任务对话，右侧是产物与设置。左右面板可独立折叠；左栏收起后默认显示 Logo，悬停 Logo 或通过键盘聚焦时显示展开按钮，触屏直接显示展开按钮。窄窗口使用浮层。任务运行时，发送按钮原位显示为蓝底白色停止图标，不显示文字。当前模型名称位于发送按钮左侧，添加文件按钮位于输入框左下角。
+
+新建会话后先显示「工作区名称 · 新会话」，发送首条任务时由当前模型自动概括会话名称。手动命名后保留用户的名称；自动命名失败不影响任务执行。
+
+可点击输入框左下角的回形针选择文件，也可从 Windows 文件管理器将文件拖入对话区域。发送前可移除附件，支持只发送文件。每条消息最多添加 10 个文件，单个文件最多 20
+MiB；不支持文件夹。附件保存在当前内核环境的数据目录，随消息恢复，并向 Agent 提供本地路径供文件工具读取。
+
+顶部不显示「内核就绪」。对话底部的「终端」按钮展开当前工作区的交互式终端，支持输入命令、方向键与 Ctrl+C；折叠后 shell 和输出保留，切换工作区时显示对应工作区的终端。Windows 原生使用 PowerShell，WSL 使用用户 shell。断线或 shell 退出时可点击重新连接；关闭 Prism 时结束终端进程。内核断线仍通过提示显示。
 
 折叠有 300ms 的宽度过渡，侧栏内容会保留 120ms 再隐藏；工具卡片的收起会先停留 40ms，再用 240ms 折起。
 
-`src/workbench/ui/main.tsx` 挂载 React，`app.tsx` 组合各区域；`use-workbench.ts`
+`src/workbench/ui/main.tsx` 挂载 React，`app.tsx` 组合各区域；`composer.tsx`
+管理输入草稿与附件，`terminal.tsx` 管理终端折叠与 xterm.js；`use-workbench.ts`
 管理内核连接和操作，继续复用 `client.ts`、`state.ts` 与
 `derive.ts`。流式更新由 React 更新对应节点，设置草稿和工具卡片的展开状态不会随事件重画而丢失。工作台资源随应用打包；Clerk 登录与个人资料界面按官方 SDK 从实例域名加载，需要联网。
 
@@ -143,10 +155,12 @@ Mono。字体文件随应用打包，无需联网或预先安装；启动页和�
 
 | 区域     | 内容                                                                                                     | 来源                                             |
 | -------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| 顶栏     | 内核连接、状态、版本、数据目录                                                                           | `kernel.status` 事件与 `/status`                 |
+| 顶栏     | 当前工作区与侧栏折叠入口                                                                                 | 工作台导航状态                                   |
 | 工作区   | 选择当前环境中的目录或从最近使用中选择                                                                   | 本地记忆 + 会话列表中的工作区                    |
 | 会话列表 | 按工作区分组、新建、继续、重命名、删除、搜索                                                             | `/sessions*` 与 `session.updated`                |
 | 聊天     | 助手文本流式增量、工具卡片（参数、结果、diff）、压缩提示、手动「压缩上下文」                             | `message.delta`、`tool.*` 与 `GET /sessions/:id` |
+| 终端     | 当前工作区的交互式 shell、底部展开与折叠                                                                 | `/terminals*` 与终端 SSE                         |
+| 附件     | 选择或拖入文件、发送前移除、随用户消息恢复                                                               | `/sessions/:id/attachments` 与消息日志           |
 | 审批     | 逐次审批卡片：工具、理由、目标、影响，按钮只有「允许一次」与「拒绝」                                     | `approval.requested` 与 `/approvals/:requestId`  |
 | 产物     | 本次会话触碰过的文件、最新状态与最新 diff（内核没给 diff 时回退到写入内容）                              | 由会话日志推导（见下）                           |
 | 设置     | 模型端点/名称/密钥（密钥只写不回传）、浏览器引擎、搜索来源与端点、数据目录；权限范围与浏览器动作审批可切 | `GET /settings` 与 `PUT /settings`               |
@@ -185,6 +199,9 @@ PRISM_ELECTRON_SMOKE=1 pnpm vitest run tests/workbench/electron.smoke.test.ts
 
 - `tests/workbench/derive.test.ts`、`state.test.ts`：视图与状态推导，另有一条用真实内核日志驱动的推导。
 - `tests/workbench/ui/render.test.tsx`：React 组件渲染，覆盖不可信文本转义、会话、工具 diff、审批与设置。
+- `tests/workbench/conversation.integration.test.ts`：自动命名、手动名称保护、命名失败、附件原字节保存与上下文恢复、文件校验、持久终端与重连。
+- `tests/workbench/terminal.windows.test.ts`：真实 Windows
+  PowerShell，验证中文工作区、命令状态、尺寸调整与关闭后进程退出；覆盖随项目保存的 ConPTY 输出线程清理补丁。
 - `tests/workbench/client.integration.test.ts`：真内核 + 脚本化模型，覆盖会话 CRUD、重命名、取消、设置写入、审批通过与拒绝（含 04 对工作区外写入的真实审批）与事件流。
 - `tests/workbench/ui-server.integration.test.ts`：UI 服务器与 `/kernel`
   代理（含 SSE 与内核断开）。

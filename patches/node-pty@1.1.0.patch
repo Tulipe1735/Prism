@@ -1,0 +1,32 @@
+diff --git a/lib/worker/conoutSocketWorker.js b/lib/worker/conoutSocketWorker.js
+index 0451e2c6b36df6c94a474efdce7d42c2ef2c9388..b36c59f5bf4795b5a1a0f36b01d4566e4d62dd42 100644
+--- a/lib/worker/conoutSocketWorker.js
++++ b/lib/worker/conoutSocketWorker.js
+@@ -12,6 +12,11 @@ conoutSocket.setEncoding('utf8');
+ conoutSocket.connect(conoutPipeName, function () {
+     var server = net_1.createServer(function (workerSocket) {
+         conoutSocket.pipe(workerSocket);
++        workerSocket.once('close', function () {
++            conoutSocket.destroy();
++            server.close();
++            if (worker_threads_1.parentPort) worker_threads_1.parentPort.close();
++        });
+     });
+     server.listen(conout_1.getWorkerPipeName(conoutPipeName));
+     if (!worker_threads_1.parentPort) {
+diff --git a/src/worker/conoutSocketWorker.ts b/src/worker/conoutSocketWorker.ts
+index 79a4148dd6a18727c725b4980655643a04981177..d853275ab3f3306f7d5faf802a2eabf327b4d2e3 100644
+--- a/src/worker/conoutSocketWorker.ts
++++ b/src/worker/conoutSocketWorker.ts
+@@ -13,6 +13,11 @@ conoutSocket.setEncoding('utf8');
+ conoutSocket.connect(conoutPipeName, () => {
+   const server = createServer(workerSocket => {
+     conoutSocket.pipe(workerSocket);
++    workerSocket.once('close', () => {
++      conoutSocket.destroy();
++      server.close();
++      parentPort?.close();
++    });
+   });
+   server.listen(getWorkerPipeName(conoutPipeName));
+   if (!parentPort) {

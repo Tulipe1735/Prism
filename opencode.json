@@ -1,0 +1,17 @@
+{
+  "mcp": {
+    "servers": {
+      "excalidraw": {
+        "type": "local",
+        "command": [
+          "/home/tulipe/.nvm/versions/node/v22.23.2/bin/node",
+          "/home/tulipe/.local/share/prism-diagram-tools/node_modules/mcp-excalidraw-server/dist/index.js"
+        ],
+        "environment": {
+          "EXPRESS_SERVER_URL": "http://127.0.0.1:3250",
+          "EXCALIDRAW_EXPORT_DIR": "/home/tulipe/projects/prism"
+        }
+      }
+    }
+  }
+}

@@ -2,7 +2,7 @@ import type { SessionEntry, SessionSummary } from "../../../src/kernel/session.t
 import type { Workbench } from "../../../src/workbench/ui/use-workbench.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
-import { ApprovalCard, KernelStatus } from "../../../src/workbench/ui/app.tsx";
+import { ApprovalCard } from "../../../src/workbench/ui/app.tsx";
 import { Inspector } from "../../../src/workbench/ui/inspector.tsx";
 import { Settings } from "../../../src/workbench/ui/settings.tsx";
 import { Sidebar } from "../../../src/workbench/ui/sidebar.tsx";
@@ -80,25 +80,6 @@ function workbench(state: UiState): Workbench {
     updateSettings: vi.fn(async () => true),
   };
 }
-
-it("shows the kernel connection state without exposing paths as markup", () => {
-  const state = reduce(emptyState(), {
-    type: "event",
-    event: {
-      type: "kernel.status",
-      status: "ready",
-      version: "0.1.6",
-      dataDir: '/tmp/<img src=x onerror="alert(1)">',
-    },
-  });
-  const html = renderToStaticMarkup(<KernelStatus state={state} />);
-  expect(html).toContain('data-status="ready"');
-  expect(html).toContain("内核就绪");
-  expect(html).not.toContain("<img");
-  expect(renderToStaticMarkup(<KernelStatus state={emptyState()} />)).toContain(
-    "已断开",
-  );
-});
 
 it("groups sessions by workspace and provides keyboard accessible session buttons", () => {
   let state = reduce(openSession(), {

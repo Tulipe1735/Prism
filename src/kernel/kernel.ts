@@ -17,6 +17,7 @@ import { VERSION } from "../shared/version.ts";
 import { saveConfigPatch } from "./config.ts";
 import { KernelError } from "./errors.ts";
 import { createContext } from "./plugins/index.ts";
+import { initialSessionTitle } from "./session-title.ts";
 
 export interface KernelOptions {
   config: PrismConfig;
@@ -156,7 +157,10 @@ export class Kernel {
     workspace: string;
     title?: string;
   }): Promise<SessionSummary> {
-    const header = await this.ctx.sessions.create(input);
+    const header = await this.ctx.sessions.create({
+      ...input,
+      title: input.title ?? initialSessionTitle(input.workspace),
+    });
     const session = await this.ctx.sessions.summary(header.id);
     this.emit({ type: "session.updated", session });
     return session;
@@ -181,6 +185,7 @@ export class Kernel {
     await this.ctx.tasks.settle(sessionId);
     if (!(await this.ctx.sessions.delete(sessionId)))
       throw new KernelError("SESSION_NOT_FOUND", `Session ${sessionId} does not exist`);
+    await this.ctx.attachments.removeSession(sessionId);
   }
 
   async renameSession(sessionId: string, title: string): Promise<SessionSummary> {
@@ -191,8 +196,12 @@ export class Kernel {
     return session;
   }
 
-  sendMessage(sessionId: string, text: string): Promise<string> {
-    return this.ctx.tasks.send(sessionId, text);
+  sendMessage(
+    sessionId: string,
+    text: string,
+    attachmentIds: string[] = [],
+  ): Promise<string> {
+    return this.ctx.tasks.send(sessionId, text, attachmentIds);
   }
 
   isRunning(sessionId: string): boolean {

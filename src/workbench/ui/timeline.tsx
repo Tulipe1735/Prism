@@ -5,6 +5,7 @@ import {
   Check,
   ChevronRight,
   Circle,
+  FileText,
   LoaderCircle,
   Terminal,
   TriangleAlert,
@@ -136,6 +137,27 @@ function TimelineEntry({ step }: { step: TimelineStep }): JSX.Element {
           <Markdown remarkPlugins={[remarkGfm]}>{step.content}</Markdown>
         ) : (
           step.content
+        )}
+        {step.attachments === undefined ? null : (
+          <ul
+            aria-label="已发送文件"
+            className="mt-2 flex flex-wrap gap-2 whitespace-normal"
+          >
+            {step.attachments.map((file) => (
+              <li
+                key={file.id}
+                title={file.name}
+                className="flex max-w-full items-center gap-2 rounded-md border bg-paper px-2.5 py-1.5 text-xs"
+              >
+                <FileText
+                  size={14}
+                  className="shrink-0 text-muted"
+                  aria-hidden="true"
+                />
+                <span className="truncate">{file.name}</span>
+              </li>
+            ))}
+          </ul>
         )}
         {step.streaming ? (
           <span

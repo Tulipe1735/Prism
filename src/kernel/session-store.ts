@@ -4,6 +4,7 @@ import {
   mkdir,
   readdir,
   readFile,
+  rename as renameFile,
   rm,
   rmdir,
   stat,
@@ -64,6 +65,17 @@ const entrySchema = z.discriminatedUnion("type", [
     timestamp: z.string().min(1),
     role: z.enum(["user", "assistant", "system", "tool"]),
     content: z.string(),
+    attachments: z
+      .array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          path: z.string(),
+          size: z.number().nonnegative(),
+          mediaType: z.string(),
+        }),
+      )
+      .optional(),
   }),
   z.object({
     type: z.literal("tool_call"),
@@ -151,7 +163,15 @@ export class SessionStore {
     const entry: SessionEntry = (() => {
       switch (input.type) {
         case "message":
-          return { type: "message", ...base, role: input.role, content: input.content };
+          return {
+            type: "message",
+            ...base,
+            role: input.role,
+            content: input.content,
+            ...(input.attachments === undefined
+              ? {}
+              : { attachments: input.attachments }),
+          };
         case "tool_call":
           return {
             type: "tool_call",
@@ -197,7 +217,17 @@ export class SessionStore {
     const lines = text.split("\n");
     const header = parseLine(headerSchema, lines[0] ?? "", sessionId);
     const renamed: SessionHeader = { ...header, title };
-    await writeFile(path, [JSON.stringify(renamed), ...lines.slice(1)].join("\n"));
+    const temporary = `${path}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(
+        temporary,
+        [JSON.stringify(renamed), ...lines.slice(1)].join("\n"),
+        { flag: "wx" },
+      );
+      await renameFile(temporary, path);
+    } finally {
+      await rm(temporary, { force: true });
+    }
     return renamed;
   }
 

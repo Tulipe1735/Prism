@@ -10,7 +10,7 @@
 
 - 内核监听 `127.0.0.1` 的随机端口（可用 `--port` 固定），只服务本机客户端。
 - HTTP 提供请求/应答；SSE 推送事件。工作台按事件渲染，不轮询。
-- 所有请求与应答均为 JSON（`content-type: application/json`），`/events` 除外。
+- 普通请求与应答使用 JSON；文件上传直接发送文件字节，内核与终端事件使用 SSE。
 
 ### 启动与关闭
 
@@ -61,24 +61,29 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 
 ## 端点
 
-| 方法   | 路径                                 | 用途                    |
-| ------ | ------------------------------------ | ----------------------- |
-| GET    | `/status`                            | 内核状态                |
-| GET    | `/settings`                          | 读取设置                |
-| PUT    | `/settings`                          | 修改设置                |
-| GET    | `/plugins`                           | 插件列表与加载状态      |
-| POST   | `/plugins`                           | 插件安装、检查与启停    |
-| GET    | `/sessions?workspace=<path>`         | 会话列表                |
-| POST   | `/sessions`                          | 新建会话                |
-| GET    | `/sessions/:id`                      | 继续会话（摘要 + 条目） |
-| PATCH  | `/sessions/:id`                      | 重命名会话（title）     |
-| DELETE | `/sessions/:id`                      | 删除会话                |
-| POST   | `/sessions/:id/messages`             | 发送用户消息            |
-| POST   | `/sessions/:id/cancel`               | 取消运行中的任务        |
-| POST   | `/sessions/:id/compact`              | 手动压缩上下文          |
-| POST   | `/sessions/:id/approvals/:requestId` | 应答审批                |
-| GET    | `/events`                            | SSE 事件流              |
-| POST   | `/shutdown`                          | 关闭内核                |
+| 方法   | 路径                                      | 用途                    |
+| ------ | ----------------------------------------- | ----------------------- |
+| GET    | `/status`                                 | 内核状态                |
+| GET    | `/settings`                               | 读取设置                |
+| PUT    | `/settings`                               | 修改设置                |
+| GET    | `/plugins`                                | 插件列表与加载状态      |
+| POST   | `/plugins`                                | 插件安装、检查与启停    |
+| GET    | `/sessions?workspace=<path>`              | 会话列表                |
+| POST   | `/sessions`                               | 新建会话                |
+| GET    | `/sessions/:id`                           | 继续会话（摘要 + 条目） |
+| PATCH  | `/sessions/:id`                           | 重命名会话（title）     |
+| DELETE | `/sessions/:id`                           | 删除会话                |
+| POST   | `/sessions/:id/messages`                  | 发送用户消息            |
+| POST   | `/sessions/:id/attachments?name=<文件名>` | 上传会话附件            |
+| POST   | `/terminals`                              | 打开工作区终端          |
+| GET    | `/terminals/:id/events`                   | 终端输出 SSE            |
+| POST   | `/terminals/:id/input`                    | 输入终端字符            |
+| POST   | `/terminals/:id/resize`                   | 调整终端尺寸            |
+| POST   | `/sessions/:id/cancel`                    | 取消运行中的任务        |
+| POST   | `/sessions/:id/compact`                   | 手动压缩上下文          |
+| POST   | `/sessions/:id/approvals/:requestId`      | 应答审批                |
+| GET    | `/events`                                 | SSE 事件流              |
+| POST   | `/shutdown`                               | 关闭内核                |
 
 ### GET /status
 
@@ -209,7 +214,7 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 - `GET /sessions?workspace=<path>` → `{ "sessions": [<摘要>, ...] }`，按 `updatedAt`
   降序；`workspace` 省略时返回全部工作区。
 - `POST /sessions`，请求体 `{ "workspace": "<绝对路径>", "title": "<可选>" }` → 201
-  `{ "session": <摘要> }`。
+  `{ "session": <摘要> }`。省略名称时，初始名称为「工作区名称 · 新会话」。首条消息落盘后，内核用当前模型生成简短名称，再开始任务；内部命名请求不写入聊天日志，最长等待 8 秒。失败时保留初始名称并继续任务。显式指定或手动修改的名称不会自动覆盖。
 - `GET /sessions/:id` → 200
   `{ "session": <摘要>, "entries": [<会话条目>, ...] }`。条目形状见
   `src/kernel/session.ts`（`header`
@@ -218,12 +223,17 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
   `{ "session": <摘要> }`，并发 `session.updated`。会话有运行中的任务时返回 409
   `TASK_RUNNING`（日志正在被追加，重写头部不安全）；条目不受影响。
 - `DELETE /sessions/:id` → 200
-  `{ "deleted": true }`；若该会话有任务在运行，先取消再删除。
+  `{ "deleted": true }`；若该会话有任务在运行，先取消再删除，同时删除该会话上传的附件。
 
 ### 发送消息
 
-`POST /sessions/:id/messages`，请求体 `{ "text": "..." }` → 202
-`{ "entryId": "<用户消息条目 id>" }`。
+`POST /sessions/:id/messages`，请求体 `{ "text": "...", "attachments": ["<附件 id>"] }`
+→ 202 `{ "entryId": "<用户消息条目 id>" }`。
+
+`attachments`
+可省略。允许只发送附件；文本和附件不能同时为空。附件必须属于当前会话，每条消息最多 10 个。用户消息条目保留附件的
+`id`、`name`、`path`、`size` 与
+`mediaType`；重建模型上下文时附上本地路径和类型，供文件工具读取，文件字节不直接塞进文本上下文。
 
 内核把用户消息追加到会话日志后立即应答，任务在后台运行，进展经 SSE 推送。该会话已有任务运行时返回 409
 `TASK_RUNNING`。
@@ -242,6 +252,32 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
   的消息条目说明失败原因，经 `session.updated`
   可见。模型请求不自动重试；失败即进入该路径。
 - 一轮任务最多 25 次模型往返，超出后以 `system` 条目说明并结束。
+
+### 文件附件
+
+`POST /sessions/:id/attachments?name=<编码后的文件名>` 直接接受文件字节，`Content-Type`
+为文件类型（未知时用 `application/octet-stream`）。单个文件最多 20
+MiB，文件名必须是单个有效名称，不能包含路径分隔符。
+
+返回 201
+`{ "attachment": { "id": "...", "name": "需求.md", "path": "<绝对路径>", "size": 123, "mediaType": "text/markdown" } }`。文件保存在
+`<dataDir>/attachments/<sessionId>/<attachmentId>/files/<name>`，同名文件互不覆盖。上传完成后，把附件 id 放入消息的
+`attachments` 列表。
+
+### 工作区终端
+
+- `POST /terminals` 接受
+  `{ "workspace": "<绝对路径>", "cols": 80, "rows": 24 }`，返回 201
+  `{ "id": "<终端 id>" }`。同一工作区复用仍在运行的 shell；目录必须存在。终端与内核运行在同一环境：Windows 使用 PowerShell，WSL 使用用户 shell。
+- `GET /terminals/:id/events` 先返回保留的输出，再实时推送 SSE。事件为
+  `{ "type": "data", "data": "..." }` 或
+  `{ "type": "exit", "exitCode": 0 }`；保留最近 1,000,000 个字符。
+- `POST /terminals/:id/input` 接受 `{ "data": "pwd\r" }`，返回
+  `{ "written": true }`。输入按原始字符传递，支持交互、方向键和 Ctrl+C；单次最多 64,000 个字符。
+- `POST /terminals/:id/resize` 接受 `{ "cols": 100, "rows": 30 }`，返回
+  `{ "resized": true }`。行列数必须是 2–500 的整数。
+
+折叠或断开界面不会结束 shell；内核关闭时终止所有工作区终端。终端由用户直接操作，独立于 Agent 任务与工具审批。
 
 ### 取消
 

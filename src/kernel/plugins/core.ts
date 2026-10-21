@@ -1,9 +1,11 @@
 import type { Context } from "cordis";
 import type { KernelOptions } from "../kernel.ts";
 import { Approvals } from "../approvals.ts";
+import { Attachments } from "../attachments.ts";
 import { streamChat } from "../model.ts";
 import { PermissionPolicy } from "../permissions.ts";
 import { SessionStore } from "../session-store.ts";
+import { WorkspaceTerminals } from "../terminal.ts";
 import { ToolRegistry } from "../tools.ts";
 
 export const configuration = {
@@ -18,6 +20,25 @@ export const sessions = {
   inject: ["config"],
   apply(ctx: Context) {
     ctx.provide("sessions", new SessionStore(ctx.config.dataDir));
+  },
+};
+
+export const attachments = {
+  name: "attachments",
+  inject: ["config"],
+  apply(ctx: Context) {
+    ctx.provide("attachments", new Attachments(ctx.config.dataDir));
+  },
+};
+
+export const terminals = {
+  name: "terminals",
+  apply(ctx: Context) {
+    const service = new WorkspaceTerminals();
+    ctx.effect(function* () {
+      yield ctx.provide("terminals", service);
+      yield () => service.close();
+    });
   },
 };
 

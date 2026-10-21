@@ -194,14 +194,26 @@ export function useWorkbench(): Workbench {
     });
   }
 
-  async function send(text: string): Promise<boolean> {
+  async function send(text: string, files: File[] = []): Promise<boolean> {
     const id = state.activeId;
-    if (id === null || text.trim() === "" || state.taskRunning || sendingNow.current)
+    if (
+      id === null ||
+      (text.trim() === "" && files.length === 0) ||
+      state.taskRunning ||
+      sendingNow.current
+    )
       return false;
     sendingNow.current = true;
     setSending(true);
     try {
-      await client.sendMessage(id, text.trim());
+      const attachments = await Promise.all(
+        files.map((file) => client.uploadAttachment(id, file)),
+      );
+      await client.sendMessage(
+        id,
+        text.trim(),
+        attachments.map((file) => file.id),
+      );
       return true;
     } catch (error: unknown) {
       dispatch({ type: "notice", notice: describe(error) });
@@ -275,7 +287,7 @@ export interface Workbench {
     requestId: string,
     approved: boolean,
   ) => Promise<void>;
-  send: (text: string) => Promise<boolean>;
+  send: (text: string, files?: File[]) => Promise<boolean>;
   cancel: () => Promise<void>;
   compact: () => Promise<void>;
   updateSettings: (patch: SettingsPatch) => Promise<boolean>;

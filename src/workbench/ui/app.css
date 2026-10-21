@@ -1,4 +1,5 @@
 @import "tailwindcss" source(none);
+@import "@xterm/xterm/css/xterm.css";
 @source "./";
 
 @font-face {

@@ -33,6 +33,7 @@ export type TaskContext = Pick<
   | "skills"
   | "model"
   | "compaction"
+  | "attachments"
   | "emit"
 >;
 

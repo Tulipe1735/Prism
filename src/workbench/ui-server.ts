@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { extname, relative, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { MAX_ATTACHMENT_BYTES } from "../shared/attachments.ts";
 
 /** Prefix the browser uses for everything that belongs to the kernel. */
 export const KERNEL_PREFIX = "/kernel";
@@ -125,7 +126,12 @@ export async function startUiServer(
           request.headers["content-type"] === undefined
             ? {}
             : { "content-type": request.headers["content-type"] },
-        body: await readBody(request),
+        body: await readBody(
+          request,
+          /\/sessions\/[^/]+\/attachments$/.test(url.pathname)
+            ? MAX_ATTACHMENT_BYTES
+            : MAX_BODY_BYTES,
+        ),
         signal: controller.signal,
       });
     } catch (error) {
@@ -185,14 +191,17 @@ export async function startUiServer(
   };
 }
 
-async function readBody(request: IncomingMessage): Promise<Buffer | undefined> {
+async function readBody(
+  request: IncomingMessage,
+  limit: number,
+): Promise<Buffer | undefined> {
   if (request.method === "GET" || request.method === "HEAD") return undefined;
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
     const buffer = Buffer.from(chunk as Buffer);
     size += buffer.byteLength;
-    if (size > MAX_BODY_BYTES) throw new Error("Request body is too large");
+    if (size > limit) throw new Error("Request body is too large");
     chunks.push(buffer);
   }
   return Buffer.concat(chunks);

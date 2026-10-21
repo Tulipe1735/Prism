@@ -15,6 +15,7 @@
     "dist",
     "skills",
     "commands",
+    "patches",
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
@@ -40,12 +41,15 @@
     "@clerk/localizations": "4.23.0",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@radix-ui/react-dropdown-menu": "2.2.1",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
     "chrome-remote-interface": "0.34.0",
     "cordis": "4.0.0-rc.11",
     "electron-store": "8.2.0",
     "electron-updater": "6.8.9",
     "html-to-text": "^10.0.1",
     "lucide-react": "^1.59.0",
+    "node-pty": "1.1.0",
     "playwright": "^1.64.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -75,5 +79,10 @@
   },
   "packageManager": "pnpm@9.15.9",
   "main": "dist/workbench/electron/main.cjs",
-  "productName": "Prism"
+  "productName": "Prism",
+  "pnpm": {
+    "patchedDependencies": {
+      "node-pty@1.1.0": "patches/node-pty@1.1.0.patch"
+    }
+  }
 }

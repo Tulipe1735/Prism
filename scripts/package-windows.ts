@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
@@ -40,7 +40,7 @@ await bundle({
   platform: "node",
   format: "cjs",
   target: "node22",
-  external: ["playwright"],
+  external: ["playwright", "node-pty"],
   legalComments: "linked",
   define: { "import.meta.url": "__prismModuleUrl" },
   banner: {
@@ -73,9 +73,39 @@ for (const [name, manifest] of [
   });
 }
 
+// Native modules must keep their package layout so node-pty can locate its
+// N-API binaries and ConPTY helpers. Its Windows binaries also ship on Linux.
+const ptyRoot = dirname(localRequire.resolve("node-pty/package.json"));
+const ptyDestination = join(runtime, "node_modules/node-pty");
+for (const entry of ["lib", "prebuilds", "build/Release", "package.json", "LICENSE"]) {
+  if (await stat(join(ptyRoot, entry)).catch(() => null))
+    await cp(join(ptyRoot, entry), join(ptyDestination, entry), {
+      recursive: true,
+      dereference: true,
+    });
+}
+
 // The same kernel and Playwright packages run on Windows with Electron's Node
 // runtime. Keep them outside app.asar; no WSL or separate Node install is needed.
 await cp(runtime, join(resources, "native"), { recursive: true });
+
+if (process.platform === "win32") {
+  // Release builders need a WSL C++ toolchain for the Linux PTY. End users
+  // receive the built module and never compile or install it themselves.
+  const ptyVersion: string = localRequire("node-pty/package.json").version;
+  execFileSync("wsl.exe", ["--exec", "sh", "-s", "--", ptyDestination, ptyVersion], {
+    input: `set -eu
+destination="$(wslpath -u "$1")"
+build="$(mktemp -d)"
+trap 'rm -rf "$build"' EXIT
+npm --prefix "$build" install --no-audit --no-fund --no-package-lock "node-pty@$2"
+rm -rf "$destination/build/Release"
+mkdir -p "$destination/build"
+cp -R "$build/node_modules/node-pty/build/Release" "$destination/build/Release"
+`,
+    stdio: ["pipe", "inherit", "inherit"],
+  });
+}
 
 const filename = `node-v${nodeVersion}-linux-x64.tar.xz`;
 const nodeUrl = `https://nodejs.org/dist/v${nodeVersion}/`;

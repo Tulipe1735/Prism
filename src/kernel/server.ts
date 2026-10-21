@@ -54,6 +54,7 @@ export async function startKernel(
 ): Promise<RunningKernel> {
   const kernel = await Kernel.create(options);
   const clients = new Set<ServerResponse>();
+  const terminalClients = new Set<ServerResponse>();
   // 订阅内核产生的事件，然后把这些事件通过 SSE 推送给所有已连接的客户端。
   const unsubscribe = kernel.subscribe((event) => {
     for (const client of clients) writeEvent(client, event);
@@ -70,7 +71,7 @@ export async function startKernel(
   });
 
   const keepAlive = setInterval(() => {
-    for (const client of clients) {
+    for (const client of [...clients, ...terminalClients]) {
       if (!client.writableEnded) client.write(": keep-alive\n\n");
     }
   }, KEEP_ALIVE_MS);
@@ -85,6 +86,8 @@ export async function startKernel(
     unsubscribe();
     for (const client of clients) client.end();
     clients.clear();
+    for (const client of terminalClients) client.end();
+    terminalClients.clear();
     await kernel.close();
     const draining = new Promise<void>((resolve) => server.close(() => resolve()));
     server.closeAllConnections();
@@ -123,6 +126,67 @@ export async function startKernel(
     if (segments[0] === "events" && segments.length === 1 && method === "GET") {
       openStream(response);
       return;
+    }
+    if (segments[0] === "terminals") {
+      if (segments.length === 1 && method === "POST") {
+        const body = await readJson(request);
+        sendJson(
+          response,
+          201,
+          await kernel.ctx.terminals.open(
+            requireText(body, "workspace"),
+            dimension(body, "cols"),
+            dimension(body, "rows"),
+          ),
+        );
+        return;
+      }
+      const id = segments[1];
+      if (
+        id !== undefined &&
+        segments.length === 3 &&
+        segments[2] === "events" &&
+        method === "GET"
+      ) {
+        const unsubscribeTerminal = kernel.ctx.terminals.subscribe(id, (event) => {
+          if (!response.headersSent) {
+            response.writeHead(200, {
+              "content-type": "text/event-stream",
+              "cache-control": "no-cache",
+              connection: "keep-alive",
+            });
+            terminalClients.add(response);
+          }
+          response.write(`data: ${JSON.stringify(event)}\n\n`);
+        });
+        const drop = (): void => {
+          unsubscribeTerminal();
+          terminalClients.delete(response);
+        };
+        response.on("close", drop);
+        response.on("error", drop);
+        return;
+      }
+      if (id !== undefined && segments.length === 3 && method === "POST") {
+        const body = await readJson(request);
+        if (segments[2] === "input") {
+          const data = field(body, "data");
+          if (typeof data !== "string" || data.length > 64_000)
+            throw new KernelError("INVALID_REQUEST", "终端输入无效。");
+          kernel.ctx.terminals.write(id, data);
+          sendJson(response, 200, { written: true });
+          return;
+        }
+        if (segments[2] === "resize") {
+          kernel.ctx.terminals.resize(
+            id,
+            dimension(body, "cols"),
+            dimension(body, "rows"),
+          );
+          sendJson(response, 200, { resized: true });
+          return;
+        }
+      }
     }
     if (segments[0] === "plugins" && segments.length === 1) {
       if (method === "GET") {
@@ -168,6 +232,14 @@ export async function startKernel(
     }
     if (segments[0] === "sessions" && segments.length >= 2) {
       const sessionId = decodeURIComponent(segments[1] as string);
+      if (segments.length === 3 && segments[2] === "attachments" && method === "POST") {
+        await kernel.readSession(sessionId);
+        const name = url.searchParams.get("name") ?? "";
+        sendJson(response, 201, {
+          attachment: await kernel.ctx.attachments.upload(sessionId, name, request),
+        });
+        return;
+      }
       if (segments.length === 2 && method === "GET") {
         sendJson(response, 200, await kernel.readSession(sessionId));
         return;
@@ -187,7 +259,15 @@ export async function startKernel(
       // 收到 POST /sessions/:id/messages 请求时，内核会调用 sendMessage 方法将消息发送到指定的会话中，并返回一个 entryId，表示消息在会话日志中的唯一标识。
       if (segments[2] === "messages" && segments.length === 3 && method === "POST") {
         const body = await readJson(request);
-        const entryId = await kernel.sendMessage(sessionId, requireText(body, "text"));
+        const text = field(body, "text");
+        const attachments = field(body, "attachments") ?? [];
+        if (
+          typeof text !== "string" ||
+          !Array.isArray(attachments) ||
+          !attachments.every((id) => typeof id === "string")
+        )
+          throw new KernelError("INVALID_REQUEST", "消息需要文本和文件标识列表。");
+        const entryId = await kernel.sendMessage(sessionId, text, attachments);
         sendJson(response, 202, { entryId });
         return;
       }
@@ -354,6 +434,16 @@ function requireBoolean(body: unknown, key: string): boolean {
   const value = field(body, key);
   if (typeof value !== "boolean")
     throw new KernelError("INVALID_REQUEST", `"${key}" must be a boolean`);
+  return value;
+}
+
+function dimension(body: unknown, key: string): number {
+  const value = field(body, key);
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 2 || value > 500)
+    throw new KernelError(
+      "INVALID_REQUEST",
+      `"${key}" must be an integer between 2 and 500`,
+    );
   return value;
 }
 

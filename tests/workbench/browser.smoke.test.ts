@@ -1,6 +1,9 @@
 import type { Tool } from "../../src/kernel/tool.ts";
+import { Buffer } from "node:buffer";
 import { existsSync, statSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
+import process from "node:process";
 import { type Browser, chromium, type Page } from "playwright";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type RunningUiServer, startUiServer } from "../../src/workbench/ui-server.ts";
@@ -66,6 +69,118 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     await browser?.close();
   });
 
+  it("names sessions, attaches picked and dropped files, and keeps a collapsible workspace terminal", async () => {
+    harness = await startTestKernel({
+      answers: [{ text: ["已经收到需求文件。"] }],
+      titleAnswer: { text: ["分析需求文件"] },
+    });
+    ui = await startUiServer({ kernelUrl: harness.kernel.url, uiRoot: UI_ROOT });
+    page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(ui.url);
+    await page.waitForSelector('[data-kernel-status="ready"]');
+    expect(await page.locator("#topbar").textContent()).not.toContain("内核就绪");
+    await page.fill("#workspace-input", harness.workspace);
+    await page.click('[data-action="use-workspace"]');
+    await page.locator(".workspace-heading").hover();
+    await page.click('[data-action="new-session"]');
+    await page.waitForSelector("#chat-header strong");
+    expect(await page.locator("#chat-header strong").textContent()).toBe(
+      "workspace · 新会话",
+    );
+    const original = (await harness.kernel.kernel.listSessions())[0]!;
+    await page.locator("#file-input").setInputFiles({
+      name: "需求.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("需要添加附件与终端。"),
+    });
+    await page.evaluate(`(() => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(["补充需求"], "补充.txt", { type: "text/plain" }));
+      document
+        .getElementById("timeline")
+        .dispatchEvent(
+          new DragEvent("drop", {
+            bubbles: true,
+            cancelable: true,
+            dataTransfer: transfer,
+          }),
+        );
+    })()`);
+    await page.waitForSelector('ul[aria-label="待发送文件"] >> text=补充.txt');
+    await page.getByRole("button", { name: "移除 补充.txt" }).click();
+    expect(await page.locator('ul[aria-label="待发送文件"] li').count()).toBe(1);
+    const model = (await page.locator("#composer-model").boundingBox())!;
+    const send = (await page.locator("#send").boundingBox())!;
+    const attach = (await page.locator("#attach-file").boundingBox())!;
+    expect(attach.x).toBeLessThan(model.x);
+    expect(model.x + model.width).toBeLessThan(send.x);
+    await page.click("#send");
+    await page.waitForSelector(".entry.assistant >> text=已经收到需求文件。");
+    expect(await page.locator("#chat-header strong").textContent()).toBe(
+      "分析需求文件",
+    );
+    expect(await page.locator('ul[aria-label="已发送文件"]').textContent()).toContain(
+      "需求.md",
+    );
+    expect(await page.locator('ul[aria-label="待发送文件"]').count()).toBe(0);
+    const log = await harness.kernel.kernel.readSession(original.id);
+    expect(log.entries[0]).toMatchObject({ attachments: [{ name: "需求.md" }] });
+
+    const terminal = page.locator("#terminal-panel");
+    const output = page.locator("#terminal-panel .xterm-rows");
+    const run = async (command: string): Promise<void> => {
+      await terminal.locator("textarea").focus();
+      await page.keyboard.type(command);
+      await page.keyboard.press("Enter");
+    };
+    await page.click("#terminal-toggle");
+    await page.waitForSelector("#terminal-panel .xterm-rows");
+    await expect.poll(() => output.textContent()).toContain(harness.workspace);
+    const windows = process.platform === "win32";
+    await run(windows ? "$env:PRISM_PANEL_VALUE='42'" : "export PRISM_PANEL_VALUE=42");
+    await run(
+      windows
+        ? "Write-Output ('panel:' + $env:PRISM_PANEL_VALUE)"
+        : "printf 'panel:%s\\n' \"$PRISM_PANEL_VALUE\"",
+    );
+    await expect.poll(() => output.textContent()).toContain("panel:42");
+    await page.click("#terminal-toggle");
+    expect(await terminal.isVisible()).toBe(false);
+    await page.click("#terminal-toggle");
+    expect(await output.textContent()).toContain("panel:42");
+
+    const otherWorkspace = join(harness.workspace, "other-project");
+    await mkdir(otherWorkspace);
+    const other = await harness.kernel.kernel.createSession({
+      workspace: otherWorkspace,
+    });
+    await page.click(`[data-action="open-session"][data-session="${other.id}"]`);
+    await expect.poll(() => output.textContent()).toContain(otherWorkspace);
+    await page.click(`[data-action="open-session"][data-session="${original.id}"]`);
+    await expect.poll(() => output.textContent()).toContain("panel:42");
+    await run(
+      windows
+        ? "Write-Output ('retained:' + $env:PRISM_PANEL_VALUE)"
+        : "printf 'retained:%s\\n' \"$PRISM_PANEL_VALUE\"",
+    );
+    await expect.poll(() => output.textContent()).toContain("retained:42");
+    for (const width of [390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 844 });
+      expect(
+        await page.evaluate(
+          "document.documentElement.scrollWidth <= window.innerWidth",
+        ),
+      ).toBe(true);
+      const composer = (await page.locator("#composer").boundingBox())!;
+      expect(composer.y + composer.height).toBeLessThan(844);
+    }
+    await page.setViewportSize({ width: 1440, height: 920 });
+    await page.screenshot({ path: "/tmp/prism-workbench-update.png" });
+    expect(errors).toEqual([]);
+  });
+
   it(
     "runs the acceptance path: workspace, session, streaming, diff, approval",
     { timeout: 120_000 },
@@ -118,7 +233,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
 
       // A plain browser talking to the UI origin only, exactly like Electron does.
       await page.goto(ui.url);
-      await page.waitForSelector('#kernel-status [data-status="ready"]');
+      await page.waitForSelector('[data-kernel-status="ready"]');
 
       await page.fill("#workspace-input", harness.workspace);
       await page.click('[data-action="use-workspace"]');
@@ -253,7 +368,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(ui.url);
-    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    await page.waitForSelector('[data-kernel-status="ready"]');
     expect(await page.locator("#message").isDisabled()).toBe(true);
 
     await page.getByRole("button", { name: "切换会话导航" }).click();
@@ -308,7 +423,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(ui.url);
-    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    await page.waitForSelector('[data-kernel-status="ready"]');
 
     const navigation = page.getByRole("button", { name: "切换会话导航" });
     const inspector = page.getByRole("button", { name: "切换产物与设置" });
@@ -432,7 +547,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     ui = await startUiServer({ kernelUrl: harness.kernel.url, uiRoot: UI_ROOT });
     page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
     await page.goto(ui.url);
-    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    await page.waitForSelector('[data-kernel-status="ready"]');
     await page.waitForSelector('[data-action="new-session"]');
     await page.fill("#workspace-input", harness.workspace);
     await page.click('[data-action="use-workspace"]');
@@ -512,7 +627,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
       };
     `);
     await page.goto(ui.url);
-    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    await page.waitForSelector('[data-kernel-status="ready"]');
     const browse = page.getByRole("button", { name: "选择文件夹…", exact: true });
     await browse.click();
     expect(await page.locator("#workspace-input").inputValue()).toBe(harness.workspace);
@@ -576,7 +691,7 @@ export function apply(ctx) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(ui.url);
-    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    await page.waitForSelector('[data-kernel-status="ready"]');
     await page.click('[data-view="settings"]');
     const toggle = page.locator('[data-action="toggle-creator"]');
     expect(await toggle.getAttribute("aria-pressed")).toBe("false");
@@ -638,7 +753,7 @@ export function apply(ctx) {
       };
     `);
     await page.goto(ui.url);
-    await page.waitForSelector('#kernel-status [data-status="ready"]');
+    await page.waitForSelector('[data-kernel-status="ready"]');
     await page.getByRole("button", { name: "切换会话导航" }).click();
     const account = page.getByRole("button", { name: "账户与更新" });
     const position = await account.boundingBox();

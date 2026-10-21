@@ -3,6 +3,7 @@ import type { ExecutionTarget } from "./types.ts";
 import { notifySession } from "./context.ts";
 import { KernelError } from "./errors.ts";
 import { runTask } from "./loop.ts";
+import { nameSession } from "./session-title.ts";
 
 interface Run {
   controller: AbortController;
@@ -33,7 +34,11 @@ export class Tasks {
   }
 
   /** Reserve synchronously, before reading or appending, so concurrent sends cannot overlap. */
-  async send(sessionId: string, text: string): Promise<string> {
+  async send(
+    sessionId: string,
+    text: string,
+    attachmentIds: string[] = [],
+  ): Promise<string> {
     if (this.closed) throw new Error("The task service is stopping");
     const previous = this.runs.get(sessionId);
     if (previous !== undefined && !previous.controller.signal.aborted)
@@ -47,18 +52,27 @@ export class Tasks {
     const started = Promise.resolve().then(async () => {
       await previous?.settled;
       const session = await this.ctx.sessions.summary(sessionId);
+      const attachments = await this.ctx.attachments.read(sessionId, attachmentIds);
+      if (text.trim() === "" && attachments.length === 0)
+        throw new KernelError("INVALID_REQUEST", "消息和附件不能同时为空。");
       const entry = await this.ctx.sessions.append(sessionId, {
         type: "message",
         role: "user",
         content: text,
+        ...(attachments.length === 0 ? {} : { attachments }),
       });
       await notifySession(this.ctx, sessionId);
-      return { session, entry };
+      return {
+        session,
+        entry,
+        titleText: text.trim() || attachments.map((file) => file.name).join("、"),
+      };
     });
     const settled = started
       .then(
-        ({ session }) =>
-          runTask({
+        async ({ session, titleText }) => {
+          await nameSession(this.ctx, session, titleText, controller.signal);
+          return runTask({
             ctx: this.ctx,
             sessionId,
             workspace: session.workspace,
@@ -67,7 +81,8 @@ export class Tasks {
             signal: controller.signal,
           }).catch((error: unknown) => {
             console.error(`Task in session ${sessionId} failed:`, error);
-          }),
+          });
+        },
         () => {},
       )
       .finally(() => {

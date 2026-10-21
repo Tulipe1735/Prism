@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadConfig } from "../../src/kernel/config.ts";
 import { type RunningKernel, startKernel } from "../../src/kernel/server.ts";
+import { SESSION_TITLE_PROMPT } from "../../src/kernel/session-title.ts";
 import { readString } from "../../src/kernel/tool-support.ts";
 
 /**
@@ -80,6 +81,7 @@ export interface FakeModel {
   baseUrl: string;
   /** Request bodies the model received, in order. */
   requests: ModelRequest[];
+  titleRequests: ModelRequest[];
   close: () => Promise<void>;
 }
 
@@ -91,9 +93,13 @@ function sseChunk(payload: unknown): string {
  * A scripted OpenAI-compatible model: one answer per request. Tool call
  * arguments arrive in two fragments, so tests exercise assembly.
  */
-export async function startFakeModel(answers: FakeAnswer[]): Promise<FakeModel> {
+export async function startFakeModel(
+  answers: FakeAnswer[],
+  titleAnswer: FakeAnswer = { text: ["处理当前任务"] },
+): Promise<FakeModel> {
   const remaining = [...answers];
   const requests: ModelRequest[] = [];
+  const titleRequests: ModelRequest[] = [];
   const server: Server = createServer((request, response) => {
     let raw = "";
     request.on("data", (chunk: Buffer) => {
@@ -101,8 +107,9 @@ export async function startFakeModel(answers: FakeAnswer[]): Promise<FakeModel> 
     });
     request.on("end", () => {
       const parsed = JSON.parse(raw) as ModelRequest;
-      requests.push(parsed);
-      const scripted = remaining.shift() ?? { text: [] };
+      const naming = parsed.messages[0]?.content === SESSION_TITLE_PROMPT;
+      (naming ? titleRequests : requests).push(parsed);
+      const scripted = naming ? titleAnswer : (remaining.shift() ?? { text: [] });
       let answer: FakeAnswer;
       try {
         answer =
@@ -182,6 +189,7 @@ export async function startFakeModel(answers: FakeAnswer[]): Promise<FakeModel> 
   return {
     baseUrl: `http://127.0.0.1:${address.port}/v1`,
     requests,
+    titleRequests,
     close: async () => {
       const closed = new Promise<void>((resolve) => server.close(() => resolve()));
       server.closeAllConnections();
@@ -333,6 +341,7 @@ export async function readSessionLog(
 export async function startTestKernel(
   options: {
     answers?: FakeAnswer[];
+    titleAnswer?: FakeAnswer;
     tools?: Tool[];
     scope?: PermissionScope;
     browserActionsNeedApproval?: boolean;
@@ -376,7 +385,7 @@ export async function startTestKernel(
       JSON.stringify(options.mcpConfig),
       "utf8",
     );
-  const model = await startFakeModel(options.answers ?? []);
+  const model = await startFakeModel(options.answers ?? [], options.titleAnswer);
   const config = await loadConfig({
     dataDir,
     overrides: {

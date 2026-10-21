@@ -1,5 +1,6 @@
 import type { PermissionAction } from "../../kernel/permissions.ts";
 import type {
+  Attachment,
   MessageRole,
   SessionEntry,
   SessionSummary,
@@ -66,6 +67,7 @@ export interface MessageStep {
   id: string;
   role: MessageRole;
   content: string;
+  attachments?: Attachment[];
   /** Text that arrived as `message.delta` and is not in the log yet. */
   streaming: boolean;
 }
@@ -121,6 +123,9 @@ export function toTimeline(
           id: entry.id,
           role: entry.role,
           content: entry.content,
+          ...(entry.attachments === undefined
+            ? {}
+            : { attachments: entry.attachments }),
           streaming: false,
         });
         break;

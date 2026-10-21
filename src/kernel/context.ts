@@ -1,6 +1,7 @@
 import type { Context } from "cordis";
 import type { SkillScan } from "../skills/loader.ts";
 import type { Approvals } from "./approvals.ts";
+import type { Attachments } from "./attachments.ts";
 import type { CompactionOutcome, CompactionReason } from "./compaction.ts";
 import type { PrismConfig } from "./config.ts";
 import type { Creator } from "./creator.ts";
@@ -10,6 +11,7 @@ import type { ChatEvent, StreamChatOptions } from "./model.ts";
 import type { PermissionPolicy } from "./permissions.ts";
 import type { SessionStore } from "./session-store.ts";
 import type { Tasks } from "./tasks.ts";
+import type { WorkspaceTerminals } from "./terminal.ts";
 import type { ToolRegistry } from "./tools.ts";
 
 export interface Model {
@@ -40,6 +42,8 @@ declare module "cordis" {
     compaction: Compaction;
     creator: Creator;
     tasks: Tasks;
+    attachments: Attachments;
+    terminals: WorkspaceTerminals;
   }
 
   interface Events {

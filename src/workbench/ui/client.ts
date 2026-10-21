@@ -5,7 +5,8 @@ import type {
   KernelStatusReport,
   SettingsPatch,
 } from "../../kernel/kernel.ts";
-import type { SessionEntry, SessionSummary } from "../../kernel/session.ts";
+import type { Attachment, SessionEntry, SessionSummary } from "../../kernel/session.ts";
+import type { TerminalEvent } from "../../kernel/terminal.ts";
 import { readSseData } from "../../shared/sse.ts";
 
 export type { SettingsPatch };
@@ -126,10 +127,22 @@ export class KernelClient {
     });
   }
 
-  async sendMessage(sessionId: string, text: string): Promise<string> {
+  async uploadAttachment(sessionId: string, file: File): Promise<Attachment> {
+    const { attachment } = await this.request<{ attachment: Attachment }>(
+      `/sessions/${encodeURIComponent(sessionId)}/attachments?name=${encodeURIComponent(file.name)}`,
+      { method: "POST", upload: file },
+    );
+    return attachment;
+  }
+
+  async sendMessage(
+    sessionId: string,
+    text: string,
+    attachments: string[] = [],
+  ): Promise<string> {
     const { entryId } = await this.request<{ entryId: string }>(
       `/sessions/${encodeURIComponent(sessionId)}/messages`,
-      { method: "POST", body: { text } },
+      { method: "POST", body: { text, attachments } },
     );
     return entryId;
   }
@@ -168,6 +181,43 @@ export class KernelClient {
     await this.request("/shutdown", { method: "POST" });
   }
 
+  openTerminal(workspace: string, cols: number, rows: number): Promise<{ id: string }> {
+    return this.request("/terminals", {
+      method: "POST",
+      body: { workspace, cols, rows },
+    });
+  }
+
+  async writeTerminal(id: string, data: string): Promise<void> {
+    await this.request(`/terminals/${encodeURIComponent(id)}/input`, {
+      method: "POST",
+      body: { data },
+    });
+  }
+
+  async resizeTerminal(id: string, cols: number, rows: number): Promise<void> {
+    await this.request(`/terminals/${encodeURIComponent(id)}/resize`, {
+      method: "POST",
+      body: { cols, rows },
+    });
+  }
+
+  async readTerminal(
+    id: string,
+    onEvent: (event: TerminalEvent) => void,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const response = await this.fetchImpl(
+      `${this.baseUrl}/terminals/${encodeURIComponent(id)}/events`,
+      { signal },
+    );
+    if (!response.ok || response.body === null)
+      throw new Error("终端连接失败，请重新连接。");
+    for await (const data of readSseData(response.body))
+      onEvent(JSON.parse(data) as TerminalEvent);
+    if (!signal.aborted) throw new Error("终端连接已断开，请重新连接。");
+  }
+
   /** Subscribes to `/events`; the returned function stops the stream for good. */
   openEvents(handlers: EventStreamHandlers): () => void {
     const controller = new AbortController();
@@ -198,12 +248,19 @@ export class KernelClient {
 
   private async request<T = unknown>(
     path: string,
-    options: { method?: string; body?: unknown } = {},
+    options: { method?: string; body?: unknown; upload?: File } = {},
   ): Promise<T> {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method: options.method ?? "GET",
-      headers: options.body === undefined ? {} : { "content-type": "application/json" },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      headers:
+        options.upload !== undefined
+          ? { "content-type": options.upload.type || "application/octet-stream" }
+          : options.body === undefined
+            ? {}
+            : { "content-type": "application/json" },
+      body:
+        options.upload ??
+        (options.body === undefined ? undefined : JSON.stringify(options.body)),
     });
     const payload = (await response.json().catch(() => null)) as {
       error?: { code: string; message: string };

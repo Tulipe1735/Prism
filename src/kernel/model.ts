@@ -17,7 +17,23 @@ export interface ChatMessage {
 export function toModelMessages(messages: ContextMessage[]): ChatMessage[] {
   return messages.map((message) => ({
     role: message.role,
-    content: message.content,
+    content:
+      message.attachments === undefined || message.attachments.length === 0
+        ? message.content
+        : [
+            message.content,
+            "Attached local files (use file tools to inspect their contents):",
+            ...message.attachments.map((file) =>
+              JSON.stringify({
+                name: file.name,
+                path: file.path,
+                size: file.size,
+                mediaType: file.mediaType,
+              }),
+            ),
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
     ...(message.toolCalls === undefined ? {} : { toolCalls: message.toolCalls }),
     ...(message.toolCallId === undefined ? {} : { toolCallId: message.toolCallId }),
   }));

@@ -20,6 +20,7 @@ export const tasks = {
     "skills",
     "model",
     "compaction",
+    "attachments",
   ],
   apply(ctx: Context, options: KernelOptions) {
     const service = new Tasks(
@@ -40,6 +41,8 @@ export async function createContext(options: KernelOptions): Promise<Context> {
     await ctx.plugin(core.configuration, options);
     await Promise.all([
       ctx.plugin(core.sessions),
+      ctx.plugin(core.attachments),
+      ctx.plugin(core.terminals),
       ctx.plugin(core.tools),
       ctx.plugin(core.model),
       ctx.plugin(core.approvals),

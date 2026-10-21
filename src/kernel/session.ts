@@ -24,6 +24,15 @@ export interface MessageEntry extends SessionEntryBase {
   type: "message";
   role: MessageRole;
   content: string;
+  attachments?: Attachment[];
+}
+
+export interface Attachment {
+  id: string;
+  name: string;
+  path: string;
+  size: number;
+  mediaType: string;
 }
 
 /** One tool call the model asked for; `arguments` is the JSON text as received. */
@@ -62,6 +71,7 @@ export type SessionEntryInput =
       type: "message";
       role: MessageRole;
       content: string;
+      attachments?: Attachment[];
       parentId?: string | null;
       /** Set by the task loop so streamed deltas carry the id of the persisted entry. */
       id?: string;
@@ -116,6 +126,7 @@ export function compareSessions(a: SessionSummary, b: SessionSummary): number {
 export interface ContextMessage {
   role: MessageRole;
   content: string;
+  attachments?: Attachment[];
   entryId: string;
   summary?: true;
   /** Tool calls of an assistant message; `arguments` is the JSON text as received. */
@@ -187,6 +198,9 @@ export function rebuildContext(
           role: entry.role,
           content: entry.content,
           entryId: entry.id,
+          ...(entry.attachments === undefined
+            ? {}
+            : { attachments: entry.attachments }),
         };
         messages.push(message);
         openAssistant = entry.role === "assistant" ? message : null;
