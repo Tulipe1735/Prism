@@ -1,6 +1,6 @@
 {
   "name": "@tulipe1735/prism",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Extensible personal agent workbench for Windows and WSL, powered by Cordis. Creator Mode builds and hot-loads plugins from natural-language requests; browser automation is also available as a standalone CLI.",
   "license": "MIT",
   "repository": {
