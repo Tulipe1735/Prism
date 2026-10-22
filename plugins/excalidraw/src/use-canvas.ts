@@ -12,6 +12,7 @@ interface CanvasEditorDocument {
   change: (scene: CanvasScene) => void;
   retry: () => Promise<void>;
   reload: () => Promise<void>;
+  save: () => Promise<void>;
 }
 
 /** One autosave writer per editor; preserve pending edits across session switches. */
@@ -83,6 +84,7 @@ export function useCanvasDocument(
   }, [backup, client, sessionId]);
 
   useEffect(() => {
+    if (!connected) return;
     live.current = true;
     let disposed = false;
     void client
@@ -90,6 +92,7 @@ export function useCanvasDocument(
       .then((document) => {
         if (disposed) return;
         revision.current = document.revision;
+        blocked.current = false;
         let draft: CanvasDocument | null = null;
         try {
           draft = JSON.parse(
@@ -139,7 +142,7 @@ export function useCanvasDocument(
       window.removeEventListener("beforeunload", beforeUnload);
       void flush();
     };
-  }, [client, flush, key, sessionId]);
+  }, [client, connected, flush, key, sessionId]);
 
   useEffect(() => {
     wanted.current = remoteRevision;
@@ -198,5 +201,12 @@ export function useCanvasDocument(
     setStatus("saved");
     setError(null);
   }
-  return { scene, status, error, change, retry, reload };
+  async function save(): Promise<void> {
+    // An in-flight autosave must finish before the Agent reads this scene.
+    while (saving.current) await new Promise((resolve) => setTimeout(resolve, 25));
+    await flush();
+    if (pending.current !== null || blocked.current)
+      throw new Error("请先处理画布保存错误或冲突，再发送给 AI。");
+  }
+  return { scene, status, error, change, retry, reload, save };
 }

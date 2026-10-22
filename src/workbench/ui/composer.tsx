@@ -1,7 +1,9 @@
 import type { JSX } from "react";
 import type { Workbench } from "./use-workbench.ts";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   ArrowUp,
+  Check,
   ChevronDown,
   FileText,
   Paperclip,
@@ -12,13 +14,13 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { THINKING_EFFORTS, type ThinkingEffort } from "../../kernel/types.ts";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS } from "../../shared/attachments.ts";
-import { Button, SCOPE_LABELS, workspaceName } from "./components.tsx";
+import { Button, SCOPE_LABELS } from "./components.tsx";
 import { PluginSlot } from "./plugin-slots.tsx";
 
 const THINKING_LABELS: Record<ThinkingEffort, string> = {
-  low: "低",
-  high: "高",
-  max: "最高",
+  low: "low",
+  high: "high",
+  max: "max",
 };
 
 export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
@@ -119,7 +121,7 @@ export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
   }, [addFiles, enabled, workbench.dispatch]);
 
   async function send(): Promise<void> {
-    if (busy) return;
+    if (workbench.sending || !enabled) return;
     const message = draft;
     const attached = files;
     if (await workbench.send(message, attached)) {
@@ -131,7 +133,7 @@ export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
     <div className="shrink-0 px-5 pt-3 pb-4 md:px-8 md:pb-6 lg:px-12">
       <form
         id="composer"
-        className={`relative mx-auto max-w-3xl rounded-lg border bg-paper transition-[border-color,box-shadow] duration-200 focus-within:border-accent/40 focus-within:shadow-[0_1px_3px_rgba(37,99,235,0.06)] focus-within:ring-2 focus-within:ring-accent/10 ${dragging ? "border-accent ring-2 ring-accent/20" : "border-line"}`}
+        className={`relative mx-auto max-w-[45rem] rounded-lg border bg-paper transition-[border-color,box-shadow] duration-200 focus-within:border-ink/25 focus-within:shadow-[0_2px_8px_rgba(55,53,47,0.06)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/30 ${dragging ? "border-accent ring-2 ring-accent/20" : "border-line"}`}
         onSubmit={(event) => {
           event.preventDefault();
           void send();
@@ -204,7 +206,7 @@ export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
               ? "新建或选择一个会话，开始你的任务…"
               : "你想完成什么？"
           }
-          className="block max-h-48 min-h-[88px] w-full border-0 bg-transparent px-4 pt-4 pb-2 text-sm leading-6 outline-none placeholder:text-muted/60 focus-visible:outline-none disabled:cursor-not-allowed md:px-5"
+          className="block max-h-48 min-h-[104px] w-full border-0 bg-transparent px-4 pt-4 pb-2 text-base leading-7 outline-none placeholder:text-muted focus-visible:outline-none disabled:cursor-not-allowed md:px-5"
           onKeyDown={(event) => {
             if (
               event.key === "Enter" &&
@@ -219,7 +221,7 @@ export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
         />
         <PluginSlot slot="composer.toolbar" />
         <div className="flex min-h-11 items-center justify-between gap-2 px-3 pb-3 md:px-4">
-          <div className="flex min-w-0 items-center gap-2 text-[13px] text-muted">
+          <div className="flex min-w-0 items-center gap-2 text-sm text-muted">
             <Button
               id="attach-file"
               variant="ghost"
@@ -240,47 +242,28 @@ export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
               </span>
             </span>
           </div>
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <span
               id="composer-model"
-              className="max-w-36 truncate text-[13px] text-muted sm:max-w-56"
+              className="max-w-36 truncate text-sm text-muted sm:max-w-56"
               title={state.settings?.model.model}
             >
               {state.settings?.model.model}
             </span>
-            <label className="relative flex shrink-0 items-center">
-              <span className="sr-only">思考强度</span>
-              <select
-                id="composer-thinking"
-                value={state.settings?.model.thinking ?? "high"}
-                disabled={state.settings === null}
-                title="思考强度：回答前的推理深度"
-                onChange={(event) =>
-                  void workbench.updateSettings({
-                    model: { thinking: event.target.value as ThinkingEffort },
-                  })
-                }
-                className="h-7 min-h-7 appearance-none rounded-full border border-line bg-transparent py-0 pr-6 pl-2.5 text-[13px] text-muted transition-colors hover:border-accent/40 hover:text-ink focus-visible:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {THINKING_EFFORTS.map((effort) => (
-                  <option key={effort} value={effort}>
-                    思考 {THINKING_LABELS[effort]}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={12}
-                aria-hidden="true"
-                className="pointer-events-none absolute right-2 text-muted"
-              />
-            </label>
+            <ThinkingEffortMenu
+              value={state.settings?.model.thinking ?? "high"}
+              disabled={state.settings === null}
+              onChange={(thinking) =>
+                void workbench.updateSettings({ model: { thinking } })
+              }
+            />
             {busy ? (
               <Button
                 id="cancel"
                 data-action="cancel"
                 variant="primary"
                 disabled={!state.taskRunning || !state.connected}
-                className="size-9 min-h-9 rounded-full border-accent bg-accent px-0 text-white hover:border-[#1d4ed8] hover:bg-[#1d4ed8]"
+                className="size-9 min-h-9 rounded-md px-0"
                 aria-label="停止任务"
                 title="停止任务"
                 onClick={() => void workbench.cancel()}
@@ -292,49 +275,86 @@ export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
                   aria-hidden="true"
                 />
               </Button>
-            ) : (
-              <Button
-                id="send"
-                type="submit"
-                variant="primary"
-                disabled={!enabled || (draft.trim() === "" && files.length === 0)}
-                className="size-9 min-h-9 rounded-full border-accent bg-accent px-0 text-white hover:border-[#1d4ed8] hover:bg-[#1d4ed8]"
-                aria-label="发送任务"
-                title="发送任务"
-              >
-                <ArrowUp size={16} aria-hidden="true" />
-              </Button>
-            )}
+            ) : null}
+            <Button
+              id="send"
+              type="submit"
+              variant="primary"
+              disabled={
+                !enabled ||
+                workbench.sending ||
+                (draft.trim() === "" && files.length === 0)
+              }
+              className="size-9 min-h-9 rounded-md px-0"
+              aria-label={state.taskRunning ? "补充指令" : "发送任务"}
+              title={state.taskRunning ? "补充指令（当前步骤结束后处理）" : "发送任务"}
+            >
+              <ArrowUp size={16} aria-hidden="true" />
+            </Button>
           </div>
         </div>
       </form>
-      <div className="mx-auto mt-2.5 flex max-w-3xl items-center justify-between gap-3 text-xs text-muted">
-        <span
-          id="task-state"
-          role="status"
-          title={state.workspace}
-          className="flex min-w-0 items-center gap-1.5"
-        >
-          <span
-            className={`size-1 shrink-0 rounded-full ${busy ? "animate-pulse bg-accent" : "bg-muted/40"}`}
-          />
-          <span className="truncate">
-            {state.workspace === "" ? "尚未选择工作区" : workspaceName(state.workspace)}
-            {busy ? " · 任务运行中…" : ""}
-          </span>
-        </span>
-        <span className="hidden sm:inline">
-          <kbd className="rounded border border-line bg-surface px-1.5 py-0.5 font-mono text-[11px]">
-            Enter
-          </kbd>{" "}
-          发送<span className="mx-1.5 text-muted/50">/</span>
-          <kbd className="rounded border border-line bg-surface px-1.5 py-0.5 font-mono text-[11px]">
-            Shift + Enter
-          </kbd>{" "}
-          换行
-        </span>
-      </div>
     </div>
+  );
+}
+
+const effortItem =
+  "flex cursor-default select-none items-center justify-between gap-3 rounded px-2.5 py-2 text-sm text-ink outline-none data-[highlighted]:bg-surface data-[disabled]:opacity-40";
+
+/** Compact menu for the current thinking effort. */
+function ThinkingEffortMenu({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: ThinkingEffort;
+  disabled: boolean;
+  onChange: (effort: ThinkingEffort) => void;
+}): JSX.Element {
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild disabled={disabled}>
+        <button
+          type="button"
+          id="composer-thinking"
+          aria-label={`思考强度：${THINKING_LABELS[value]}`}
+          title="思考强度：回答前的推理深度"
+          className="flex h-8 min-h-8 shrink-0 items-center gap-1 rounded-md border border-transparent bg-transparent px-2 py-0 text-sm text-muted transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:bg-surface data-[state=open]:text-ink"
+        >
+          <span className="sr-only">思考强度</span>
+          <span>effort {THINKING_LABELS[value]}</span>
+          <ChevronDown size={12} aria-hidden="true" className="text-muted" />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          side="top"
+          align="end"
+          sideOffset={8}
+          collisionPadding={8}
+          className="z-50 w-40 rounded-lg border bg-paper p-1 shadow-lg shadow-ink/10"
+        >
+          <DropdownMenu.RadioGroup
+            value={value}
+            aria-label="思考强度"
+            onValueChange={(next) => onChange(next as ThinkingEffort)}
+          >
+            {THINKING_EFFORTS.map((effort) => (
+              <DropdownMenu.RadioItem
+                key={effort}
+                value={effort}
+                className={effortItem}
+              >
+                <span>{THINKING_LABELS[effort]}</span>
+                <DropdownMenu.ItemIndicator>
+                  <Check size={13} className="text-accent" aria-hidden="true" />
+                </DropdownMenu.ItemIndicator>
+              </DropdownMenu.RadioItem>
+            ))}
+          </DropdownMenu.RadioGroup>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 

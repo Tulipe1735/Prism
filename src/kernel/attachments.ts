@@ -80,6 +80,14 @@ export class Attachments {
     );
   }
 
+  async content(
+    sessionId: string,
+    id: string,
+  ): Promise<{ attachment: Attachment; data: Uint8Array }> {
+    const [attachment] = await this.read(sessionId, [id]);
+    return { attachment: attachment!, data: await readFile(attachment!.path) };
+  }
+
   removeSession(sessionId: string): Promise<void> {
     return rm(join(this.dataDir, "attachments", sessionId), {
       recursive: true,

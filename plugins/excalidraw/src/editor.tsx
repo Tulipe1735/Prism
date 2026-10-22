@@ -17,8 +17,9 @@ import {
   restore,
   serializeAsJSON,
 } from "@excalidraw/excalidraw";
-import { Download, Upload } from "lucide-react";
+import { Download, Sparkles, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CanvasAgentPanel } from "./agent.tsx";
 import { Button } from "./button.tsx";
 import { MAX_CANVAS_BYTES } from "./scene.ts";
 import { useCanvasDocument } from "./use-canvas.ts";
@@ -126,6 +127,7 @@ function CanvasEditor(props: CanvasProps & { sessionId: string }): JSX.Element {
   const document = useCanvasDocument(props.sessionId, props.revision, props.connected);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [count, setCount] = useState(0);
+  const [aiOpen, setAiOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -307,9 +309,31 @@ function CanvasEditor(props: CanvasProps & { sessionId: string }): JSX.Element {
             initialData={restored}
             onChange={changed}
             langCode="zh-CN"
+            renderTopRightUI={() => (
+              <Button
+                className="canvas-ai-toggle"
+                aria-label="画布 AI"
+                aria-expanded={aiOpen}
+                onClick={() => setAiOpen((value) => !value)}
+              >
+                <Sparkles size={17} aria-hidden="true" />
+                AI
+              </Button>
+            )}
             UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false } }}
           />
         )}
+        <CanvasAgentPanel
+          sessionId={props.sessionId}
+          connected={props.connected}
+          open={aiOpen}
+          onClose={() => setAiOpen(false)}
+          prepare={async () => {
+            await document.save();
+            const selected = Object.keys(api?.getAppState().selectedElementIds ?? {});
+            return `从 Excalidraw 画布面板发来的请求。请先用 excalidraw_read 读取当前会话画布，再按需求用 excalidraw_update 修改，保留未涉及的内容。选中元素 ID：${JSON.stringify(selected)}。`;
+          }}
+        />
       </div>
       <p
         data-canvas-status

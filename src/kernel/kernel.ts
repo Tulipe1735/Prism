@@ -187,13 +187,18 @@ export class Kernel {
     return this.ctx.sessions.list(options);
   }
 
-  async readSession(
-    sessionId: string,
-  ): Promise<{ session: SessionSummary; entries: SessionEntry[] }> {
+  async readSession(sessionId: string): Promise<{
+    session: SessionSummary;
+    entries: SessionEntry[];
+    running: boolean;
+    approvals: ReturnType<Context["approvals"]["list"]>;
+  }> {
     const log = await this.ctx.sessions.read(sessionId);
     return {
       session: await this.ctx.sessions.summary(sessionId),
       entries: log.entries,
+      running: this.isRunning(sessionId),
+      approvals: this.ctx.approvals.list(sessionId),
     };
   }
 
@@ -218,17 +223,31 @@ export class Kernel {
     sessionId: string,
     text: string,
     attachmentIds: string[] = [],
+    inputContext?: string,
   ): Promise<string> {
-    return this.ctx.tasks.send(sessionId, text, attachmentIds);
+    return this.ctx.tasks.send(sessionId, text, attachmentIds, inputContext);
   }
 
   isRunning(sessionId: string): boolean {
     return this.ctx.tasks.isRunning(sessionId);
   }
 
-  async compactManually(sessionId: string): Promise<CompactionOutcome> {
+  steerSession(
+    sessionId: string,
+    text: string,
+    attachmentIds: string[] = [],
+    inputContext?: string,
+  ): Promise<string> {
+    return this.ctx.tasks.steer(sessionId, text, attachmentIds, inputContext);
+  }
+
+  async compactManually(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<CompactionOutcome> {
     await this.ctx.tasks.idle(sessionId);
-    return this.ctx.compaction.compact(sessionId, { reason: "manual" });
+    signal?.throwIfAborted();
+    return this.ctx.compaction.compact(sessionId, { reason: "manual", signal });
   }
 
   cancelSession(sessionId: string): boolean {

@@ -9,12 +9,14 @@ import type { WebFetchOverrides } from "./web-tools.ts";
 import { Buffer } from "node:buffer";
 import { createServer } from "node:http";
 import { KernelError } from "./errors.ts";
+import { EventJournal } from "./event-stream.ts";
 import {
   Kernel,
   type KernelSettings,
   type KernelStatusReport,
   type SettingsPatch,
 } from "./kernel.ts";
+import { assertPluginUi, pluginHostRequest } from "./plugin-host.ts";
 import { SessionStoreError } from "./session-store.ts";
 import {
   BROWSER_ENGINES,
@@ -58,9 +60,11 @@ export async function startKernel(
   const kernel = await Kernel.create(options);
   const clients = new Set<ServerResponse>();
   const terminalClients = new Set<ServerResponse>();
+  const journal = new EventJournal();
   // 订阅内核产生的事件，然后把这些事件通过 SSE 推送给所有已连接的客户端。
   const unsubscribe = kernel.subscribe((event) => {
-    for (const client of clients) writeEvent(client, event);
+    const frame = journal.publish(event);
+    for (const client of clients) if (!client.writableEnded) client.write(frame);
   });
   let closed = false;
 
@@ -105,6 +109,53 @@ export async function startKernel(
     const segments = url.pathname.split("/").filter((segment) => segment !== "");
     const method = request.method ?? "GET";
 
+    if (segments[0] === "plugins" && segments.length >= 3) {
+      const plugin = decodeURIComponent(segments[1]!);
+      if (segments[2] === "host" && segments.length === 4 && method === "POST") {
+        if (!request.headers["content-type"]?.startsWith("application/json"))
+          throw new KernelError(
+            "INVALID_REQUEST",
+            "Host requests require application/json.",
+          );
+        const body = await readJson(request);
+        const controller = new AbortController();
+        const abort = (): void => controller.abort();
+        response.on("close", abort);
+        try {
+          sendJson(response, 200, {
+            result: await pluginHostRequest(
+              kernel,
+              plugin,
+              segments[3]!,
+              requireText(body, "sessionId"),
+              field(body, "input"),
+              controller.signal,
+            ),
+          });
+        } finally {
+          response.off("close", abort);
+        }
+        return;
+      }
+      if (segments[2] === "resources") {
+        const sessionId = url.searchParams.get("sessionId") ?? "";
+        await assertPluginUi(kernel, plugin, sessionId);
+        if (segments.length === 3 && method === "POST") {
+          const { path: _path, ...resource } = await kernel.ctx.attachments.upload(
+            sessionId,
+            url.searchParams.get("name") ?? "",
+            request,
+          );
+          sendJson(response, 201, { resource });
+          return;
+        }
+        if (segments.length === 4 && method === "GET") {
+          await sendAttachment(sessionId, segments[3]!, response);
+          return;
+        }
+      }
+    }
+
     if (
       segments[0] === "plugins" &&
       segments[1] === "ui" &&
@@ -131,7 +182,7 @@ export async function startKernel(
         "cache-control": "no-store",
         "access-control-allow-origin": "*",
         "content-security-policy": asset.contentType.startsWith("text/html")
-          ? "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'"
+          ? "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
           : "default-src 'none'; script-src 'self' 'unsafe-eval'; connect-src 'self' data: blob:",
       });
       response.end(asset.content);
@@ -205,7 +256,12 @@ export async function startKernel(
       }
     }
     if (segments[0] === "events" && segments.length === 1 && method === "GET") {
-      openStream(response);
+      openStream(
+        response,
+        typeof request.headers["last-event-id"] === "string"
+          ? request.headers["last-event-id"]
+          : undefined,
+      );
       return;
     }
     if (segments[0] === "terminals") {
@@ -313,6 +369,11 @@ export async function startKernel(
     }
     if (segments[0] === "sessions" && segments.length >= 2) {
       const sessionId = decodeURIComponent(segments[1] as string);
+      if (segments.length === 4 && segments[2] === "attachments" && method === "GET") {
+        await kernel.ctx.sessions.summary(sessionId);
+        await sendAttachment(sessionId, segments[3]!, response);
+        return;
+      }
       if (segments.length === 3 && segments[2] === "attachments" && method === "POST") {
         await kernel.readSession(sessionId);
         const name = url.searchParams.get("name") ?? "";
@@ -338,7 +399,11 @@ export async function startKernel(
         return;
       }
       // 收到 POST /sessions/:id/messages 请求时，内核会调用 sendMessage 方法将消息发送到指定的会话中，并返回一个 entryId，表示消息在会话日志中的唯一标识。
-      if (segments[2] === "messages" && segments.length === 3 && method === "POST") {
+      if (
+        (segments[2] === "messages" || segments[2] === "steering") &&
+        segments.length === 3 &&
+        method === "POST"
+      ) {
         const body = await readJson(request);
         const text = field(body, "text");
         const attachments = field(body, "attachments") ?? [];
@@ -348,7 +413,9 @@ export async function startKernel(
           !attachments.every((id) => typeof id === "string")
         )
           throw new KernelError("INVALID_REQUEST", "消息需要文本和文件标识列表。");
-        const entryId = await kernel.sendMessage(sessionId, text, attachments);
+        const entryId = await (segments[2] === "steering"
+          ? kernel.steerSession(sessionId, text, attachments)
+          : kernel.sendMessage(sessionId, text, attachments));
         sendJson(response, 202, { entryId });
         return;
       }
@@ -385,13 +452,35 @@ export async function startKernel(
     throw new KernelError("INVALID_REQUEST", `Unknown route ${method} ${url.pathname}`);
   }
 
-  function openStream(response: ServerResponse): void {
+  async function sendAttachment(
+    sessionId: string,
+    id: string,
+    response: ServerResponse,
+  ): Promise<void> {
+    const {
+      attachment: { path: _path, ...resource },
+      data,
+    } = await kernel.ctx.attachments.content(sessionId, id);
+    response.writeHead(200, {
+      "content-type": resource.mediaType,
+      "content-length": data.byteLength,
+      "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(resource.name)}`,
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "default-src 'none'; sandbox",
+      "x-prism-resource": encodeURIComponent(JSON.stringify(resource)),
+      "cache-control": "no-store",
+    });
+    response.end(data);
+  }
+
+  function openStream(response: ServerResponse, cursor?: string): void {
     response.writeHead(200, {
       "content-type": "text/event-stream",
       "cache-control": "no-cache",
       connection: "keep-alive",
     });
     response.write("retry: 2000\n\n");
+    journal.resume(response, cursor);
     clients.add(response);
     writeEvent(response, kernel.statusEvent());
     const drop = (): void => {
@@ -459,6 +548,7 @@ function classify(error: unknown): { status: number; code: string } {
         SESSION_NOT_FOUND: 404,
         APPROVAL_NOT_FOUND: 404,
         TASK_RUNNING: 409,
+        TASK_NOT_RUNNING: 409,
         CREATOR_DISABLED: 403,
         PLUGIN_NOT_FOUND: 404,
         PLUGIN_FAILED: 422,

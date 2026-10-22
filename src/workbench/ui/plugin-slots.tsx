@@ -1,9 +1,10 @@
 import type { JSX, ReactNode } from "react";
 import type {
-  PluginEvent,
+  HostMethod,
   PluginUiEntry,
   UiSlot,
 } from "../../../packages/plugin-sdk/src/index.ts";
+import type { KernelEvent } from "../../kernel/events.ts";
 import {
   createContext,
   useCallback,
@@ -13,6 +14,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { HOST_METHODS } from "../../../packages/plugin-sdk/src/index.ts";
 import { KernelClient } from "./client.ts";
 
 /** Slots the host layout renders in place; the panel slot opens in the drawer. */
@@ -23,7 +25,7 @@ interface SlotsState {
   sessionId: string | null;
   connected: boolean;
   client: KernelClient;
-  subscribe: (listener: (event: PluginEvent) => void) => () => void;
+  subscribe: (listener: (event: KernelEvent) => void) => () => void;
   /** Composite `plugin/id` of the panel shown in the drawer, if any. */
   activePanel: string | null;
   openPanel: (key: string) => void;
@@ -70,8 +72,9 @@ export function PluginProvider({
   const [entries, setEntries] = useState<PluginUiEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<string | null>(null);
-  const listeners = useRef(new Set<(event: PluginEvent) => void>());
-  const subscribe = useCallback((listener: (event: PluginEvent) => void) => {
+  const [streamConnected, setStreamConnected] = useState(false);
+  const listeners = useRef(new Set<(event: KernelEvent) => void>());
+  const subscribe = useCallback((listener: (event: KernelEvent) => void) => {
     listeners.current.add(listener);
     return () => {
       listeners.current.delete(listener);
@@ -83,7 +86,7 @@ export function PluginProvider({
     () => ({
       entries,
       sessionId,
-      connected,
+      connected: connected && streamConnected,
       client,
       subscribe,
       activePanel,
@@ -94,6 +97,7 @@ export function PluginProvider({
       entries,
       sessionId,
       connected,
+      streamConnected,
       client,
       subscribe,
       activePanel,
@@ -102,6 +106,7 @@ export function PluginProvider({
     ],
   );
   useEffect(() => {
+    setStreamConnected(false);
     if (!connected) return;
     let live = true;
     let sequence = 0;
@@ -121,12 +126,12 @@ export function PluginProvider({
     };
     const close = client.openEvents({
       onState: (state) => {
+        if (live) setStreamConnected(state === "open");
         if (state === "open") refresh();
       },
       onEvent: (event) => {
         if (event.type === "plugins.updated") refresh();
-        if (event.type === "plugin.event")
-          for (const listener of listeners.current) listener(event);
+        for (const listener of listeners.current) listener(event);
       },
     });
     refresh();
@@ -251,10 +256,18 @@ function PluginFrame({
   const { client, connected, sessionId, subscribe } = state;
   useEffect(() => {
     let live = true;
-    const send = (message: unknown): void =>
-      frame.current?.contentWindow?.postMessage(message, "*");
+    const calls = new Map<number, AbortController>();
+    const send = (message: unknown, transfer: Transferable[] = []): void =>
+      frame.current?.contentWindow?.postMessage(message, "*", transfer);
     const context = (): void =>
-      send({ prism: "context", context: { sessionId, connected } });
+      send({
+        prism: "context",
+        context: {
+          sessionId,
+          connected,
+          desktop: window.prismDesktop?.webApps !== undefined,
+        },
+      });
     const receive = (event: MessageEvent): void => {
       if (
         event.source !== frame.current?.contentWindow ||
@@ -275,13 +288,19 @@ function PluginFrame({
         return;
       }
       if (message.prism === "ready") context();
+      if (message.prism === "cancel" && typeof message.id === "number") {
+        calls.get(message.id)?.abort();
+        return;
+      }
       if (
-        message.prism !== "request" ||
+        (message.prism !== "request" && message.prism !== "host.request") ||
         !Number.isSafeInteger(message.id) ||
         typeof message.method !== "string" ||
-        !/^[a-z][a-z0-9._-]{0,63}$/.test(message.method)
+        !/^[a-z][\w.-]{0,63}$/.test(message.method)
       )
         return;
+      const id = message.id!;
+      if (calls.has(id)) return;
       if (message.sessionId !== sessionId) {
         send({
           prism: "result",
@@ -298,13 +317,63 @@ function PluginFrame({
         });
         return;
       }
-      void client
-        .pluginRequest(entry.plugin, message.method, sessionId, message.input)
+      const controller = new AbortController();
+      calls.set(id, controller);
+      const request =
+        message.prism === "host.request" && message.method === "app.open"
+          ? entry.webApp === undefined || window.prismDesktop?.webApps === undefined
+            ? Promise.reject(
+                Object.assign(new Error("此网页应用需要在 Prism 桌面端打开。"), {
+                  code: "DESKTOP_REQUIRED",
+                }),
+              )
+            : window.prismDesktop.webApps.open({
+                plugin: entry.plugin,
+                id: entry.id,
+                sessionId,
+                ...(message.input !== null &&
+                typeof message.input === "object" &&
+                "url" in message.input &&
+                typeof message.input.url === "string"
+                  ? { url: message.input.url }
+                  : {}),
+              })
+          : message.prism === "host.request"
+            ? HOST_METHODS.includes(message.method as HostMethod)
+              ? client.pluginHostRequest(
+                  entry.plugin,
+                  message.method as HostMethod,
+                  sessionId,
+                  message.input,
+                  controller.signal,
+                )
+              : Promise.reject(
+                  Object.assign(new Error("不支持的 Host 方法。"), {
+                    code: "INVALID_REQUEST",
+                  }),
+                )
+            : client.pluginRequest(
+                entry.plugin,
+                message.method,
+                sessionId,
+                message.input,
+                controller.signal,
+              );
+      void request
         .then((result) => {
-          if (live) send({ prism: "result", id: message.id, result });
+          if (live && !controller.signal.aborted) {
+            const transfer =
+              result !== null &&
+              typeof result === "object" &&
+              "data" in result &&
+              result.data instanceof ArrayBuffer
+                ? [result.data]
+                : [];
+            send({ prism: "result", id, result }, transfer);
+          }
         })
         .catch((reason: unknown) => {
-          if (live)
+          if (live && !controller.signal.aborted)
             send({
               prism: "result",
               id: message.id,
@@ -316,19 +385,32 @@ function PluginFrame({
                 message: reason instanceof Error ? reason.message : String(reason),
               },
             });
-        });
+        })
+        .finally(() => calls.delete(id));
     };
     window.addEventListener("message", receive);
     const close = subscribe((event) => {
-      if (
-        event.plugin === entry.plugin &&
-        (event.sessionId === undefined || event.sessionId === sessionId)
-      )
-        send({ prism: "event", event });
+      if (event.type === "stream.reset") {
+        send({ prism: "resync" });
+      } else if (event.type === "plugin.event") {
+        if (
+          event.plugin === entry.plugin &&
+          (event.sessionId === undefined || event.sessionId === sessionId)
+        )
+          send({ prism: "event", event });
+      } else if (
+        event.type === "session.updated"
+          ? event.session.id === sessionId
+          : "sessionId" in event && event.sessionId === sessionId
+      ) {
+        send({ prism: "agent.event", agentEvent: event });
+      }
     });
     context();
     return () => {
       live = false;
+      for (const controller of calls.values()) controller.abort();
+      calls.clear();
       window.removeEventListener("message", receive);
       close();
     };
@@ -341,7 +423,7 @@ function PluginFrame({
         src={entry.url}
         title={entry.title}
         data-plugin={entry.plugin}
-        sandbox="allow-scripts allow-same-origin allow-downloads"
+        sandbox="allow-scripts allow-same-origin allow-downloads allow-forms"
         className={`border-0 ${layout === "toolbar" ? "h-10 w-40 max-w-full shrink-0" : layout === "panel" ? "min-h-0 w-full flex-1" : "h-48 w-full"}`}
         onError={() => setError(`${entry.title} 加载失败，请重载插件。`)}
       />

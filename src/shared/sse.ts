@@ -6,26 +6,43 @@
 export async function* readSseData(
   body: ReadableStream<Uint8Array>,
 ): AsyncGenerator<string> {
+  for await (const frame of readSseFrames(body)) yield frame.data;
+}
+
+export async function* readSseFrames(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<{ id?: string; data: string }> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    if (value === undefined) continue;
-    buffer += decoder.decode(value, { stream: true }).replaceAll("\r\n", "\n");
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary !== -1) {
-      const frame = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      boundary = buffer.indexOf("\n\n");
-      // `:` lines are comments (keep-alives); a frame without data is skipped.
-      const data = frame
-        .split("\n")
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice("data:".length).trim())
-        .join("\n");
-      if (data !== "") yield data;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value === undefined) continue;
+      buffer += decoder.decode(value, { stream: true });
+      buffer = buffer.replaceAll("\r\n", "\n");
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary !== -1) {
+        const frame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        boundary = buffer.indexOf("\n\n");
+        // `:` lines are comments (keep-alives); a frame without data is skipped.
+        const data = frame
+          .split("\n")
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice("data:".length).trim())
+          .join("\n");
+        const id = frame
+          .split("\n")
+          .find((line) => line.startsWith("id:"))
+          ?.slice(3)
+          .trim();
+        if (data !== "") yield { data, ...(id === undefined ? {} : { id }) };
+      }
     }
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
   }
 }

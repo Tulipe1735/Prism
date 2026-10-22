@@ -79,8 +79,15 @@ export function useWorkbench(): Workbench {
       void client
         .readSession(id)
         .then((log) => {
-          if (!disposed && latest.current.activeId === log.session.id)
+          if (!disposed && latest.current.activeId === log.session.id) {
             dispatch({ type: "entries", entries: log.entries });
+            dispatch({
+              type: "runtime",
+              sessionId: log.session.id,
+              running: log.running,
+              approvals: log.approvals,
+            });
+          }
         })
         .catch(report)
         .finally(() => {
@@ -95,6 +102,10 @@ export function useWorkbench(): Workbench {
     const onEvent = (event: KernelEvent): void => {
       if (disposed) return;
       dispatch({ type: "event", event });
+      if (event.type === "stream.reset") {
+        refresh();
+        reload();
+      }
       const changedId =
         event.type === "session.updated"
           ? event.session.id
@@ -161,8 +172,15 @@ export function useWorkbench(): Workbench {
     if (id === state.activeId) return;
     const request = ++navigation.current;
     const log = await attempt(() => client.readSession(id));
-    if (log !== undefined && request === navigation.current)
+    if (log !== undefined && request === navigation.current) {
       dispatch({ type: "open", session: log.session, entries: log.entries });
+      dispatch({
+        type: "runtime",
+        sessionId: log.session.id,
+        running: log.running,
+        approvals: log.approvals,
+      });
+    }
   }
 
   async function rename(id: string, title: string): Promise<void> {
@@ -196,12 +214,7 @@ export function useWorkbench(): Workbench {
 
   async function send(text: string, files: File[] = []): Promise<boolean> {
     const id = state.activeId;
-    if (
-      id === null ||
-      (text.trim() === "" && files.length === 0) ||
-      state.taskRunning ||
-      sendingNow.current
-    )
+    if (id === null || (text.trim() === "" && files.length === 0) || sendingNow.current)
       return false;
     sendingNow.current = true;
     setSending(true);
@@ -209,7 +222,12 @@ export function useWorkbench(): Workbench {
       const attachments = await Promise.all(
         files.map((file) => client.uploadAttachment(id, file)),
       );
-      await client.sendMessage(
+      if (latest.current.activeId !== id)
+        throw new Error("会话已切换，消息未发送。请在目标会话中重试。");
+      const sendInput = latest.current.taskRunning
+        ? client.steerSession.bind(client)
+        : client.sendMessage.bind(client);
+      await sendInput(
         id,
         text.trim(),
         attachments.map((file) => file.id),

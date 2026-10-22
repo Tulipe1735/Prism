@@ -157,11 +157,20 @@ export class PluginManager {
     return [...this.installed.values()].flatMap(({ mounted }) =>
       mounted === undefined
         ? []
-        : (mounted.build.bundle.manifest.ui ?? []).map((ui) => ({
+        : (mounted.build.bundle.manifest.ui ?? []).map(({ webApp, ...ui }) => ({
             ...ui,
             plugin: mounted.build.bundle.manifest.name,
             revision: mounted.build.revision,
             url: `/plugins/${mounted.build.bundle.manifest.name}/assets/${mounted.build.revision}/${ui.id}/index.html`,
+            ...(webApp === undefined
+              ? {}
+              : {
+                  webApp: {
+                    ...webApp,
+                    scriptUrl: `/plugins/${mounted.build.bundle.manifest.name}/assets/${mounted.build.revision}/${ui.id}/webapp.js`,
+                    styleUrl: `/plugins/${mounted.build.bundle.manifest.name}/assets/${mounted.build.revision}/${ui.id}/webapp.css`,
+                  },
+                }),
           })),
     );
   }

@@ -2,11 +2,17 @@ import type { KernelEvent } from "./events.ts";
 import type { ApprovalRequest } from "./permissions.ts";
 import { randomUUID } from "node:crypto";
 
+export type PendingApprovalEvent = Extract<KernelEvent, { type: "approval.requested" }>;
+
 /** One-shot decisions owned by the approvals plugin. */
 export class Approvals {
   private readonly pending = new Map<
     string,
-    { sessionId: string; resolve: (approved: boolean) => void }
+    {
+      sessionId: string;
+      event: PendingApprovalEvent;
+      resolve: (approved: boolean) => void;
+    }
   >();
 
   private readonly publish: (event: KernelEvent) => void;
@@ -21,8 +27,14 @@ export class Approvals {
   ): Promise<boolean> {
     const requestId = randomUUID();
     return new Promise<boolean>((resolve) => {
-      this.pending.set(requestId, { sessionId, resolve });
-      this.publish({ type: "approval.requested", sessionId, requestId, ...request });
+      const event: PendingApprovalEvent = {
+        type: "approval.requested",
+        sessionId,
+        requestId,
+        ...request,
+      };
+      this.pending.set(requestId, { sessionId, event, resolve });
+      this.publish(event);
     });
   }
 
@@ -38,8 +50,13 @@ export class Approvals {
   refuse(sessionId?: string): void {
     for (const [requestId, pending] of this.pending) {
       if (sessionId !== undefined && pending.sessionId !== sessionId) continue;
-      this.pending.delete(requestId);
-      pending.resolve(false);
+      this.resolve(pending.sessionId, requestId, false);
     }
+  }
+
+  list(sessionId: string): PendingApprovalEvent[] {
+    return [...this.pending.values()]
+      .filter((pending) => pending.sessionId === sessionId)
+      .map((pending) => ({ ...pending.event }));
   }
 }

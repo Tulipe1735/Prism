@@ -165,6 +165,19 @@ export async function buildBundle(
       define: { "process.env.NODE_ENV": '"production"' },
       loader: { ".woff2": "file", ".woff": "file", ".png": "file", ".svg": "file" },
     });
+    if (ui.webApp !== undefined) {
+      await build({
+        ...common,
+        entryPoints: [join(source, ui.webApp.entry)],
+        outfile: join(root, "webapp.js"),
+        platform: "browser",
+        format: "iife",
+        jsx: "automatic",
+        define: { "process.env.NODE_ENV": '"production"' },
+      });
+      if ((await readFile(join(root, "webapp.css")).catch(() => null)) === null)
+        await writeFile(join(root, "webapp.css"), "");
+    }
     for (const asset of bundle.manifest.assets ?? []) {
       let from: string;
       if (asset.from.startsWith("node_modules/")) {

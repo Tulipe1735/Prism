@@ -77,12 +77,18 @@
 @theme {
   --font-sans: "Inter Variable", "Source Han Serif SC", serif;
   --font-mono: "JetBrains Mono", "Source Han Serif SC", monospace;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.5;
+  --text-code: 0.875rem;
+  --text-code--line-height: 1.7;
   --color-paper: #ffffff;
-  --color-surface: #f7f8fa;
-  --color-ink: #1f2328;
-  --color-muted: #6b7280;
-  --color-line: #e7e9ed;
-  --color-accent: #2563eb;
+  --color-surface: #f7f7f5;
+  --color-ink: #37352f;
+  --color-muted: #73716c;
+  --color-line: #e9e9e7;
+  --color-accent: #2383e2;
   --color-success: #2f7d5b;
 }
 
@@ -106,8 +112,8 @@
     background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 16px;
+    line-height: 1.6;
     letter-spacing: -0.006em;
     font-optical-sizing: auto;
     -webkit-font-smoothing: antialiased;
@@ -165,7 +171,7 @@
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: #d9dce1 transparent;
+    scrollbar-color: #d3d1cb transparent;
   }
 }
 
@@ -212,10 +218,10 @@
     opacity: 0;
   }
   .field {
-    @apply w-full min-w-0 rounded-md border bg-paper px-3 py-2 text-[13px] text-ink placeholder:text-muted/70 focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none;
+    @apply w-full min-w-0 rounded-md border bg-paper px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none;
   }
   .diff {
-    @apply overflow-x-auto py-2 font-mono text-xs leading-6;
+    @apply overflow-x-auto py-2 font-mono text-code leading-6;
   }
   .diff > div {
     @apply min-w-max whitespace-pre px-4;
@@ -235,7 +241,7 @@
     @apply text-muted;
   }
   .code-output {
-    @apply max-h-80 overflow-auto whitespace-pre-wrap break-words bg-surface/70 p-4 font-mono text-xs leading-6 text-[#3a414b];
+    @apply max-h-80 overflow-auto whitespace-pre-wrap break-words bg-surface/70 p-4 font-mono text-code leading-6 text-ink;
   }
   .workspace-create {
     opacity: 0;
@@ -259,7 +265,7 @@
     margin-bottom: 0;
   }
   .markdown :where(p, ul, ol, pre, blockquote, table, hr) {
-    margin-block: 0.75em;
+    margin-block: 1em;
   }
   .markdown :where(h1, h2, h3, h4, h5, h6) {
     margin-block: 1.25em 0.5em;
@@ -267,13 +273,13 @@
     line-height: 1.4;
   }
   .markdown h1 {
-    font-size: 1.5em;
+    font-size: 1.875em;
   }
   .markdown h2 {
-    font-size: 1.25em;
+    font-size: 1.5em;
   }
   .markdown h3 {
-    font-size: 1.1em;
+    font-size: 1.25em;
   }
   .markdown :where(ul, ol) {
     padding-left: 1.5em;
@@ -287,6 +293,9 @@
   .markdown li > :where(ul, ol, p) {
     margin-block: 0.25em;
   }
+  .markdown li + li {
+    margin-top: 0.375em;
+  }
   .markdown a {
     @apply text-accent underline underline-offset-2;
   }
@@ -294,13 +303,13 @@
     @apply rounded bg-surface px-1.5 py-0.5 font-mono text-[0.875em];
   }
   .markdown pre {
-    @apply overflow-x-auto rounded-lg border bg-surface p-4 font-mono text-xs leading-6 whitespace-pre;
+    @apply overflow-x-auto rounded-md border bg-surface p-4 font-mono text-code leading-6 whitespace-pre;
   }
   .markdown blockquote {
-    @apply border-l-2 pl-4 text-muted;
+    @apply border-l-3 border-ink/70 pl-4 text-ink;
   }
   .markdown table {
-    @apply block max-w-full overflow-x-auto border-collapse text-[13px];
+    @apply block max-w-full overflow-x-auto border-collapse text-sm;
   }
   .markdown :where(th, td) {
     @apply border px-3 py-1.5;

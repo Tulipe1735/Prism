@@ -24,6 +24,7 @@ export interface MessageEntry extends SessionEntryBase {
   type: "message";
   role: MessageRole;
   content: string;
+  context?: string;
   attachments?: Attachment[];
   /**
    * Thinking that preceded an assistant message. Requests carrying tools must
@@ -81,6 +82,7 @@ export type SessionEntryInput =
       type: "message";
       role: MessageRole;
       content: string;
+      context?: string;
       attachments?: Attachment[];
       reasoning?: string;
       parentId?: string | null;
@@ -138,6 +140,7 @@ export function compareSessions(a: SessionSummary, b: SessionSummary): number {
 export interface ContextMessage {
   role: MessageRole;
   content: string;
+  context?: string;
   attachments?: Attachment[];
   entryId: string;
   summary?: true;
@@ -211,6 +214,7 @@ export function rebuildContext(
         const message: ContextMessage = {
           role: entry.role,
           content: entry.content,
+          ...(entry.context === undefined ? {} : { context: entry.context }),
           entryId: entry.id,
           ...(entry.attachments === undefined
             ? {}

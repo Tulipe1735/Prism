@@ -1,31 +1,55 @@
-import type { JSX } from "react";
+import type { JSX, PointerEvent as ReactPointerEvent } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import {
-  ChevronDown,
-  ChevronUp,
-  RotateCw,
-  Terminal as TerminalIcon,
-} from "lucide-react";
+import { RotateCw, Terminal as TerminalIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { KernelClient } from "./client.ts";
 
-export function WorkspaceTerminal({ workspace }: { workspace: string }): JSX.Element {
-  const [open, setOpen] = useState(false);
-  const [visited, setVisited] = useState(false);
-  const [connection, setConnection] = useState(0);
+const MIN_TERMINAL_HEIGHT = 140;
+/** Space the rest of the workbench keeps even with the drawer fully stretched. */
+const BOTTOM_RESERVE = 180;
+
+function clampHeight(value: number): number {
+  const ceiling = Math.max(MIN_TERMINAL_HEIGHT, window.innerHeight - BOTTOM_RESERVE);
+  return Math.round(Math.min(Math.max(value, MIN_TERMINAL_HEIGHT), ceiling));
+}
+
+/**
+ * Workspace shell that slides in above the composer when the top-bar button asks
+ * for it. It stays mounted while hidden, so the shell and its scrollback survive.
+ */
+export function WorkspaceTerminal({
+  workspace,
+  open,
+  onClose,
+}: {
+  workspace: string;
+  open: boolean;
+  onClose: () => void;
+}): JSX.Element {
   const [status, setStatus] = useState("连接中…");
+  const [connection, setConnection] = useState(0);
+  const [started, setStarted] = useState(false);
+  const [height, setHeight] = useState<number | null>(null);
+  const [measured, setMeasured] = useState<number | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ y: number; height: number } | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
+
+  useEffect(() => {
+    if (open) setStarted(true);
+  }, [open]);
 
   useEffect(() => {
     const node = host.current;
-    if (!visited || workspace === "" || node === null) return;
+    if (!started || workspace === "" || node === null) return;
     const client = new KernelClient();
     const controller = new AbortController();
     const terminal = new Terminal({
       cursorBlink: true,
-      fontSize: 12,
+      fontSize: 14,
       fontFamily: '"JetBrains Mono", "Source Han Serif SC", monospace',
       scrollback: 5_000,
       theme: {
@@ -37,6 +61,7 @@ export function WorkspaceTerminal({ workspace }: { workspace: string }): JSX.Ele
     });
     terminalRef.current = terminal;
     const fit = new FitAddon();
+    fitRef.current = fit;
     terminal.loadAddon(fit);
     terminal.open(node);
     let id: string | null = null;
@@ -86,60 +111,127 @@ export function WorkspaceTerminal({ workspace }: { workspace: string }): JSX.Ele
       sizing.dispose();
       terminal.dispose();
       terminalRef.current = null;
+      fitRef.current = null;
     };
-  }, [workspace, visited, connection]);
+  }, [workspace, started, connection]);
+
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => {
+      fitRef.current?.fit();
+      terminalRef.current?.focus();
+      const rect = panel.current?.getBoundingClientRect();
+      if (rect !== undefined) setMeasured(Math.round(rect.height));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
+  useEffect(() => {
+    if (height === null) return;
+    const keep = (): void => setHeight((current) => clampHeight(current ?? 0));
+    window.addEventListener("resize", keep);
+    return () => window.removeEventListener("resize", keep);
+  }, [height]);
+
+  function startResize(event: ReactPointerEvent<HTMLDivElement>): void {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    drag.current = {
+      y: event.clientY,
+      height: panel.current?.getBoundingClientRect().height ?? MIN_TERMINAL_HEIGHT,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveResize(event: ReactPointerEvent<HTMLDivElement>): void {
+    const started = drag.current;
+    if (started === null) return;
+    setHeight(clampHeight(started.height - (event.clientY - started.y)));
+  }
+
+  function endResize(event: ReactPointerEvent<HTMLDivElement>): void {
+    if (drag.current === null) return;
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+  }
 
   return (
-    <div id="workspace-terminal" className="shrink-0 border-t bg-paper">
-      <div className="flex h-9 items-center gap-2 px-4 text-xs text-muted">
-        <button
-          type="button"
-          id="terminal-toggle"
-          aria-expanded={open}
-          aria-controls="terminal-panel"
-          disabled={workspace === ""}
-          onClick={() => {
-            setOpen(!open);
-            setVisited(true);
-            if (!open) requestAnimationFrame(() => terminalRef.current?.focus());
-          }}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <TerminalIcon size={14} aria-hidden="true" />
-          <span>终端</span>
-          <span className="min-w-0 truncate font-mono text-[11px]" title={workspace}>
-            {workspace || "先选择工作区"}
-          </span>
-          {open ? (
-            <ChevronDown size={13} className="ml-auto shrink-0" aria-hidden="true" />
-          ) : (
-            <ChevronUp size={13} className="ml-auto shrink-0" aria-hidden="true" />
-          )}
-        </button>
-        {open && status !== "" ? (
-          <>
-            <span role="status" className="truncate">
-              {status}
-            </span>
-            <button
-              type="button"
-              aria-label="重新连接终端"
-              title="重新连接终端"
-              onClick={() => setConnection((value) => value + 1)}
-              className="rounded p-1 hover:bg-surface"
-            >
-              <RotateCw size={13} aria-hidden="true" />
-            </button>
-          </>
-        ) : null}
-      </div>
+    <div
+      ref={panel}
+      id="terminal-panel"
+      role="region"
+      aria-label="当前工作区终端"
+      hidden={!open}
+      style={height === null ? undefined : { height }}
+      className="flex h-[clamp(200px,38dvh,420px)] shrink-0 flex-col overflow-hidden rounded-t-xl border-t border-line bg-paper shadow-[0_-12px_40px_rgba(15,20,30,0.14)]"
+    >
       <div
-        id="terminal-panel"
-        hidden={!open}
-        className="h-[clamp(120px,27dvh,260px)] border-t px-3 py-2"
-        role="region"
-        aria-label="当前工作区终端"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="调整终端高度"
+        aria-valuemin={MIN_TERMINAL_HEIGHT}
+        aria-valuemax={Math.max(
+          MIN_TERMINAL_HEIGHT,
+          window.innerHeight - BOTTOM_RESERVE,
+        )}
+        aria-valuenow={height ?? measured ?? undefined}
+        title="拖动调整终端高度，双击恢复默认"
+        tabIndex={0}
+        onPointerDown={startResize}
+        onPointerMove={moveResize}
+        onPointerUp={endResize}
+        onPointerCancel={endResize}
+        onDoubleClick={() => setHeight(null)}
+        onKeyDown={(event) => {
+          const step =
+            event.key === "ArrowUp" ? 24 : event.key === "ArrowDown" ? -24 : 0;
+          if (step === 0) return;
+          event.preventDefault();
+          const rect = panel.current?.getBoundingClientRect();
+          const current = height ?? rect?.height ?? MIN_TERMINAL_HEIGHT;
+          setHeight(clampHeight(current + step));
+        }}
+        className="group flex h-2.5 shrink-0 cursor-row-resize touch-none items-center justify-center transition-colors hover:bg-ink/[0.03] focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:outline-none"
       >
+        <span
+          aria-hidden="true"
+          className="h-0.5 w-8 rounded-full bg-line transition-colors group-hover:bg-muted/60 group-focus-visible:bg-muted/60"
+        />
+      </div>
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b px-3 text-xs text-muted">
+        <TerminalIcon size={14} aria-hidden="true" className="shrink-0" />
+        <span className="shrink-0">终端</span>
+        <span className="min-w-0 truncate font-mono text-xs" title={workspace}>
+          {workspace}
+        </span>
+        {status !== "" ? (
+          <span role="status" className="min-w-0 truncate">
+            {status}
+          </span>
+        ) : null}
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            aria-label="重新连接终端"
+            title="重新连接终端"
+            onClick={() => setConnection((value) => value + 1)}
+            className="flex size-6 items-center justify-center rounded-md transition-colors hover:bg-ink/5 hover:text-ink"
+          >
+            <RotateCw size={13} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label="收起终端"
+            title="收起终端"
+            onClick={onClose}
+            className="flex size-6 items-center justify-center rounded-md transition-colors hover:bg-ink/5 hover:text-ink"
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 px-3 py-2">
         <div ref={host} className="h-full w-full overflow-hidden" />
       </div>
     </div>

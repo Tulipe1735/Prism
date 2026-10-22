@@ -6,6 +6,8 @@ import {
   ChevronRight,
   Circle,
   Minimize2,
+  PanelBottomClose,
+  PanelBottomOpen,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -39,6 +41,7 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
   const { state } = workbench;
   const inlineNavigation = useMediaQuery("(min-width: 768px)");
   const inlineInspector = useMediaQuery("(min-width: 1280px)");
+  const [terminalOpen, setTerminalOpen] = useState(false);
   const [navigationOpen, setNavigationOpen] = useState(inlineNavigation);
   const [inspectorOpen, setInspectorOpen] = useState(
     () =>
@@ -49,8 +52,8 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
   const inspectorButton = useRef<HTMLButtonElement>(null);
   const navigationVisible = navigationOpen && (inlineNavigation || !inspectorOpen);
   const navigationWidth =
-    inlineNavigation && navigationVisible ? (inlineInspector ? 268 : 248) : 64;
-  const inspectorWidth = inlineInspector && inspectorOpen ? 320 : 0;
+    inlineNavigation && navigationVisible ? (inlineInspector ? 280 : 264) : 64;
+  const inspectorWidth = inlineInspector && inspectorOpen ? 336 : 0;
   const overlayOpen =
     (!inlineNavigation && navigationVisible) || (!inlineInspector && inspectorOpen);
   const sidebarContent = useDelayedFlag(navigationVisible, 120);
@@ -70,6 +73,10 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
   useEffect(() => {
     const escape = (event: KeyboardEvent): void => {
       if (event.key !== "Escape") return;
+      if (terminalOpen) {
+        setTerminalOpen(false);
+        return;
+      }
       if (inspectorOpen && !inlineInspector) {
         setInspectorOpen(false);
         inspectorButton.current?.focus();
@@ -89,7 +96,7 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
     >
       <a
         href="#message"
-        className="fixed top-2 left-2 z-50 -translate-y-20 rounded-md bg-ink px-4 py-2 text-[13px] text-paper focus:translate-y-0"
+        className="fixed top-2 left-2 z-50 -translate-y-20 rounded-md bg-ink px-4 py-2 text-sm text-paper focus:translate-y-0"
       >
         跳到任务输入
       </a>
@@ -133,7 +140,7 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
           </button>
         </div>
         <div className="flex min-w-0 flex-1 items-center gap-2.5 px-3 md:px-5">
-          <div className="hidden min-w-0 items-center gap-1.5 text-[13px] sm:flex">
+          <div className="hidden min-w-0 items-center gap-1.5 text-sm sm:flex">
             <span className="text-muted">工作台</span>
             <ChevronRight size={13} className="text-muted/60" aria-hidden="true" />
             <span className="truncate font-medium">
@@ -141,25 +148,44 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
             </span>
           </div>
           <PluginSlot slot="workbench.header" />
-          <button
-            ref={inspectorButton}
-            type="button"
-            aria-label="切换产物与设置"
-            aria-controls="inspector"
-            aria-expanded={inspectorOpen}
-            title={inspectorOpen ? "折叠右侧栏" : "展开右侧栏"}
-            onClick={() => {
-              setInspectorOpen((open) => !open);
-              if (!inlineNavigation) setNavigationOpen(false);
-            }}
-            className="ml-auto flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface hover:text-ink"
-          >
-            {inspectorOpen ? (
-              <PanelRightClose size={16} aria-hidden="true" />
-            ) : (
-              <PanelRightOpen size={16} aria-hidden="true" />
-            )}
-          </button>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              id="terminal-toggle"
+              aria-label="切换底部终端"
+              aria-controls="terminal-panel"
+              aria-expanded={terminalOpen}
+              disabled={state.workspace === ""}
+              title={terminalOpen ? "收起终端" : "打开终端"}
+              onClick={() => setTerminalOpen((open) => !open)}
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {terminalOpen ? (
+                <PanelBottomClose size={16} aria-hidden="true" />
+              ) : (
+                <PanelBottomOpen size={16} aria-hidden="true" />
+              )}
+            </button>
+            <button
+              ref={inspectorButton}
+              type="button"
+              aria-label="切换产物与设置"
+              aria-controls="inspector"
+              aria-expanded={inspectorOpen}
+              title={inspectorOpen ? "折叠右侧栏" : "展开右侧栏"}
+              onClick={() => {
+                setInspectorOpen((open) => !open);
+                if (!inlineNavigation) setNavigationOpen(false);
+              }}
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface hover:text-ink"
+            >
+              {inspectorOpen ? (
+                <PanelRightClose size={16} aria-hidden="true" />
+              ) : (
+                <PanelRightOpen size={16} aria-hidden="true" />
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -204,7 +230,7 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
         >
           <div
             id="chat-header"
-            className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-5 md:px-8 lg:px-12"
+            className="flex h-16 shrink-0 items-center justify-between gap-3 px-5 md:px-8 lg:px-12"
           >
             <div className="min-w-0 flex-1">
               {state.session === null ? (
@@ -254,8 +280,12 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
               />
             ))}
           </div>
+          <WorkspaceTerminal
+            workspace={state.workspace}
+            open={terminalOpen && state.workspace !== ""}
+            onClose={() => setTerminalOpen(false)}
+          />
           <Composer key={state.activeId ?? "no-session"} workbench={workbench} />
-          <WorkspaceTerminal workspace={state.workspace} />
         </section>
         <aside
           id="inspector"
@@ -351,7 +381,7 @@ export function ApprovalCard({
   }
   return (
     <section
-      className="approval mx-auto mb-4 max-w-3xl rounded-lg border border-line border-l-2 border-l-accent bg-paper p-4 shadow-[0_1px_2px_rgba(31,35,40,0.04)]"
+      className="approval mx-auto mb-4 max-w-[45rem] rounded-md border border-line border-l-2 border-l-accent bg-paper p-4"
       data-request={approval.requestId}
       aria-label="需要审批"
     >
@@ -362,7 +392,7 @@ export function ApprovalCard({
           {approval.tool}
         </span>
       </h3>
-      <dl className="my-4 grid grid-cols-[36px_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px] leading-6">
+      <dl className="my-4 grid grid-cols-[36px_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm leading-6">
         <dt className="text-muted">理由</dt>
         <dd className="break-words">{approval.reason}</dd>
         <dt className="text-muted">目标</dt>

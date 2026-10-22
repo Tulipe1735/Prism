@@ -5,6 +5,11 @@ import { describe, expect, it } from "vitest";
 /** Fails to compile when a new event kind is not handled here. */
 function category(event: KernelEvent): string {
   switch (event.type) {
+    case "stream.reset":
+      return "stream";
+    case "task.state":
+    case "task.input":
+      return "task";
     case "message.delta":
       return "message";
     case "tool.started":

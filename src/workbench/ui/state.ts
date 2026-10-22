@@ -57,6 +57,12 @@ export type UiAction =
   | { type: "sessions"; sessions: SessionSummary[] }
   | { type: "open"; session: SessionSummary; entries: SessionEntry[] }
   | { type: "entries"; entries: SessionEntry[] }
+  | {
+      type: "runtime";
+      sessionId: string;
+      running: boolean;
+      approvals: PendingApproval[];
+    }
   | { type: "close" }
   | { type: "search"; query: string }
   | { type: "view"; view: UiView }
@@ -135,6 +141,16 @@ export function reduce(state: UiState, action: UiAction): UiState {
         deltas: withoutLogged(state.deltas, action.entries),
         taskRunning: isTaskRunning(action.entries),
       };
+    case "runtime":
+      return {
+        ...state,
+        taskRunning:
+          state.activeId === action.sessionId ? action.running : state.taskRunning,
+        approvals: [
+          ...state.approvals.filter((item) => item.sessionId !== action.sessionId),
+          ...action.approvals,
+        ],
+      };
     case "close":
       return {
         ...state,
@@ -164,9 +180,23 @@ export function reduce(state: UiState, action: UiAction): UiState {
 
 function reduceEvent(state: UiState, event: KernelEvent): UiState {
   switch (event.type) {
+    case "stream.reset":
     case "plugins.updated":
     case "plugin.event":
       return state;
+    case "task.input":
+      if (event.sessionId !== state.activeId || event.state === "applied") return state;
+      return {
+        ...state,
+        notice:
+          event.state === "queued"
+            ? "补充指令已排队，将在当前步骤结束后处理。"
+            : "任务已停止，尚未处理的补充指令需要重新发送。",
+      };
+    case "task.state":
+      return event.sessionId === state.activeId
+        ? { ...state, taskRunning: event.running }
+        : state;
     case "kernel.status":
       return {
         ...state,

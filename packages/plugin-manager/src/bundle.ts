@@ -26,6 +26,39 @@ export const bundlePath = z
 const packageName = z
   .string()
   .regex(/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/);
+const secureUrl = z
+  .string()
+  .url()
+  .max(2048)
+  .refine((value) => {
+    if (!URL.canParse(value)) return false;
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.username === "" &&
+      url.password === "" &&
+      !url.hostname.includes("*")
+    );
+  }, "Web apps require an HTTPS URL without credentials");
+const webApp = z
+  .object({
+    url: secureUrl,
+    origins: z
+      .array(
+        secureUrl.refine(
+          (value) => URL.canParse(value) && new URL(value).origin === value,
+          "Expected an exact HTTPS origin",
+        ),
+      )
+      .min(1)
+      .max(8),
+    entry: bundlePath,
+  })
+  .strict()
+  .refine(
+    (app) => URL.canParse(app.url) && app.origins.includes(new URL(app.url).origin),
+    "Web app URL must belong to its declared origins",
+  );
 export const manifestSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -45,6 +78,7 @@ export const manifestSchema = z
             slot: z.enum(UI_SLOTS),
             title: z.string().min(1).max(100),
             entry: bundlePath,
+            webApp: webApp.optional(),
           })
           .strict(),
       )
@@ -86,6 +120,9 @@ export const bundleSchema = z
     for (const entry of [
       bundle.manifest.backend,
       ...(bundle.manifest.ui ?? []).map((ui) => ui.entry),
+      ...(bundle.manifest.ui ?? []).flatMap((ui) =>
+        ui.webApp === undefined ? [] : [ui.webApp.entry],
+      ),
     ])
       if (bundle.files[entry] === undefined)
         ctx.addIssue({ code: "custom", message: `Missing entry: ${entry}` });

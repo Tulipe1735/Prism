@@ -72,7 +72,7 @@ function Startup(): JSX.Element {
             );
           }}
         >
-          <label className="block text-[13px] font-medium">
+          <label className="block text-sm font-medium">
             运行环境
             <select
               id="runtime-mode"
@@ -89,7 +89,7 @@ function Startup(): JSX.Element {
             </select>
           </label>
           {mode === "wsl" && state.distributions.length > 0 ? (
-            <label className="block text-[13px] font-medium">
+            <label className="block text-sm font-medium">
               WSL 发行版
               <select
                 id="distribution"
@@ -111,7 +111,7 @@ function Startup(): JSX.Element {
               未找到 WSL 发行版。可以直接使用 Windows，或先安装并启动 WSL 后重新检查。
             </p>
           ) : null}
-          <label className="flex items-start gap-3 text-[13px] leading-6 text-muted">
+          <label className="flex items-start gap-3 text-sm leading-6 text-muted">
             <input
               type="checkbox"
               checked={browser}
@@ -121,7 +121,7 @@ function Startup(): JSX.Element {
             />
             <span>
               同时准备 Chromium 浏览器
-              <span className="block text-[13px] text-muted">
+              <span className="block text-sm text-muted">
                 首次准备需要联网。也可以稍后通过工作台菜单安装浏览器。
               </span>
             </span>
@@ -160,10 +160,7 @@ function Startup(): JSX.Element {
           </div>
         ) : null}
         {state.phase === "error" ? (
-          <p
-            role="alert"
-            className="mt-5 flex items-center gap-2 text-[13px] text-accent"
-          >
+          <p role="alert" className="mt-5 flex items-center gap-2 text-sm text-accent">
             <TriangleAlert size={14} />
             准备未完成。检查下面的详情后可以重试。
           </p>

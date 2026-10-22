@@ -122,13 +122,18 @@ export async function startUiServer(
     try {
       upstream = await fetch(target, {
         method: request.method,
-        headers:
-          request.headers["content-type"] === undefined
+        headers: {
+          ...(request.headers["content-type"] === undefined
             ? {}
-            : { "content-type": request.headers["content-type"] },
+            : { "content-type": request.headers["content-type"] }),
+          ...(typeof request.headers["last-event-id"] === "string"
+            ? { "last-event-id": request.headers["last-event-id"] }
+            : {}),
+        },
         body: await readBody(
           request,
           /\/sessions\/[^/]+\/attachments$/.test(url.pathname) ||
+            /\/plugins\/[^/]+\/resources$/.test(url.pathname) ||
             /\/plugins\/[^/]+\/rpc\//.test(url.pathname)
             ? MAX_ATTACHMENT_BYTES
             : MAX_BODY_BYTES,
@@ -151,6 +156,14 @@ export async function startUiServer(
     response.writeHead(upstream.status, {
       "content-type": upstream.headers.get("content-type") ?? "application/json",
       "cache-control": "no-store",
+      ...Object.fromEntries(
+        ["x-prism-resource", "content-disposition", "x-content-type-options"].flatMap(
+          (name) => {
+            const value = upstream.headers.get(name);
+            return value === null ? [] : [[name, value]];
+          },
+        ),
+      ),
       ...(upstream.headers.has("content-security-policy")
         ? {
             "content-security-policy": upstream.headers.get("content-security-policy")!,

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "name": "notion",
+  "version": "1.0.0",
+  "description": "使用 Notion 原生网页，将 AI 入口连接到 Prism 当前会话；支持读取页面与选区，并在已观察的编辑位置插入或替换文字。",
+  "backend": "src/index.ts",
+  "ui": [
+    {
+      "id": "workspace",
+      "slot": "workbench.panel",
+      "title": "Notion",
+      "entry": "src/client.ts",
+      "webApp": {
+        "url": "https://app.notion.com/",
+        "origins": [
+          "https://app.notion.com",
+          "https://www.notion.so",
+          "https://notion.so",
+          "https://www.notion.com"
+        ],
+        "entry": "src/page.ts"
+      }
+    }
+  ]
+}

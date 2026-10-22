@@ -5,7 +5,6 @@ import {
   Check,
   ChevronRight,
   Circle,
-  FileText,
   LoaderCircle,
   Terminal,
   TriangleAlert,
@@ -13,6 +12,7 @@ import {
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { AttachmentView } from "./attachment.tsx";
 import { PrismMark } from "./components.tsx";
 import { parseUnifiedDiff, toTimeline } from "./derive.ts";
 
@@ -44,14 +44,11 @@ export function Timeline({ state }: { state: UiState }): JSX.Element {
       }}
     >
       {steps.length === 0 ? (
-        <Welcome
-          hasSession={state.session !== null}
-          hasWorkspace={state.workspace !== ""}
-        />
+        <Welcome />
       ) : (
-        <div className="mx-auto max-w-[45rem] space-y-8 py-10">
+        <div className="mx-auto max-w-[45rem] space-y-10 py-10">
           {steps.map((step) => (
-            <TimelineEntry key={step.id} step={step} />
+            <TimelineEntry key={step.id} step={step} sessionId={state.activeId} />
           ))}
         </div>
       )}
@@ -59,13 +56,7 @@ export function Timeline({ state }: { state: UiState }): JSX.Element {
   );
 }
 
-function Welcome({
-  hasSession,
-  hasWorkspace,
-}: {
-  hasSession: boolean;
-  hasWorkspace: boolean;
-}): JSX.Element {
+function Welcome(): JSX.Element {
   return (
     <div className="mx-auto flex min-h-full max-w-[45rem] flex-col justify-center py-12 md:py-16">
       <PrismMark className="mb-8 size-9" />
@@ -74,35 +65,22 @@ function Welcome({
         <br />
         <span className="text-muted">成为下一步。</span>
       </h1>
-      <p className="mt-5 max-w-md text-sm leading-7 text-muted">
-        {hasSession
-          ? "写下你的目标。Prism 会理解代码、推进任务，让每一步都清晰可见。"
-          : hasWorkspace
-            ? "工作区已就绪。新建一个会话，从你想解决的问题开始。"
-            : "从一个工作区开始。让 Prism 和你一起读代码、做修改、核查结果。"}
-      </p>
-      <div className="mt-12 grid grid-cols-1 divide-y divide-line border-t sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-        {[
-          ["选择工作区", "你的项目，是工作的起点。"],
-          ["描述任务", "给出目标，也可以随时补充。"],
-          ["查看结果", "过程、改动与产物一目了然。"],
-        ].map(([title, detail]) => (
-          <div key={title} className="py-5 sm:px-5 sm:first:pl-0 sm:last:pr-0">
-            <h2 className="text-[13px] font-semibold">{title}</h2>
-            <p className="mt-1.5 text-[13px] leading-6 text-muted">{detail}</p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
 
-function TimelineEntry({ step }: { step: TimelineStep }): JSX.Element {
+function TimelineEntry({
+  step,
+  sessionId,
+}: {
+  step: TimelineStep;
+  sessionId: string | null;
+}): JSX.Element {
   if (step.kind === "tool") return <ToolCard step={step} />;
   if (step.kind === "compaction")
     return (
       <details
-        className="entry system border-y py-3.5 text-[13px] text-muted"
+        className="entry system border-y py-3.5 text-sm text-muted"
         data-entry={step.id}
       >
         <summary className="flex items-center gap-2">
@@ -115,7 +93,7 @@ function TimelineEntry({ step }: { step: TimelineStep }): JSX.Element {
   const assistant = step.role === "assistant";
   return (
     <article className={`entry ${step.role}`} data-entry={step.id}>
-      <div className="meta mb-2.5 flex items-center gap-2 text-[13px] font-semibold">
+      <div className="meta mb-2.5 flex items-center gap-2 text-sm font-semibold">
         {assistant ? (
           <PrismMark className="size-4" />
         ) : (
@@ -129,8 +107,8 @@ function TimelineEntry({ step }: { step: TimelineStep }): JSX.Element {
       <div
         className={
           assistant
-            ? "markdown text-sm leading-7 break-words"
-            : "rounded-lg bg-surface/80 px-4 py-3 text-sm leading-7 break-words whitespace-pre-wrap"
+            ? "markdown text-base leading-7 break-words"
+            : "rounded-md bg-surface px-4 py-3 text-base leading-7 break-words whitespace-pre-wrap"
         }
       >
         {assistant ? (
@@ -143,20 +121,11 @@ function TimelineEntry({ step }: { step: TimelineStep }): JSX.Element {
             aria-label="已发送文件"
             className="mt-2 flex flex-wrap gap-2 whitespace-normal"
           >
-            {step.attachments.map((file) => (
-              <li
-                key={file.id}
-                title={file.name}
-                className="flex max-w-full items-center gap-2 rounded-md border bg-paper px-2.5 py-1.5 text-xs"
-              >
-                <FileText
-                  size={14}
-                  className="shrink-0 text-muted"
-                  aria-hidden="true"
-                />
-                <span className="truncate">{file.name}</span>
-              </li>
-            ))}
+            {sessionId === null
+              ? null
+              : step.attachments.map((file) => (
+                  <AttachmentView key={file.id} file={file} sessionId={sessionId} />
+                ))}
           </ul>
         )}
         {step.streaming ? (
@@ -180,12 +149,12 @@ function ToolCard({ step }: { step: ToolStep }): JSX.Element {
   );
   return (
     <details
-      className="tool overflow-hidden rounded-lg border bg-paper"
+      className="tool overflow-hidden rounded-md border bg-paper"
       data-call={step.callId}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary className="flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] transition-colors hover:bg-surface/70">
+      <summary className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition-colors hover:bg-surface/70">
         <ChevronRight
           className="disclosure shrink-0 text-muted"
           size={13}

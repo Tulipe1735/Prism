@@ -24,10 +24,12 @@ import {
 import { RENDERER_HOST, RENDERER_ORIGIN, RENDERER_SCHEME } from "./identity-config.ts";
 import { isRendererUrl, registerRenderer } from "./renderer.ts";
 import { createDesktopUpdates } from "./updates.ts";
+import { DesktopWebApps } from "./web-apps.ts";
 import { selectWorkspaceDirectory } from "./workspace.ts";
 
 let kernel: RunningKernelProcess | null = null;
 let ui: RunningUiServer | null = null;
+let webApps: DesktopWebApps | null = null;
 let window: BrowserWindow | null = null;
 let stopping = false;
 let preparing = false;
@@ -117,6 +119,11 @@ async function main(): Promise<void> {
     if (typeof currentPath !== "string") throw new Error("工作区路径必须是文本。");
     if (kernel === null) throw new Error("请等待内核启动完成。");
     return selectWorkspaceDirectory(window!, runtime?.distribution, currentPath);
+  });
+  ipcMain.handle("prism:web-app:open", (event, input: unknown) => {
+    requireWorkbench(event);
+    if (webApps === null) throw new Error("请等待内核启动完成。");
+    return webApps.open(input);
   });
   ipcMain.handle("prism:updates:read", (event) => {
     requireWorkbench(event);
@@ -240,6 +247,8 @@ async function changeEnvironment(): Promise<void> {
       return;
     }
   }
+  webApps?.close();
+  webApps = null;
   await ui?.close();
   ui = null;
   await kernel?.close();
@@ -297,6 +306,8 @@ async function prepare(choice: DesktopSetupChoice): Promise<void> {
     await writeFile(preferencesFile(), `${JSON.stringify(choice, null, 2)}\n`);
     await openWorkbench();
   } catch (error) {
+    webApps?.close();
+    webApps = null;
     await ui?.close();
     ui = null;
     await kernel?.close();
@@ -346,6 +357,12 @@ async function installBrowser(engine: BrowserEngine): Promise<void> {
 async function openWorkbench(): Promise<void> {
   if (kernel === null || window === null || stopping) return;
   ui = await startUiServer({ kernelUrl: kernel.url, uiRoot: uiRoot() });
+  webApps?.close();
+  webApps = new DesktopWebApps({
+    kernelUrl: kernel.url,
+    parent: window,
+    preload: join(appRoot(), "dist/workbench/electron/web-app-preload.cjs"),
+  });
   const settings = (await fetch(`${kernel.url}/settings`).then((response) =>
     response.json(),
   )) as { model: { hasApiKey: boolean } };
@@ -435,6 +452,8 @@ app.on("before-quit", (event) => {
   clerk?.cleanup();
   preparation.abort();
   void (async () => {
+    webApps?.close();
+    webApps = null;
     await ui?.close();
     await kernel?.close();
     app.exit(0);

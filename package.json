@@ -1,6 +1,6 @@
 {
   "name": "@tulipe1735/prism",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Extensible personal agent workbench for Windows and WSL, powered by Cordis. Creator Mode builds and hot-loads plugins from natural-language requests; browser automation is also available as a standalone CLI.",
   "license": "MIT",
   "repository": {
@@ -28,7 +28,7 @@
     "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test",
     "start": "node dist/cli.js",
     "test": "vitest run --exclude '.scratch/**'",
-    "typecheck": "tsc --noEmit && tsc -p src/workbench/ui/tsconfig.json --noEmit && tsc -p plugins/excalidraw/tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p src/workbench/ui/tsconfig.json --noEmit && tsc -p plugins/excalidraw/tsconfig.json --noEmit && tsc -p plugins/notion/tsconfig.json --noEmit",
     "workbench": "node dist/workbench-ui/server.js",
     "workbench:electron": "electron dist/workbench/electron/main.cjs",
     "package:win": "pnpm build && node --use-env-proxy --experimental-strip-types --disable-warning=ExperimentalWarning scripts/package-windows.ts",

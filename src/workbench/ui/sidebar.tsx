@@ -74,7 +74,7 @@ export function Sidebar({
         <Plus size={18} aria-hidden="true" />
       </Button>
       <div hidden={collapsed} className="flex min-h-0 flex-1 flex-col">
-        <div className="border-b px-5 pt-6 pb-5">
+        <div className="px-5 pt-6 pb-4">
           <SectionLabel>工作区</SectionLabel>
           <WorkspacePicker
             key={state.workspace}
@@ -92,7 +92,7 @@ export function Sidebar({
             <Search
               size={14}
               aria-hidden="true"
-              className="pointer-events-none absolute top-2.5 left-2.5 text-muted/70"
+              className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted/70"
             />
             <input
               id="search"
@@ -102,7 +102,7 @@ export function Sidebar({
               onChange={(event) =>
                 workbench.dispatch({ type: "search", query: event.target.value })
               }
-              className="field py-2 pl-8"
+              className="field border-transparent bg-ink/[0.035] py-2 pl-8 focus:bg-paper"
               autoComplete="off"
             />
           </div>
@@ -112,7 +112,7 @@ export function Sidebar({
             className="min-h-0 flex-1 overflow-y-auto"
           >
             {groups.length === 0 ? (
-              <div className="empty px-3 py-8 text-[13px] leading-6 text-muted">
+              <div className="empty px-3 py-8 text-sm leading-6 text-muted">
                 <MessageSquare
                   size={20}
                   strokeWidth={1.4}
@@ -219,7 +219,7 @@ function WorkspacePicker({
         workbench.openWorkspace(path);
       }}
     >
-      <label htmlFor="workspace-input" className="mb-2 block text-[13px] font-semibold">
+      <label htmlFor="workspace-input" className="mb-2 block text-sm font-semibold">
         {state.workspace === "" ? "选择你的工作区" : workspaceName(state.workspace)}
       </label>
       {desktop === undefined ? null : (
@@ -290,7 +290,7 @@ function SessionRow({
   if (edit?.kind === "delete")
     return (
       <div className="session mb-1 rounded-lg border bg-paper p-3">
-        <p className="title truncate text-[13px] font-medium">{title}</p>
+        <p className="title truncate text-sm font-medium">{title}</p>
         <p className="my-2 text-xs leading-5 text-muted">删除这个会话及其日志？</p>
         <div className="flex gap-2">
           <Button
@@ -311,14 +311,8 @@ function SessionRow({
     );
   return (
     <div
-      className={`session group/row relative mb-0.5 rounded-md ${active ? "active bg-paper shadow-[0_1px_2px_rgba(31,35,40,0.06)]" : "hover:bg-ink/[0.035]"}`}
+      className={`session group/row relative mb-0.5 rounded-md transition-colors ${active ? "active bg-ink/[0.07]" : "hover:bg-ink/[0.035]"}`}
     >
-      {active ? (
-        <span
-          aria-hidden="true"
-          className="absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-full bg-accent"
-        />
-      ) : null}
       <button
         type="button"
         data-action="open-session"
@@ -328,15 +322,13 @@ function SessionRow({
           void workbench.openSession(session.id);
           onNavigate();
         }}
-        className="block w-full min-w-0 py-2.5 pr-16 pl-3 text-left"
+        className="flex w-full min-w-0 items-center gap-2 py-2.5 pr-16 pl-3 text-left"
       >
+        <MessageSquare size={15} aria-hidden="true" className="shrink-0 text-muted" />
         <span
-          className={`title block truncate text-[13px] ${active ? "font-semibold" : "font-medium"}`}
+          className={`title block min-w-0 truncate text-sm ${active ? "font-semibold" : "font-medium"}`}
         >
           {title}
-        </span>
-        <span className="mt-0.5 block truncate text-xs text-muted">
-          {formatDate(session.updatedAt)}
         </span>
       </button>
       <div className="absolute top-2 right-1 flex opacity-0 transition-opacity delay-100 duration-150 group-focus-within/row:opacity-100 group-focus-within/row:delay-0 group-hover/row:opacity-100 group-hover/row:delay-0">
@@ -413,11 +405,4 @@ function RenameSession({
       </div>
     </form>
   );
-}
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString("zh-CN", {
-    month: "long",
-    day: "numeric",
-  });
 }

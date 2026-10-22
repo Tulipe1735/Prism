@@ -3,6 +3,7 @@ export type KernelErrorCode =
   | "SESSION_NOT_FOUND"
   | "APPROVAL_NOT_FOUND"
   | "TASK_RUNNING"
+  | "TASK_NOT_RUNNING"
   | "CREATOR_DISABLED"
   | "PLUGIN_NOT_FOUND"
   | "PLUGIN_FAILED";

@@ -54,6 +54,7 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 | `SESSION_NOT_FOUND`  | 404  | 会话 id 不存在                         |
 | `APPROVAL_NOT_FOUND` | 404  | 审批请求不存在、已应答或已失效         |
 | `TASK_RUNNING`       | 409  | 该会话已有任务在运行，不能并发再发消息 |
+| `TASK_NOT_RUNNING`   | 409  | 当前没有可接收补充指令的任务           |
 | `CREATOR_DISABLED`   | 403  | Creator Mode 未开启，拒绝安装插件      |
 | `PLUGIN_NOT_FOUND`   | 404  | 插件不存在                             |
 | `PLUGIN_FAILED`      | 422  | 插件加载或更新失败                     |
@@ -61,29 +62,34 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 
 ## 端点
 
-| 方法   | 路径                                      | 用途                    |
-| ------ | ----------------------------------------- | ----------------------- |
-| GET    | `/status`                                 | 内核状态                |
-| GET    | `/settings`                               | 读取设置                |
-| PUT    | `/settings`                               | 修改设置                |
-| GET    | `/plugins`                                | 插件列表与加载状态      |
-| POST   | `/plugins`                                | 插件安装、检查与启停    |
-| GET    | `/sessions?workspace=<path>`              | 会话列表                |
-| POST   | `/sessions`                               | 新建会话                |
-| GET    | `/sessions/:id`                           | 继续会话（摘要 + 条目） |
-| PATCH  | `/sessions/:id`                           | 重命名会话（title）     |
-| DELETE | `/sessions/:id`                           | 删除会话                |
-| POST   | `/sessions/:id/messages`                  | 发送用户消息            |
-| POST   | `/sessions/:id/attachments?name=<文件名>` | 上传会话附件            |
-| POST   | `/terminals`                              | 打开工作区终端          |
-| GET    | `/terminals/:id/events`                   | 终端输出 SSE            |
-| POST   | `/terminals/:id/input`                    | 输入终端字符            |
-| POST   | `/terminals/:id/resize`                   | 调整终端尺寸            |
-| POST   | `/sessions/:id/cancel`                    | 取消运行中的任务        |
-| POST   | `/sessions/:id/compact`                   | 手动压缩上下文          |
-| POST   | `/sessions/:id/approvals/:requestId`      | 应答审批                |
-| GET    | `/events`                                 | SSE 事件流              |
-| POST   | `/shutdown`                               | 关闭内核                |
+| 方法   | 路径                                                    | 用途                      |
+| ------ | ------------------------------------------------------- | ------------------------- |
+| GET    | `/status`                                               | 内核状态                  |
+| GET    | `/settings`                                             | 读取设置                  |
+| PUT    | `/settings`                                             | 修改设置                  |
+| GET    | `/plugins`                                              | 插件列表与加载状态        |
+| POST   | `/plugins`                                              | 插件安装、检查与启停      |
+| GET    | `/sessions?workspace=<path>`                            | 会话列表                  |
+| POST   | `/sessions`                                             | 新建会话                  |
+| GET    | `/sessions/:id`                                         | 继续会话（摘要 + 条目）   |
+| PATCH  | `/sessions/:id`                                         | 重命名会话（title）       |
+| DELETE | `/sessions/:id`                                         | 删除会话                  |
+| POST   | `/sessions/:id/messages`                                | 发送用户消息              |
+| POST   | `/sessions/:id/steering`                                | 补充运行中任务的要求      |
+| POST   | `/sessions/:id/attachments?name=<文件名>`               | 上传会话附件              |
+| GET    | `/sessions/:id/attachments/:attachmentId`               | 读取/下载本会话附件       |
+| POST   | `/plugins/:name/host/:method`                           | 当前会话的通用 Agent 接口 |
+| POST   | `/plugins/:name/resources?sessionId=<id>&name=<文件名>` | 插件上传二进制附件        |
+| GET    | `/plugins/:name/resources/:resourceId?sessionId=<id>`   | 插件读取二进制附件        |
+| POST   | `/terminals`                                            | 打开工作区终端            |
+| GET    | `/terminals/:id/events`                                 | 终端输出 SSE              |
+| POST   | `/terminals/:id/input`                                  | 输入终端字符              |
+| POST   | `/terminals/:id/resize`                                 | 调整终端尺寸              |
+| POST   | `/sessions/:id/cancel`                                  | 取消运行中的任务          |
+| POST   | `/sessions/:id/compact`                                 | 手动压缩上下文            |
+| POST   | `/sessions/:id/approvals/:requestId`                    | 应答审批                  |
+| GET    | `/events`                                               | SSE 事件流                |
+| POST   | `/shutdown`                                             | 关闭内核                  |
 
 ### GET /status
 
@@ -120,16 +126,40 @@ ID、是否有待启用版本、开发目录和错误。准备不会执行插件
 ### 通用插件 UI 与 RPC
 
 - `GET /plugins/ui` →
-  `{ "entries": [...] }`：仅包含活动插件的 UI 声明和带 revision 的资源 URL。
+  `{ "entries": [...] }`：仅包含活动插件的 UI 声明和带 revision 的资源 URL。原生网页贡献可带
+  `webApp:{url,origins,entry,scriptUrl,styleUrl}`，后两个字段指向当前活动版本的适配 JS/CSS。
 - `GET /plugins/:name/assets/:revision/:id/*`：只服务当前活动版本的编译后 UI 资源。停用或版本过期返回 404，拒绝路径越界。设置独立 CSP 和资源类型。
 - `POST /plugins/:name/rpc/:method`，JSON `{ "sessionId": "真实会话", "input": ... }` →
   `{ "result": ... }`。宿主验证会话存在，提供取消信号；插件负责输入校验。插件的
   `PluginError` 保留 code、message、HTTP status。
+- `POST /plugins/:name/host/:method` 使用相同 JSON 外形并要求
+  `application/json`，方法限定为
+  `agent.read`、`agent.send`、`agent.steer`、`agent.command`。只允许活动且声明 UI 的插件；发送与补充输入为
+  `{text,context?,attachments?}`，命令为
+  `{command:"cancel"|"compact"}`。可选 context 持久化为消息元数据，以用户级任务数据提供给模型。所有工具执行复用共享 harness 与权限检查。
+- `POST /plugins/:name/resources?sessionId=<id>&name=<文件名>` 直接上传字节，返回
+  `{resource:{id,name,size,mediaType}}`。`GET /plugins/:name/resources/:id?sessionId=<id>`
+  返回原始字节，`x-prism-resource`
+  响应头携带 URI 编码后的引用 JSON。附件按会话隔离，最多 20
+  MiB，插件不可指定任意主机路径。
+
+`agent.read` 返回 `{sessionId,entries,running,pending,approvals}`。`send` 与 `steer`
+返回
+`{entryId}`。前者只在空闲时创建任务，后者将输入排队，在当前整批工具调用结束后写入用户消息并进入下一轮。队列属于当前进程；取消或任务失败时未应用的输入发布
+`task.input: cancelled`，客户端需保留或重新提交要求。接口不接受任意 shell 命令。请求取消只中止在途调用，已接受的任务需要显式 cancel。
+
+`GET /sessions/:id` 同时返回 `running` 与待处理
+`approvals`，供断线恢复与重新打开会话时恢复实际运行状态。附件下载响应设置
+`Content-Disposition: attachment`、`nosniff` 与 sandbox
+CSP；工作台支持图片缩略图和按需文本预览。
 
 源 Bundle 最多 1 MB，插件 RPC 请求上限为 21 MiB（画布场景自身限制 20
 MiB）。UI 请求经工作台同源代理转发。插件事件通过 `plugin.event`
 携带 plugin、name、data 和可选 sessionId；`plugins.updated`
 通知客户端重新获取目录，无轮询。
+
+桌面专用的 `app.open`、`app.insertText` 由 Electron Host 处理，不是 HTTP
+Host 端点。前者仅从可信工作台打开活动贡献声明的 HTTPS 站点；后者在绑定的原生页中核对实际编辑证据后输入文字。非声明 origin、子 frame、停用版本及不存在的会话不可调用。普通浏览器不能打开受管原生应用。完整契约见[原生网页应用](../develop/plugins.md#桌面端原生网页应用)。
 
 ### GET /settings
 
@@ -388,6 +418,7 @@ MiB，文件名必须是单个有效名称，不能包含路径分隔符。
 `GET /events`，`content-type: text/event-stream`。每条事件写成：
 
 ```
+id: <process-epoch>:<sequence>
 event: tool.started
 data: {"type":"tool.started","sessionId":"...","callId":"...","name":"read_file","arguments":{"path":"README.md"}}
 
@@ -397,10 +428,14 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"read_file"
   `EventSource` 的 `onmessage` 或按类型 `addEventListener`。
 - 连接建立后立即推送一条当前 `kernel.status`（迟到的订阅者据此显示状态与版本）。
 - 每 15 秒发送一行注释 `: keep-alive` 保活。
-- 不重放历史事件：重连后工作台用 `GET /sessions/:id` 取回状态。事件只用于增量。
-- 事件不带 `id:`，客户端不需要 `Last-Event-ID`。
+- 业务事件带 `id:`；重连客户端通过 `Last-Event-ID`
+  请求补发遗漏事件，进程内保留最近 512 条。
+- 游标过期或属于上一进程时，先发送
+  `stream.reset`。客户端重读会话、运行状态、待审批操作与插件业务状态。工作台代理保留游标和二进制资源响应头。
+- 连接状态变化会传给插件
+  `onContext`，请求超时/取消会中止对应 HTTP/RPC；写操作不自动重试。
 
-事件类型（定义见 `src/kernel/events.ts`，共 9 种）：
+事件类型（定义见 `src/kernel/events.ts`）：
 
 | 类型                 | 载荷（除 `type` 外）                                           | 语义                                                     |
 | -------------------- | -------------------------------------------------------------- | -------------------------------------------------------- |
@@ -413,6 +448,11 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"read_file"
 | `session.updated`    | `session`（会话摘要）                                          | 会话日志已变化，含最后 `entryCount`/`leafId`             |
 | `session.compacted`  | `sessionId`, `entryId`, `reason`                               | 已写入 `compaction` 条目；`reason` 为 `auto` 或 `manual` |
 | `kernel.status`      | `status`, `version`, `dataDir`                                 | 连接建立时与状态切换时                                   |
+| `task.state`         | `sessionId`, `running`                                         | 任务启动与最终清理完成                                   |
+| `task.input`         | `sessionId`, `entryId`, `state`                                | steering 的 `queued` / `applied` / `cancelled` 状态      |
+| `stream.reset`       | 无                                                             | 回放不可用，重新同步快照                                 |
+| `plugins.updated`    | 无                                                             | 活动插件目录改变                                         |
+| `plugin.event`       | `plugin`, `name`, `sessionId?`, `data`                         | 插件业务事件                                             |
 
 顺序保证（可断言）：
 
@@ -424,7 +464,8 @@ data: {"type":"tool.started","sessionId":"...","callId":"...","name":"read_file"
    `entryId` 与该会话日志中的 `message` 条目 id 一致。
 4. `approval.requested` 先于同一 `requestId` 的 `approval.resolved`；同一 `requestId` 的
    `approval.requested` 只出现一次。
-5. 取消之后不再出现本次任务的事件。
+5. 取消后仍会写入最终结果、发布未应用输入的取消状态及
+   `task.state: running=false`；不会继续开始后续工具调用。
 6. `session.compacted` 一定在该 `entryId` 对应的 `session.updated` 之后出现。
 
 ## 工具

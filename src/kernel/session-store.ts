@@ -65,6 +65,7 @@ const entrySchema = z.discriminatedUnion("type", [
     timestamp: z.string().min(1),
     role: z.enum(["user", "assistant", "system", "tool"]),
     content: z.string(),
+    context: z.string().optional(),
     attachments: z
       .array(
         z.object({
@@ -170,6 +171,7 @@ export class SessionStore {
             ...base,
             role: input.role,
             content: input.content,
+            ...(input.context === undefined ? {} : { context: input.context }),
             ...(input.attachments === undefined
               ? {}
               : { attachments: input.attachments }),

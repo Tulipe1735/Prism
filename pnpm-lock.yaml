@@ -156,6 +156,12 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
 
+  plugins/notion:
+    dependencies:
+      '@prism/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
+
 packages:
 
   '@adraffy/ens-normalize@1.11.1':

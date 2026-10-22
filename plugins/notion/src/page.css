@@ -1,0 +1,152 @@
+#prism-notion-root {
+  color: #37352f;
+  font:
+    13px/1.6 system-ui,
+    sans-serif;
+}
+#prism-notion-root * {
+  box-sizing: border-box;
+}
+#prism-notion-root [hidden] {
+  display: none !important;
+}
+#prism-notion-root button,
+#prism-notion-root textarea {
+  font: inherit;
+}
+#prism-notion-root button {
+  cursor: pointer;
+}
+#prism-notion-root button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+#prism-notion-root button:focus-visible,
+#prism-notion-root textarea:focus-visible {
+  outline: 2px solid #9e8ee5;
+  outline-offset: 2px;
+}
+#prism-notion-root .prism-notion-entry {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483600;
+  padding: 10px 16px;
+  border: 1px solid #ddd7ef;
+  border-radius: 24px;
+  color: #6f53b0;
+  background: #f6f2ff;
+  box-shadow: 0 4px 20px #2a253018;
+}
+#prism-notion-root .prism-notion-panel {
+  position: fixed;
+  z-index: 2147483601;
+  display: flex;
+  flex-direction: column;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: min(390px, calc(100vw - 32px));
+  max-height: 900px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e4dfeb;
+  border-radius: 14px;
+  box-shadow: 0 12px 60px #19132226;
+}
+#prism-notion-root header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  border-bottom: 1px solid #f0eef3;
+}
+#prism-notion-root header strong {
+  color: #7756b5;
+  font-size: 14px;
+}
+#prism-notion-root header span {
+  color: #9b9a97;
+  font-size: 11px;
+}
+#prism-notion-root header button {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: #787774;
+  font-size: 22px;
+  line-height: 1;
+}
+#prism-notion-root .prism-notion-log {
+  flex: 1;
+  min-height: 60px;
+  overflow-y: auto;
+  padding: 14px;
+  overflow-wrap: anywhere;
+}
+#prism-notion-root .prism-notion-message {
+  padding: 11px 13px;
+  margin-bottom: 12px;
+  border-radius: 9px;
+  background: #f7f6f9;
+}
+#prism-notion-root .prism-notion-message.user {
+  background: #f1ecfa;
+}
+#prism-notion-root .prism-notion-message strong {
+  font-size: 11px;
+  color: #9b9a97;
+}
+#prism-notion-root .prism-notion-message p {
+  margin: 5px 0 0;
+  white-space: pre-wrap;
+}
+#prism-notion-root .prism-notion-hint {
+  color: #9b9a97;
+  margin: 8px 0;
+}
+#prism-notion-root .prism-notion-state {
+  padding: 8px 14px;
+  margin: 0;
+  color: #9b9a97;
+  font-size: 11px;
+  border-top: 1px solid #f0eef3;
+}
+#prism-notion-root .prism-notion-error {
+  margin: 0;
+  padding: 6px 14px;
+  color: #b12727;
+}
+#prism-notion-root form {
+  padding: 12px;
+  border-top: 1px solid #f0eef3;
+  margin: 0;
+}
+#prism-notion-root textarea {
+  width: 100%;
+  min-height: 80px;
+  max-height: 180px;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid #d9d2e5;
+  border-radius: 9px;
+  background: #fff;
+  color: #37352f;
+}
+#prism-notion-root .prism-notion-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+#prism-notion-root .prism-notion-actions button {
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 7px;
+  background: #f1eef5;
+  color: #787774;
+}
+#prism-notion-root .prism-notion-actions .prism-notion-send {
+  background: #7756b5;
+  color: #fff;
+}

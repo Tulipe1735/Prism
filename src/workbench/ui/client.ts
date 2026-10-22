@@ -1,4 +1,8 @@
-import type { PluginUiEntry } from "../../../packages/plugin-sdk/src/index.ts";
+import type {
+  HostMethod,
+  PluginUiEntry,
+  ResourceReference,
+} from "../../../packages/plugin-sdk/src/index.ts";
 import type { PluginSummary } from "../../kernel/creator.ts";
 import type { KernelEvent } from "../../kernel/events.ts";
 import type {
@@ -8,7 +12,7 @@ import type {
 } from "../../kernel/kernel.ts";
 import type { Attachment, SessionEntry, SessionSummary } from "../../kernel/session.ts";
 import type { TerminalEvent } from "../../kernel/terminal.ts";
-import { readSseData } from "../../shared/sse.ts";
+import { readSseData, readSseFrames } from "../../shared/sse.ts";
 
 export type { SettingsPatch };
 
@@ -37,6 +41,8 @@ export interface KernelClientOptions {
 export interface SessionLogPayload {
   session: SessionSummary;
   entries: SessionEntry[];
+  running: boolean;
+  approvals: Extract<KernelEvent, { type: "approval.requested" }>[];
 }
 
 export interface EventStreamHandlers {
@@ -79,7 +85,19 @@ export class KernelClient {
 
   async pluginUi(): Promise<PluginUiEntry[]> {
     const { entries } = await this.request<{ entries: PluginUiEntry[] }>("/plugins/ui");
-    return entries.map((entry) => ({ ...entry, url: `${this.baseUrl}${entry.url}` }));
+    return entries.map((entry) => ({
+      ...entry,
+      url: `${this.baseUrl}${entry.url}`,
+      ...(entry.webApp === undefined
+        ? {}
+        : {
+            webApp: {
+              ...entry.webApp,
+              scriptUrl: `${this.baseUrl}${entry.webApp.scriptUrl}`,
+              styleUrl: `${this.baseUrl}${entry.webApp.styleUrl}`,
+            },
+          }),
+    }));
   }
 
   async pluginRequest(
@@ -87,12 +105,88 @@ export class KernelClient {
     method: string,
     sessionId: string,
     input: unknown,
+    signal?: AbortSignal,
   ): Promise<unknown> {
     const { result } = await this.request<{ result: unknown }>(
       `/plugins/${encodeURIComponent(plugin)}/rpc/${encodeURIComponent(method)}`,
-      { method: "POST", body: { sessionId, input } },
+      { method: "POST", body: { sessionId, input }, signal },
     );
     return result;
+  }
+
+  async pluginHostRequest(
+    plugin: string,
+    method: HostMethod,
+    sessionId: string,
+    input: unknown,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    const prefix = `/plugins/${encodeURIComponent(plugin)}`;
+    const query = `sessionId=${encodeURIComponent(sessionId)}`;
+    if (method === "resources.upload") {
+      const upload = input as {
+        name?: unknown;
+        mediaType?: unknown;
+        data?: unknown;
+      } | null;
+      if (
+        upload === null ||
+        typeof upload !== "object" ||
+        typeof upload.name !== "string" ||
+        typeof upload.mediaType !== "string" ||
+        !(upload.data instanceof ArrayBuffer)
+      )
+        throw new KernelApiError(
+          400,
+          "INVALID_REQUEST",
+          "文件上传需要名称、类型和二进制内容。",
+        );
+      const { resource } = await this.request<{ resource: ResourceReference }>(
+        `${prefix}/resources?${query}&name=${encodeURIComponent(upload.name)}`,
+        {
+          method: "POST",
+          upload: new Blob([upload.data], { type: upload.mediaType }),
+          signal,
+        },
+      );
+      return resource;
+    }
+    if (method === "resources.read") {
+      const id =
+        input !== null && typeof input === "object" && "id" in input
+          ? input.id
+          : undefined;
+      if (typeof id !== "string")
+        throw new KernelApiError(400, "INVALID_REQUEST", "文件标识无效。");
+      const response = await this.fetchImpl(
+        `${this.baseUrl}${prefix}/resources/${encodeURIComponent(id)}?${query}`,
+        { signal },
+      );
+      if (!response.ok) {
+        const payload = (await response.json()) as {
+          error: { code: string; message: string };
+        };
+        throw new KernelApiError(
+          response.status,
+          payload.error.code,
+          payload.error.message,
+        );
+      }
+      const resource = JSON.parse(
+        decodeURIComponent(response.headers.get("x-prism-resource") ?? "null"),
+      ) as ResourceReference | null;
+      if (resource === null) throw new Error("文件响应缺少引用信息。");
+      return { resource, data: await response.arrayBuffer() };
+    }
+    const { result } = await this.request<{ result: unknown }>(
+      `${prefix}/host/${method}`,
+      { method: "POST", body: { sessionId, input }, signal },
+    );
+    return result;
+  }
+
+  attachmentUrl(sessionId: string, id: string): string {
+    return `${this.baseUrl}/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(id)}`;
   }
 
   async developPlugin(directory: string): Promise<PluginSummary[]> {
@@ -182,6 +276,18 @@ export class KernelClient {
     return cancelled;
   }
 
+  async steerSession(
+    sessionId: string,
+    text: string,
+    attachments: string[] = [],
+  ): Promise<string> {
+    const { entryId } = await this.request<{ entryId: string }>(
+      `/sessions/${encodeURIComponent(sessionId)}/steering`,
+      { method: "POST", body: { text, attachments } },
+    );
+    return entryId;
+  }
+
   /**
    * Compacts the session's context into a summary entry. `compacted: false`
    * means the context was still inside the keep window and nothing changed.
@@ -248,25 +354,49 @@ export class KernelClient {
   /** Subscribes to `/events`; the returned function stops the stream for good. */
   openEvents(handlers: EventStreamHandlers): () => void {
     const controller = new AbortController();
+    let cursor: string | undefined;
     const run = async (): Promise<void> => {
       for (;;) {
         if (controller.signal.aborted) return;
         try {
           const response = await this.fetchImpl(`${this.baseUrl}/events`, {
-            headers: { accept: "text/event-stream" },
+            headers: {
+              accept: "text/event-stream",
+              ...(cursor === undefined ? {} : { "last-event-id": cursor }),
+            },
             signal: controller.signal,
           });
           if (!response.ok || response.body === null)
             throw new Error(`Event stream refused with HTTP ${response.status}`);
           handlers.onState?.("open");
-          for await (const event of parseSse(response.body)) handlers.onEvent(event);
+          for await (const frame of readSseFrames(response.body)) {
+            let event: KernelEvent;
+            try {
+              event = JSON.parse(frame.data) as KernelEvent;
+            } catch {
+              continue;
+            }
+            if (frame.id !== undefined) cursor = frame.id;
+            handlers.onEvent(event);
+          }
         } catch (error) {
           // Dropped or refused: report why and try again below.
-          console.warn("Kernel event stream interrupted:", error);
+          if (!controller.signal.aborted)
+            console.warn("Kernel event stream interrupted:", error);
         }
         if (controller.signal.aborted) return;
         handlers.onState?.("closed");
-        await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+        await new Promise<void>((resolve) => {
+          let timer: ReturnType<typeof setTimeout>;
+          const done = (): void => {
+            clearTimeout(timer);
+            controller.signal.removeEventListener("abort", done);
+            resolve();
+          };
+          timer = setTimeout(done, RETRY_MS);
+          controller.signal.addEventListener("abort", done, { once: true });
+          if (controller.signal.aborted) done();
+        });
       }
     };
     void run();
@@ -275,10 +405,16 @@ export class KernelClient {
 
   private async request<T = unknown>(
     path: string,
-    options: { method?: string; body?: unknown; upload?: File } = {},
+    options: {
+      method?: string;
+      body?: unknown;
+      upload?: Blob;
+      signal?: AbortSignal;
+    } = {},
   ): Promise<T> {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method: options.method ?? "GET",
+      signal: options.signal,
       headers:
         options.upload !== undefined
           ? { "content-type": options.upload.type || "application/octet-stream" }

@@ -1,0 +1,69 @@
+body {
+  margin: 0;
+  background: #fff;
+  color: #37352f;
+  font:
+    14px/1.7 system-ui,
+    sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+.notion-launch {
+  max-width: 560px;
+  margin: 64px auto;
+  padding: 32px;
+}
+.notion-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 2px solid #37352f;
+  border-radius: 7px;
+  font:
+    bold 34px Georgia,
+    serif;
+}
+h1 {
+  margin: 22px 0 10px;
+  font-size: 28px;
+}
+p {
+  color: #787774;
+}
+label {
+  display: grid;
+  gap: 8px;
+  margin-top: 28px;
+}
+input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d3d1cb;
+  border-radius: 7px;
+  font: inherit;
+}
+button {
+  margin-top: 16px;
+  padding: 10px 16px;
+  color: #fff;
+  background: #37352f;
+  border: 0;
+  border-radius: 7px;
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid #8d7fe1;
+  outline-offset: 3px;
+}
+.notion-note {
+  margin-top: 28px;
+  font-size: 12px;
+}

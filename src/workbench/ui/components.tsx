@@ -11,15 +11,15 @@ export function Button({
   variant?: "primary" | "outline" | "ghost";
 }): JSX.Element {
   const styles = {
-    primary: "border-ink bg-ink text-paper hover:border-[#33373d] hover:bg-[#33373d]",
-    outline: "border-line bg-paper text-ink hover:border-[#d5d8dd] hover:bg-surface",
+    primary: "border-ink bg-ink text-paper hover:border-[#504e48] hover:bg-[#504e48]",
+    outline: "border-line bg-paper text-ink hover:border-[#d3d1cb] hover:bg-surface",
     ghost: "border-transparent text-muted hover:bg-ink/5 hover:text-ink",
   };
   return (
     <button
       type={type}
       className={twMerge(
-        "inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-150 disabled:pointer-events-none disabled:opacity-40",
+        "inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium tracking-[-0.01em] transition-colors duration-150 disabled:pointer-events-none disabled:opacity-40",
         styles[variant],
         className,
       )}

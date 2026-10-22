@@ -12,6 +12,14 @@ export type KernelStatus = (typeof KERNEL_STATUSES)[number];
  * never polls.
  */
 export type KernelEvent =
+  | { type: "stream.reset" }
+  | { type: "task.state"; sessionId: string; running: boolean }
+  | {
+      type: "task.input";
+      sessionId: string;
+      entryId: string;
+      state: "queued" | "applied" | "cancelled";
+    }
   | { type: "plugins.updated" }
   | PluginEvent
   | { type: "message.delta"; sessionId: string; entryId: string; delta: string }

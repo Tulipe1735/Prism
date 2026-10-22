@@ -177,7 +177,7 @@ export function apply(ctx: Context, api: BundleApi): void {
 px 高 iframe，多个贡献横向排列并可滚动。侧栏、会话底部、详情与设置使用 192
 px 高的内容 iframe，区域限制高度并支持纵向滚动。主面板不占布局位置：它在右侧栏「插件」页按需打开成占满窗口高度的抽屉，同一时刻只挂载一个选中的面板，关闭按钮或 Esc 收起。没有贡献时不占位；侧栏折叠或详情标签切换时撤销对应的 iframe。
 
-十个位置使用同一套 session 绑定、RPC、事件与 revision 重载规则。Slot 提供呈现位置；输入区插件仍通过自己的 RPC 工作，当前 SDK 不提供读取或改写宿主未发送草稿的操作。单个 Bundle 可声明多个位置，也可在同一位置声明多个具有不同 ID 的贡献。
+十个位置使用同一套 session 绑定、RPC、事件与 revision 重载规则。Slot 提供呈现位置；插件可以调用自身 RPC，也可以通过 SDK 的 Agent 与资源通道访问当前会话。SDK 不提供读取或改写宿主未发送草稿的操作。单个 Bundle 可声明多个位置，也可在同一位置声明多个具有不同 ID 的贡献。
 
 UI 编译成独立浏览器产物，在插件自己的 iframe 中运行。框架依赖也属于 Bundle；无需与宿主共享 React 实例。UI 源码不能导入宿主前端。面板首次打开才请求脚本、样式与字体。停用撤销资源路由和 UI 声明，重载通过新 revision
 URL 更新打开的界面。
@@ -208,17 +208,110 @@ window.addEventListener(
 { "from": "node_modules/@excalidraw/excalidraw/dist/prod/fonts", "to": "fonts" }
 ```
 
+## UI → Agent 与 Host
+
+`PluginClient`
+将插件 RPC 与宿主接口分开。以下操作均由宿主绑定当前活动插件和会话，输入不能覆盖身份：
+
+| SDK 方法                                      | 行为                                                                               |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `agent.read()`                                | 返回 `sessionId`、持久化 `entries`、`running`、待处理 `pending` 输入与 `approvals` |
+| `agent.send({text, context?, attachments?})`  | 记录用户消息并启动共享 harness；任务运行中返回 `TASK_RUNNING`                      |
+| `agent.steer({text, context?, attachments?})` | 补充当前任务；整批工具结果落盘后进入下一轮；无任务时返回 `TASK_NOT_RUNNING`        |
+| `agent.command("cancel")`                     | 停止当前会话任务并拒绝待审批操作                                                   |
+| `agent.command("compact")`                    | 空闲时调用宿主的上下文压缩                                                         |
+| `agent.subscribe(listener)`                   | 订阅当前会话的文本增量、工具、任务与审批事件；返回取消订阅函数                     |
+| `resources.upload(blob, name)`                | 原始二进制上传，返回 `{id,name,size,mediaType}` 引用                               |
+| `resources.read(id)`                          | 读取本会话引用，返回 `{resource,data: ArrayBuffer}`                                |
+
+Agent 接口在已启用的 Standard 插件中也可用，不要求开启 Creator
+Mode。所有工具仍经过原有权限检查与审批；`agent.command`
+只接受上述两个命令。插件停用后这些 Host 路由拒绝新调用。取消单次 RPC 请求不会撤回已接受的 Agent 消息；停止任务使用
+`agent.command("cancel")`。
+
+`text` 是用户可见消息；`context`
+是可选的界面上下文（最多 32,000 字符，如选中元素 ID）。上下文与消息一起持久化，以用户级任务数据交给模型，不作为 system 指令，也不混入可见消息正文。界面表单可通过 JavaScript 处理提交；原生表单导航由 CSP
+`form-action 'none'` 拒绝。
+
+```ts
+const resource = await client.resources.upload(file, file.name);
+await client.agent.send({ text: "按这个素材修改画布", attachments: [resource.id] });
+// 任务运行中使用 client.agent.steer({ text: "补充：用中文标注" })。
+```
+
+每个资源最多 20
+MiB，每条消息最多 10 个不同引用。文件内容存储在宿主，引用只属于上传会话；删除会话同时删除附件。图片可以将读取到的字节转成 Blob
+URL 后展示，文本用 `textContent`
+或 React 文本节点渲染，下载使用宿主附件 URL；清理时撤销 Blob
+URL。不要把 HTML 附件作为可信页面执行。
+
+请求可传
+`{signal,timeoutMs}`，默认 30 秒超时。超时、中止、关闭 UI 和切换会话会清理待应答请求，并取消对应的 HTTP/RPC。消息等写操作不自动重试；超时后先读取会话确认结果。SSE 带游标，宿主保留最近 512 条进程内事件并在重连时补发；游标过期或内核重启时通知重新同步。`onContext`
+在恢复连接和需要重新同步时再次调用；插件应据此重新读取业务状态。待处理 steering 队列属于当前进程，任务取消时发布
+`task.input: cancelled`；已经应用的输入写入会话日志。
+
+## 桌面端原生网页应用
+
+UI 贡献可额外声明 `webApp`，本地 `entry` 负责启动界面，`webApp.entry`
+负责原生页面适配。示例见 `plugins/notion`：
+
+```json
+{
+  "id": "workspace",
+  "slot": "workbench.panel",
+  "title": "Notion",
+  "entry": "src/client.ts",
+  "webApp": {
+    "url": "https://app.notion.com/",
+    "origins": ["https://app.notion.com"],
+    "entry": "src/page.ts"
+  }
+}
+```
+
+地址必须使用 HTTPS 且不含凭据；`origins`
+是最多 8 个精确 origin，不接受通配符或路径。适配入口必须在 Bundle 中，构建时生成独立的
+`webapp.js` / `webapp.css`，服从同样的导入限制和活动版本资源规则。
+
+```ts
+client.onContext(({ desktop }) => {
+  /* desktop 表示桌面网页能力可用 */
+});
+await client.app.open("https://app.notion.com/page");
+```
+
+宿主通用能力创建独立的原生窗口，绑定打开时的插件贡献、revision 和会话；切换工作台会话不会重绑已有窗口。按插件与贡献保留本机登录分区，跨会话共享该插件的站点登录。启用 context
+isolation、renderer sandbox 并关闭 Node
+integration；仅在声明的 origin 注入适配脚本和样式。登录流程可经过其它 HTTPS 站点，这些页面不能访问 Prism 接口。子窗口保留登录回调所需的 opener 关系，使用同一分区，不加载 Prism
+preload，也不注入适配脚本。插件停用、版本替换、环境切换和桌面退出会关闭对应窗口、子窗口并取消在途请求。
+
+适配脚本同样使用
+`PluginClient`：客户端自动选择原生 preload 消息桥，无须获得内核地址、凭据或 Node
+API。宿主验证主 frame、来源、插件活动版本和绑定会话；Agent、RPC、资源与事件沿用同一协议。连接丢失会通知断线，恢复后重新同步。普通浏览器中的本地启动界面明确提示需要桌面端。
+
+`client.app.insertText(text, guard, {signal})` 仅在受管原生页中可用；`guard` 包含
+`token`、`url`、`content`、`selection`。适配器为已观察到的 contenteditable 添加
+`data-prism-edit-token`，恢复实际焦点和 Range；宿主再次核对页面地址、可编辑元素、原文本和当前选区，再通过原生文本输入写入。Agent 修改必须由插件工具声明 effects，通过共享权限检查与审批；此接口本身属于用户 UI 通道，不能当成执行不可信插件的安全边界。已送入原生编辑器的输入无法通过取消请求回滚。
+
+Notion 的 DOM 识别、选区记录、AI 对话面板、页面读写工具都在 Bundle 中，宿主没有 Notion 专用分支。当前只支持可见文字与单个可编辑位置的纯文本输入；真实账号的登录、编辑器版本兼容与云端保存需要在实际工作区验收，不能由本地页面测试代替。使用步骤见
+[Notion 指南](../guide/notion.md)。
+
 ## Excalidraw 与工作区组织
 
 `plugins/excalidraw` 是标准 Bundle，迁移自 Git 历史 `9071d5a`
 的画布实现。工具、版本冲突保护、自动保存、草稿恢复、导入导出、字体与 UI 均由插件拥有；宿主源码没有 Excalidraw 分支、组件导入、专用路由或事件类型。旧
 `<dataDir>/canvases` 仍可读取，新写入使用插件持久数据目录。
 
+素材库左侧的「✦
+AI」按钮打开当前会话的 AI 面板。发送前先等待画布保存，再将需求、选中元素 ID 和可选附件交给 harness；Agent 使用
+`excalidraw_read` / `excalidraw_update`
+更新同一画布。任务运行时可补充指令或停止；断线后同步画布和任务状态，未发送的面板文字按会话保留。主会话草稿不受影响。
+
 `pnpm build`
 构建并分发插件；新安装默认停用，在设置中启用即可。后续添加插件只需遵循 manifest 与 SDK，无须重新构建或修改宿主前端。仓库中的标准插件作为随应用发布的产物才会参与整包构建。
 
 当前工作区抽出 `packages/plugin-sdk`、`packages/plugin-manager`、`packages/runtime` 与
-`plugins/excalidraw`。现有 CLI、桌面入口和浏览器模块保留原位置，避免把目录搬迁混入功能升级。`cli-anything`、`computer-use`
+`plugins/excalidraw`、`plugins/notion`。现有 CLI、桌面入口和浏览器模块保留原位置，避免把目录搬迁混入功能升级。`cli-anything`、`computer-use`
 尚未实现。本次未引入会话级 preset；Creator 开关和后端工具组成仍属于当前内核，共用一个 Agent 循环。
 
 设计参考：[DeepSeek Bundle 分发](https://deepseek-harness.github.io/deepseek-harness/en/develop/basic/publish)、[UI Slot 生命周期](https://deepseek-harness.github.io/deepseek-harness/en/reference/subsystems/slots)和[组合与 HMR](https://deepseek-harness.github.io/deepseek-harness/en/develop/cordis-tutorial/06-composition-and-hmr)。这里只采用当前需求需要的 Bundle、固定 Slot 和 effect 生命周期。

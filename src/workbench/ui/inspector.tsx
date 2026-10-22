@@ -41,7 +41,7 @@ export function Inspector({
               data-view={view}
               aria-pressed={state.view === view}
               onClick={() => dispatch({ type: "view", view })}
-              className={`relative flex items-center gap-1.5 text-[13px] transition-colors ${state.view === view ? "font-semibold text-ink after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-accent" : "text-muted hover:text-ink"}`}
+              className={`relative flex items-center gap-1.5 text-sm transition-colors ${state.view === view ? "font-semibold text-ink after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-ink" : "text-muted hover:text-ink"}`}
             >
               {label}
               {view === "artifacts" ? (
@@ -65,20 +65,20 @@ export function Inspector({
         <div id="artifacts" hidden={state.view !== "artifacts"}>
           <div className="px-5 pt-5 pb-3">
             <SectionLabel>任务产物</SectionLabel>
-            <p className="mt-1.5 text-[13px] leading-6 text-muted">
+            <p className="mt-1.5 text-sm leading-6 text-muted">
               本次会话产生的文件改动与执行结果。
             </p>
           </div>
           {artifacts.length === 0 ? (
-            <div className="empty mx-5 rounded-lg border border-dashed px-5 py-9">
+            <div className="empty mx-5 rounded-md bg-surface px-4 py-7">
               <Files
                 size={22}
                 strokeWidth={1.3}
                 className="mb-3 text-muted/70"
                 aria-hidden="true"
               />
-              <p className="text-[13px] font-medium">还没有文件改动</p>
-              <p className="mt-1.5 text-[13px] leading-6 text-muted">
+              <p className="text-sm font-medium">还没有文件改动</p>
+              <p className="mt-1.5 text-sm leading-6 text-muted">
                 任务开始后，改动的文件会出现在这里。
               </p>
             </div>
@@ -91,7 +91,7 @@ export function Inspector({
           )}
           {state.view === "artifacts" ? <PluginSlot slot="inspector.panel" /> : null}
           <div className="mx-5 mt-8 border-t pt-5 pb-6">
-            <dl className="space-y-3 text-[13px]">
+            <dl className="space-y-3 text-sm">
               <div className="flex justify-between gap-3">
                 <dt className="text-muted">工作区</dt>
                 <dd className="truncate font-medium" title={state.workspace}>
@@ -138,7 +138,7 @@ function ArtifactCard({ artifact }: { artifact: Artifact }): JSX.Element {
       className="artifact min-w-0 overflow-hidden rounded-lg border bg-paper"
       data-path={artifact.path}
     >
-      <summary className="flex items-center gap-2 p-3 text-[13px] transition-colors hover:bg-surface/70">
+      <summary className="flex items-center gap-2 p-3 text-sm transition-colors hover:bg-surface/70">
         <ChevronRight
           size={12}
           className="disclosure shrink-0 text-muted"

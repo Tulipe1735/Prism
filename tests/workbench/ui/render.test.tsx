@@ -318,7 +318,7 @@ it("renders editable kernel settings, effective scope and browser approval state
   ).toContain("尚未读取");
 });
 
-it("offers the thinking effort in a pill beside the model name in the composer", () => {
+it("offers the thinking effort in an accessible menu beside the model name", () => {
   const settings: UiState["settings"] = {
     dataDir: "/home/demo/.prism",
     model: {
@@ -337,10 +337,10 @@ it("offers the thinking effort in a pill beside the model name in the composer",
 
   expect(html).toContain('id="composer-thinking"');
   expect(html).toContain("思考强度");
-  expect(html).toContain("rounded-full");
-  expect(html).toContain('<option value="low" selected="">思考 低</option>');
-  expect(html).toContain('<option value="high">思考 高</option>');
-  expect(html).toContain('<option value="max">思考 最高</option>');
+  // The current effort opens a menu rather than a native option list.
+  expect(html).toContain("<span>effort low</span>");
+  expect(html).toContain('aria-haspopup="menu"');
+  expect(html).not.toContain("<select");
   // The control sits between the model name and the send button.
   expect(html.indexOf('id="composer-model"')).toBeLessThan(
     html.indexOf('id="composer-thinking"'),

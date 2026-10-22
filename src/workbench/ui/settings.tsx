@@ -12,7 +12,7 @@ export function Settings({ workbench }: { workbench: Workbench }): JSX.Element {
   const settings = workbench.state.settings;
   const [pending, setPending] = useState(false);
   if (settings === null)
-    return <p className="p-5 text-[13px] text-muted">尚未读取内核设置。</p>;
+    return <p className="p-5 text-sm text-muted">尚未读取内核设置。</p>;
   async function update(patch: SettingsPatch): Promise<boolean> {
     setPending(true);
     try {
@@ -85,7 +85,7 @@ export function Settings({ workbench }: { workbench: Workbench }): JSX.Element {
               browser: { actionsNeedApproval: !settings.browser.actionsNeedApproval },
             })
           }
-          className="mt-4 flex w-full items-center justify-between gap-3 border-y py-3 text-left text-[13px] transition-colors hover:text-accent"
+          className="mt-4 flex w-full items-center justify-between gap-3 border-y py-3 text-left text-sm transition-colors hover:text-accent"
         >
           浏览器动作需要审批
           <span
@@ -168,7 +168,7 @@ function SettingsForm({
     >
       {model ? (
         <>
-          <label className="block text-[13px]">
+          <label className="block text-sm">
             模型名称
             <input
               name="model"
@@ -178,7 +178,7 @@ function SettingsForm({
               required
             />
           </label>
-          <label className="block text-[13px]">
+          <label className="block text-sm">
             API 端点
             <input
               name="baseUrl"
@@ -189,7 +189,7 @@ function SettingsForm({
               required
             />
           </label>
-          <label className="block text-[13px]">
+          <label className="block text-sm">
             API 密钥
             <input
               name="apiKey"
@@ -202,7 +202,7 @@ function SettingsForm({
         </>
       ) : (
         <>
-          <label className="block text-[13px]">
+          <label className="block text-sm">
             搜索来源
             <input
               name="provider"
@@ -212,7 +212,7 @@ function SettingsForm({
               required
             />
           </label>
-          <label className="block text-[13px]">
+          <label className="block text-sm">
             搜索端点
             <input
               name="baseUrl"

@@ -45,6 +45,8 @@ export interface TaskRun {
   scope: PermissionScope;
   target: ExecutionTarget;
   signal: AbortSignal;
+  /** Host input channel; drains only at complete round boundaries. */
+  takeSteering?: (finishing?: boolean) => Promise<boolean>;
 }
 
 /**
@@ -89,6 +91,7 @@ export async function runTask(run: TaskRun): Promise<void> {
         await finish(run, "The user cancelled the task.");
         return;
       }
+      await run.takeSteering?.();
       let messages = await requestMessages();
       if (
         !compactionFailed &&
@@ -183,6 +186,7 @@ export async function runTask(run: TaskRun): Promise<void> {
 
       if (calls.length === 0) {
         await notifySession(ctx, sessionId);
+        if (!signal.aborted && (await run.takeSteering?.(true))) continue;
         return;
       }
 

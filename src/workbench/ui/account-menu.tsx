@@ -79,7 +79,7 @@ export function AccountMenu({
   }
 
   const item =
-    "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-[13px] outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[highlighted]:bg-surface";
+    "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[highlighted]:bg-surface";
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
@@ -98,7 +98,7 @@ export function AccountMenu({
         {collapsed ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium">{name}</span>
+              <span className="block truncate text-sm font-medium">{name}</span>
               <span className="mt-0.5 block truncate text-xs text-muted">
                 {signedIn ? account.email : loading ? "正在连接账号…" : "本地工作台"}
               </span>
@@ -116,7 +116,7 @@ export function AccountMenu({
           className="z-50 w-64 rounded-lg border bg-paper p-1.5 text-ink shadow-lg shadow-ink/5"
         >
           <DropdownMenu.Label className="px-3 py-3">
-            <span className="block truncate text-[13px] font-semibold">
+            <span className="block truncate text-sm font-semibold">
               {signedIn ? name : "Prism"}
             </span>
             <span className="mt-0.5 block truncate text-xs text-muted">
@@ -193,7 +193,7 @@ export function AccountMenu({
             </>
           ) : null}
           <DropdownMenu.Separator className="my-1 h-px bg-line" />
-          <div className="px-3 py-1.5 text-[11px] tabular-nums text-muted">
+          <div className="px-3 py-1.5 text-xs tabular-nums text-muted">
             Prism v{update.version}
           </div>
         </DropdownMenu.Content>

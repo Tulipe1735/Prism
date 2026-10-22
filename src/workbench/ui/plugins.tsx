@@ -78,7 +78,7 @@ export function Plugins(): JSX.Element {
   }
 
   if (slots === null)
-    return <p className="p-5 text-[13px] text-muted">插件服务尚未连接。</p>;
+    return <p className="p-5 text-sm text-muted">插件服务尚未连接。</p>;
   const sessionReady = connected && slots.sessionId !== null;
   return (
     <fieldset
@@ -98,9 +98,6 @@ export function Plugins(): JSX.Element {
           <RefreshCw size={12} aria-hidden="true" /> 刷新
         </Button>
       </div>
-      <p className="text-xs leading-6 text-muted">
-        插件以内核权限运行，只启用可信代码。启用后的插件面板从这里打开，每个会话独立。
-      </p>
       {error === null ? null : (
         <p role="alert" className="text-xs leading-6 text-accent">
           {error}
@@ -117,7 +114,7 @@ export function Plugins(): JSX.Element {
           data-plugin={plugin.name}
           className="rounded-lg border p-3"
         >
-          <div className="flex items-center justify-between gap-3 text-[13px]">
+          <div className="flex items-center justify-between gap-3 text-sm">
             <span className="font-mono break-all">{plugin.name}</span>
             <span className="shrink-0 text-xs text-muted">
               {STATE_LABELS[plugin.state]}

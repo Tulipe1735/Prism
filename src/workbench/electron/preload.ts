@@ -34,6 +34,7 @@ const desktop: DesktopApi = {
   clerkPublishableKey: CLERK_PUBLISHABLE_KEY,
   selectWorkspace: (currentPath) =>
     ipcRenderer.invoke("prism:workspace:select", currentPath),
+  webApps: { open: (input) => ipcRenderer.invoke("prism:web-app:open", input) },
   updates: {
     read: () => ipcRenderer.invoke("prism:updates:read"),
     check: () => ipcRenderer.invoke("prism:updates:check"),

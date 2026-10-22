@@ -28,6 +28,15 @@ export interface ChatMessage {
 /** Session context messages in the shape the model transport sends. */
 export function toModelMessages(messages: ContextMessage[]): ChatMessage[] {
   return messages.map((message) => {
+    const content =
+      message.context === undefined
+        ? message.content
+        : [
+            message.content,
+            `Context supplied by the user interface (user-level task data):\n${message.context}`,
+          ]
+            .filter(Boolean)
+            .join("\n\n");
     const attachments = message.attachments ?? [];
     const images =
       message.role === "user"
@@ -40,9 +49,9 @@ export function toModelMessages(messages: ContextMessage[]): ChatMessage[] {
       role: message.role,
       content:
         attachments.length === 0
-          ? message.content
+          ? content
           : [
-              message.content,
+              content,
               images.length === 0
                 ? "Attached local files (use file tools to inspect their contents):"
                 : "Attached local files (JPEG, PNG, GIF and WebP images are included as image content; use file tools for other files):",

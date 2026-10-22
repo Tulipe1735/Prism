@@ -45,7 +45,10 @@ export default defineConfig([
     minify: true,
   },
   {
-    entry: { "workbench/electron/preload": "src/workbench/electron/preload.ts" },
+    entry: {
+      "workbench/electron/preload": "src/workbench/electron/preload.ts",
+      "workbench/electron/web-app-preload": "src/workbench/electron/web-app-preload.ts",
+    },
     platform: "node",
     target: "node22",
     format: ["cjs"],

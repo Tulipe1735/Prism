@@ -38,6 +38,14 @@ export interface DesktopApi {
   version: string;
   clerkPublishableKey: string;
   selectWorkspace: (currentPath: string) => Promise<string | null>;
+  webApps: {
+    open: (input: {
+      plugin: string;
+      id: string;
+      sessionId: string;
+      url?: string;
+    }) => Promise<{ opened: boolean }>;
+  };
   updates: {
     read: () => Promise<UpdateState>;
     check: () => Promise<UpdateState>;

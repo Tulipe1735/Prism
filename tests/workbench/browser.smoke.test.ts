@@ -119,16 +119,8 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     expect(attach.x).toBeLessThan(model.x);
     expect(model.x + model.width).toBeLessThan(thinking.x);
     expect(thinking.x + thinking.width).toBeLessThan(send.x);
-    // A pill, not a native box: the corners are rounded past half the height.
-    const pill = (await page.evaluate(`(() => {
-      const node = document.querySelector("#composer-thinking");
-      return {
-        radius: parseFloat(getComputedStyle(node).borderTopLeftRadius),
-        height: node.getBoundingClientRect().height,
-      };
-    })()`)) as { radius: number; height: number };
-    expect(pill.radius).toBeGreaterThanOrEqual(pill.height / 2);
-    await page.selectOption("#composer-thinking", "max");
+    await page.click("#composer-thinking");
+    await page.getByRole("menuitemradio", { name: "max", exact: true }).click();
     await expect
       .poll(async () => (await harness.kernel.kernel.settings()).model.thinking)
       .toBe("max");
@@ -300,7 +292,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
         },
       );
       await page.waitForSelector("#cancel", { state: "detached", timeout: 10_000 });
-      expect(await page.locator("#task-state").getAttribute("title")).toBe(
+      expect(await page.locator("#chat-header span[title]").getAttribute("title")).toBe(
         harness.workspace,
       );
       expect(await page.locator("#timeline").textContent()).toContain("全部完成。");
@@ -594,7 +586,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     await page.keyboard.press("Tab");
     await page.keyboard.press("Enter");
     await page.waitForSelector("#chat-header strong");
-    expect(await page.locator("#task-state").textContent()).toContain(
+    expect(await page.locator("#chat-header span[title]").textContent()).toContain(
       "another-project",
     );
     expect(
@@ -649,7 +641,7 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     const browse = page.getByRole("button", { name: "选择文件夹…", exact: true });
     await browse.click();
     expect(await page.locator("#workspace-input").inputValue()).toBe(harness.workspace);
-    expect(await page.locator("#task-state").textContent()).toContain(
+    expect(await page.locator('label[for="workspace-input"]').textContent()).toContain(
       basename(harness.workspace),
     );
     expect(await page.locator('[data-action="new-session"]').count()).toBe(1);

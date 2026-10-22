@@ -46,7 +46,7 @@ export function CreatorSettings({
         data-action="toggle-creator"
         aria-pressed={enabled}
         onClick={() => void update({ creator: { enabled: !enabled } })}
-        className="mt-3 flex w-full items-center justify-between gap-3 border-y py-3 text-left text-[13px] transition-colors hover:text-accent"
+        className="mt-3 flex w-full items-center justify-between gap-3 border-y py-3 text-left text-sm transition-colors hover:text-accent"
       >
         允许 Agent 创建和更新插件
         <span
