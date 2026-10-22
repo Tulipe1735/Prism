@@ -15,19 +15,25 @@ import {
 } from "react";
 import { KernelClient } from "./client.ts";
 
+/** Slots the host layout renders in place; the panel slot opens in the drawer. */
+export type InlineSlot = Exclude<UiSlot, "workbench.panel">;
+
 interface SlotsState {
   entries: PluginUiEntry[];
   sessionId: string | null;
   connected: boolean;
   client: KernelClient;
   subscribe: (listener: (event: PluginEvent) => void) => () => void;
+  /** Composite `plugin/id` of the panel shown in the drawer, if any. */
+  activePanel: string | null;
+  openPanel: (key: string) => void;
+  closePanel: () => void;
 }
 const Slots = createContext<SlotsState | null>(null);
 
 const layouts = {
   "workbench.header": "toolbar",
   "workbench.sidebar": "content",
-  "workbench.panel": "panel",
   "workbench.status": "toolbar",
   "session.header": "toolbar",
   "session.toolbar": "toolbar",
@@ -35,7 +41,21 @@ const layouts = {
   "composer.toolbar": "toolbar",
   "inspector.panel": "content",
   "settings.panel": "content",
-} as const satisfies Record<UiSlot, "panel" | "toolbar" | "content">;
+} as const satisfies Record<InlineSlot, "toolbar" | "content">;
+
+/** Stable identity for one panel contribution; also the drawer's selection key. */
+export function panelKey(entry: { plugin: string; id: string }): string {
+  return `${entry.plugin}/${entry.id}`;
+}
+
+export function panelEntries(entries: PluginUiEntry[]): PluginUiEntry[] {
+  return entries.filter((entry) => entry.slot === "workbench.panel");
+}
+
+/** Read the shared plugin state; the drawer and the plugin list both use it. */
+export function usePluginSlots(): SlotsState | null {
+  return useContext(Slots);
+}
 
 export function PluginProvider({
   connected,
@@ -49,6 +69,7 @@ export function PluginProvider({
   const [client] = useState(() => new KernelClient());
   const [entries, setEntries] = useState<PluginUiEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [activePanel, setActivePanel] = useState<string | null>(null);
   const listeners = useRef(new Set<(event: PluginEvent) => void>());
   const subscribe = useCallback((listener: (event: PluginEvent) => void) => {
     listeners.current.add(listener);
@@ -56,9 +77,29 @@ export function PluginProvider({
       listeners.current.delete(listener);
     };
   }, []);
+  const openPanel = useCallback((key: string) => setActivePanel(key), []);
+  const closePanel = useCallback(() => setActivePanel(null), []);
   const value = useMemo(
-    () => ({ entries, sessionId, connected, client, subscribe }),
-    [entries, sessionId, connected, client, subscribe],
+    () => ({
+      entries,
+      sessionId,
+      connected,
+      client,
+      subscribe,
+      activePanel,
+      openPanel,
+      closePanel,
+    }),
+    [
+      entries,
+      sessionId,
+      connected,
+      client,
+      subscribe,
+      activePanel,
+      openPanel,
+      closePanel,
+    ],
   );
   useEffect(() => {
     if (!connected) return;
@@ -106,72 +147,92 @@ export function PluginProvider({
   );
 }
 
-export function PluginSlot({ slot }: { slot: UiSlot }): JSX.Element | null {
+export function PluginSlot({ slot }: { slot: InlineSlot }): JSX.Element | null {
   const state = useContext(Slots);
-  const [active, setActive] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
   if (state === null) return null;
   const entries = state.entries.filter((entry) => entry.slot === slot);
   if (entries.length === 0) return null;
   const layout = layouts[slot];
-  const panels = layout === "panel";
-  const selected = entries.find((entry) => `${entry.plugin}/${entry.id}` === active);
   return (
     <section
       data-plugin-slot={slot}
       className={
-        panels
-          ? `shrink-0 border-t ${selected === undefined ? "" : expanded ? "fixed inset-4 z-40 flex flex-col bg-paper shadow-xl" : "flex h-[52%] min-h-72 flex-col"}`
-          : layout === "toolbar"
-            ? "flex min-w-0 shrink items-center gap-2 overflow-x-auto"
-            : "max-h-64 min-w-0 shrink-0 overflow-y-auto"
+        layout === "toolbar"
+          ? "flex min-w-0 shrink items-center gap-2 overflow-x-auto"
+          : "max-h-64 min-w-0 shrink-0 overflow-y-auto"
       }
     >
-      {panels ? (
-        <div className="flex items-center gap-2 px-3 py-2 text-xs">
-          {entries.map((entry) => (
-            <button
-              key={`${entry.plugin}/${entry.id}`}
-              type="button"
-              disabled={!state.connected || state.sessionId === null}
-              aria-pressed={selected === entry}
-              onClick={() => setActive(`${entry.plugin}/${entry.id}`)}
-              className="rounded border px-3 py-1"
-            >
-              {entry.title}
-            </button>
-          ))}
-          {selected === undefined ? null : (
-            <>
-              <button
-                type="button"
-                className="ml-auto"
-                onClick={() => setExpanded((value) => !value)}
-              >
-                {expanded ? "还原" : "放大"}
-              </button>
-              <button
-                type="button"
-                aria-label="关闭插件面板"
-                onClick={() => {
-                  setActive(null);
-                  setExpanded(false);
-                }}
-              >
-                关闭
-              </button>
-            </>
-          )}
-        </div>
-      ) : null}
-      {(panels ? (selected === undefined ? [] : [selected]) : entries).map((entry) => (
+      {entries.map((entry) => (
         <PluginFrame
-          key={`${entry.plugin}/${entry.id}/${entry.revision}/${state.sessionId}`}
+          key={`${panelKey(entry)}/${entry.revision}/${state.sessionId}`}
           entry={entry}
           state={state}
           layout={layout}
         />
       ))}
+    </section>
+  );
+}
+
+/**
+ * Full-height drawer for `workbench.panel` contributions. It opens on demand from
+ * the inspector's plugin list so the canvas keeps the whole area instead of a
+ * narrow column, and it holds a single frame per selected contribution so the
+ * editor's revision guard is never split across two copies.
+ */
+export function PluginPanelDrawer(): JSX.Element | null {
+  const state = useContext(Slots);
+  const closePanel = state?.closePanel;
+  const activePanel = state?.activePanel ?? null;
+  useEffect(() => {
+    if (closePanel === undefined || activePanel === null) return;
+    const escape = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      // Capture phase: the workbench's own Escape handler closes the sidebars next.
+      event.stopPropagation();
+      closePanel();
+    };
+    document.addEventListener("keydown", escape, true);
+    return () => document.removeEventListener("keydown", escape, true);
+  }, [activePanel, closePanel]);
+  if (state === null) return null;
+  const panels = panelEntries(state.entries);
+  const selected = panels.find((entry) => panelKey(entry) === activePanel);
+  if (selected === undefined) return null;
+  return (
+    <section
+      data-plugin-slot="workbench.panel"
+      role="region"
+      aria-label={selected.title}
+      className="fixed top-14 right-0 bottom-0 z-30 flex w-[min(94vw,880px)] flex-col border-l bg-paper shadow-xl"
+    >
+      <div className="flex h-11 shrink-0 items-center gap-2 overflow-x-auto border-b px-3 text-xs">
+        {panels.map((entry) => (
+          <button
+            key={panelKey(entry)}
+            type="button"
+            aria-pressed={entry === selected}
+            onClick={() => state.openPanel(panelKey(entry))}
+            className={`shrink-0 rounded border px-3 py-1 ${entry === selected ? "border-accent text-accent" : ""}`}
+          >
+            {entry.title}
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-label="关闭插件面板"
+          onClick={state.closePanel}
+          className="ml-auto shrink-0 rounded border px-3 py-1"
+        >
+          关闭
+        </button>
+      </div>
+      <PluginFrame
+        key={`${panelKey(selected)}/${selected.revision}/${state.sessionId}`}
+        entry={selected}
+        state={state}
+        layout="panel"
+      />
     </section>
   );
 }

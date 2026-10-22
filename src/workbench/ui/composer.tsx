@@ -1,10 +1,25 @@
 import type { JSX } from "react";
 import type { Workbench } from "./use-workbench.ts";
-import { ArrowUp, FileText, Paperclip, ShieldCheck, Square, X } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronDown,
+  FileText,
+  Paperclip,
+  ShieldCheck,
+  Square,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { THINKING_EFFORTS, type ThinkingEffort } from "../../kernel/types.ts";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS } from "../../shared/attachments.ts";
 import { Button, SCOPE_LABELS, workspaceName } from "./components.tsx";
 import { PluginSlot } from "./plugin-slots.tsx";
+
+const THINKING_LABELS: Record<ThinkingEffort, string> = {
+  low: "低",
+  high: "高",
+  max: "最高",
+};
 
 export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
   const { state } = workbench;
@@ -233,6 +248,32 @@ export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
             >
               {state.settings?.model.model}
             </span>
+            <label className="relative flex shrink-0 items-center">
+              <span className="sr-only">思考强度</span>
+              <select
+                id="composer-thinking"
+                value={state.settings?.model.thinking ?? "high"}
+                disabled={state.settings === null}
+                title="思考强度：回答前的推理深度"
+                onChange={(event) =>
+                  void workbench.updateSettings({
+                    model: { thinking: event.target.value as ThinkingEffort },
+                  })
+                }
+                className="h-7 min-h-7 appearance-none rounded-full border border-line bg-transparent py-0 pr-6 pl-2.5 text-[13px] text-muted transition-colors hover:border-accent/40 hover:text-ink focus-visible:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {THINKING_EFFORTS.map((effort) => (
+                  <option key={effort} value={effort}>
+                    思考 {THINKING_LABELS[effort]}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={12}
+                aria-hidden="true"
+                className="pointer-events-none absolute right-2 text-muted"
+              />
+            </label>
             {busy ? (
               <Button
                 id="cancel"

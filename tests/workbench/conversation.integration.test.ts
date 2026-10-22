@@ -1,12 +1,16 @@
 import { Buffer, File } from "node:buffer";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, rm, stat } from "node:fs/promises";
 import process from "node:process";
 import { afterEach, expect, it } from "vitest";
+import { rebuildContext } from "../../src/kernel/session.ts";
 import { KernelClient } from "../../src/workbench/ui/client.ts";
 import { type KernelHarness, startTestKernel } from "../kernel/harness.ts";
 
 let harness: KernelHarness;
 afterEach(async () => harness?.cleanup());
+
+const PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
 
 it("names a session from its first task, persists the name, and keeps manual names", async () => {
   harness = await startTestKernel({
@@ -88,6 +92,86 @@ it("uploads exact file bytes, sends files without text, exposes their paths to t
   await client.deleteSession(session.id);
   await expect(stat(text.path)).rejects.toMatchObject({ code: "ENOENT" });
 });
+
+it("sends image content through tool rounds, restored history and compaction without persisting base64", async () => {
+  harness = await startTestKernel({
+    answers: [
+      { toolCalls: [{ id: "image-check", name: "echo", arguments: '{"text":"ok"}' }] },
+      { text: ["收到图片"] },
+      { text: ["继续查看图片"] },
+      { text: ["SUMMARY: 已查看截图"] },
+    ],
+    compaction: { triggerTokens: 100_000, keepTokens: 1 },
+  });
+  const client = new KernelClient({ baseUrl: harness.kernel.url });
+  const session = await client.createSession({ workspace: harness.workspace });
+  const bytes = Buffer.from(PNG_BASE64, "base64");
+  const attachments = await Promise.all([
+    client.uploadAttachment(
+      session.id,
+      new File([bytes], "截图.png", { type: "image/png" }),
+    ),
+    client.uploadAttachment(session.id, new File([bytes], "同一截图.PNG")),
+  ]);
+  await client.sendMessage(
+    session.id,
+    "",
+    attachments.map((file) => file.id),
+  );
+  await harness.kernel.kernel.ctx.tasks.settle(session.id);
+
+  // A subsequent turn rebuilds the image references from the stored session log.
+  await client.sendMessage(session.id, "接着分析");
+  await harness.kernel.kernel.ctx.tasks.settle(session.id);
+  expect(harness.model.requests).toHaveLength(3);
+  await client.compactSession(session.id);
+  expect(harness.model.requests).toHaveLength(4);
+  expect(harness.model.requests[3]?.tools).toBeUndefined();
+
+  for (const request of harness.model.requests) {
+    const content = request.messages.find(
+      (message) => message.role === "user",
+    )?.content;
+    expect(Array.isArray(content)).toBe(true);
+    if (!Array.isArray(content)) throw new Error("Expected image content blocks");
+    expect(content.filter((part) => part.type === "image_url")).toEqual([
+      { type: "image_url", image_url: { url: `data:image/png;base64,${PNG_BASE64}` } },
+      { type: "image_url", image_url: { url: `data:image/png;base64,${PNG_BASE64}` } },
+    ]);
+  }
+  const log = await client.readSession(session.id);
+  expect(log.entries[0]).toMatchObject({ role: "user", content: "", attachments });
+  expect(JSON.stringify(log.entries)).not.toContain(PNG_BASE64);
+  expect(
+    rebuildContext(log.entries).some((message) => message.attachments !== undefined),
+  ).toBe(false);
+});
+
+it.each(["missing file", "provider rejection"])(
+  "reports image input failure to the conversation: %s",
+  async (failure) => {
+    harness = await startTestKernel({ answers: [{ status: 400 }] });
+    const client = new KernelClient({ baseUrl: harness.kernel.url });
+    const session = await client.createSession({ workspace: harness.workspace });
+    const attachment = await client.uploadAttachment(
+      session.id,
+      new File([Buffer.from(PNG_BASE64, "base64")], "截图.png", { type: "image/png" }),
+    );
+    if (failure === "missing file") await rm(attachment.path);
+    await client.sendMessage(session.id, "分析这张图", [attachment.id]);
+    await harness.kernel.kernel.ctx.tasks.settle(session.id);
+    const log = await client.readSession(session.id);
+    expect(log.entries).toHaveLength(2);
+    expect(log.entries.at(-1)).toMatchObject({
+      type: "message",
+      role: "system",
+      content: expect.stringContaining(
+        failure === "missing file" ? "Could not read attached image" : "HTTP 400",
+      ),
+    });
+    expect(harness.model.requests).toHaveLength(failure === "missing file" ? 0 : 1);
+  },
+);
 
 it("rejects foreign attachments, invalid filenames and oversized uploads without creating messages", async () => {
   harness = await startTestKernel();

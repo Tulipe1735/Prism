@@ -160,22 +160,22 @@ export function apply(ctx: Context, api: BundleApi): void {
 
 ## 十个 UI Slot
 
-| Slot                | 呈现位置                           |
-| ------------------- | ---------------------------------- |
-| `workbench.header`  | 工作台顶栏，工作区名称之后         |
-| `workbench.sidebar` | 左侧栏，工作区选择与会话列表之间   |
-| `workbench.panel`   | 对话中的通用启动按钮、可放大的面板 |
-| `workbench.status`  | 工作台底部状态栏                   |
-| `session.header`    | 会话标题栏，压缩上下文按钮之前     |
-| `session.toolbar`   | 会话标题栏下方的工具栏             |
-| `session.footer`    | 对话内容之后、审批与输入区之前     |
-| `composer.toolbar`  | 输入框与发送操作之间的工具栏       |
-| `inspector.panel`   | 右侧「产物」页，文件列表之后       |
-| `settings.panel`    | 右侧「设置」页扩展区               |
+| Slot                | 呈现位置                         |
+| ------------------- | -------------------------------- |
+| `workbench.header`  | 工作台顶栏，工作区名称之后       |
+| `workbench.sidebar` | 左侧栏，工作区选择与会话列表之间 |
+| `workbench.panel`   | 右侧「插件」页打开的全高抽屉面板 |
+| `workbench.status`  | 工作台底部状态栏                 |
+| `session.header`    | 会话标题栏，压缩上下文按钮之前   |
+| `session.toolbar`   | 会话标题栏下方的工具栏           |
+| `session.footer`    | 对话内容之后、审批与输入区之前   |
+| `composer.toolbar`  | 输入框与发送操作之间的工具栏     |
+| `inspector.panel`   | 右侧「产物」页，文件列表之后     |
+| `settings.panel`    | 右侧「设置」页扩展区             |
 
 顶栏、状态栏、会话标题栏与两种工具栏使用紧凑的 40
 px 高 iframe，多个贡献横向排列并可滚动。侧栏、会话底部、详情与设置使用 192
-px 高的内容 iframe，区域限制高度并支持纵向滚动。主面板保留按需打开、关闭与放大行为。没有贡献时不占位；侧栏折叠或详情标签切换时撤销对应的 iframe。
+px 高的内容 iframe，区域限制高度并支持纵向滚动。主面板不占布局位置：它在右侧栏「插件」页按需打开成占满窗口高度的抽屉，同一时刻只挂载一个选中的面板，关闭按钮或 Esc 收起。没有贡献时不占位；侧栏折叠或详情标签切换时撤销对应的 iframe。
 
 十个位置使用同一套 session 绑定、RPC、事件与 revision 重载规则。Slot 提供呈现位置；输入区插件仍通过自己的 RPC 工作，当前 SDK 不提供读取或改写宿主未发送草稿的操作。单个 Bundle 可声明多个位置，也可在同一位置声明多个具有不同 ID 的贡献。
 

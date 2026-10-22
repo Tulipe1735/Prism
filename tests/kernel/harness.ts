@@ -2,6 +2,7 @@ import type { Buffer } from "node:buffer";
 import type { Server } from "node:http";
 import type { CommandConfig, CompactionConfig } from "../../src/kernel/config.ts";
 import type { KernelEvent } from "../../src/kernel/events.ts";
+import type { ChatContentPart } from "../../src/kernel/model.ts";
 import type { SessionEntry } from "../../src/kernel/session.ts";
 import type { Tool } from "../../src/kernel/tool.ts";
 import type { SkillToolRoots } from "../../src/kernel/tools.ts";
@@ -39,6 +40,8 @@ export const echoTool: Tool = {
 
 /** One scripted `/chat/completions` answer, consumed in order by the fake model. */
 export interface FakeAnswer {
+  /** Thinking deltas streamed before the text. */
+  reasoning?: string[];
   /** Text deltas the model streams, in order. */
   text?: string[];
   /** Tool calls the model asks for after the text; `arguments` is JSON text. */
@@ -60,16 +63,22 @@ export interface FakeAnswer {
 export interface ModelRequest {
   model: string;
   stream?: boolean;
-  messages: {
-    role: string;
-    content: string | null;
+  /** Effort the client asked for; thinking stays enabled for every level. */
+  reasoning_effort?: string;
+  messages: ({
+    reasoning_content?: string;
     tool_calls?: {
       id: string;
       type: string;
       function: { name: string; arguments: string };
     }[];
     tool_call_id?: string;
-  }[];
+  } & (
+    | { role: "user"; content: string | ChatContentPart[] }
+    | { role: "system"; content: string | null }
+    | { role: "assistant"; content: string | null }
+    | { role: "tool"; content: string }
+  ))[];
   tools?: {
     type: string;
     function: { name: string; description: string; parameters: unknown };
@@ -134,6 +143,10 @@ export async function startFakeModel(
         return;
       }
       response.writeHead(200, { "content-type": "text/event-stream" });
+      for (const delta of answer.reasoning ?? [])
+        response.write(
+          sseChunk({ choices: [{ delta: { reasoning_content: delta } }] }),
+        );
       for (const delta of answer.text ?? [])
         response.write(sseChunk({ choices: [{ delta: { content: delta } }] }));
       for (const [index, call] of (answer.toolCalls ?? []).entries()) {

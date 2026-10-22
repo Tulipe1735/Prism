@@ -29,3 +29,14 @@ export type BrowserEngine = (typeof BROWSER_ENGINES)[number];
 export function isBrowserEngine(value: unknown): value is BrowserEngine {
   return (BROWSER_ENGINES as readonly string[]).includes(value as string);
 }
+
+/** How much the model reasons before answering. */
+export const THINKING_EFFORTS = ["low", "high", "max"] as const;
+
+/** The DeepSeek `reasoning_effort` levels; every effort keeps thinking enabled. */
+export type ThinkingEffort = (typeof THINKING_EFFORTS)[number];
+
+/** True when `value` is one of the three effort literals (config and requests). */
+export function isThinkingEffort(value: unknown): value is ThinkingEffort {
+  return (THINKING_EFFORTS as readonly string[]).includes(value as string);
+}

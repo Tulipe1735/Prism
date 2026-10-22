@@ -23,7 +23,11 @@ describe("kernel config", () => {
     expect(resolveDataDir()).toBe(join("/home/demo", ".prism"));
     expect(await loadConfig({ dataDir: "/data/prism" })).toEqual({
       dataDir: "/data/prism",
-      model: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
+      model: {
+        baseUrl: "https://api.deepseek.com/v1",
+        model: "deepseek-chat",
+        thinking: "high",
+      },
       browser: { engine: "chromium", actionsNeedApproval: false },
       search: { provider: "deepseek" },
       compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
@@ -56,6 +60,7 @@ describe("kernel config", () => {
         baseUrl: "https://api.deepseek.com/v1",
         model: "deepseek-chat",
         apiKey: "sk-explicit",
+        thinking: "high",
       },
       browser: { engine: "firefox", actionsNeedApproval: true },
       search: { provider: "brave", apiKey: "search-from-file" },

@@ -61,6 +61,15 @@ describe.runIf(enabled)("standard plugin UI in the unmodified host", () => {
     sessionId = (await client.listSessions())[0]!.id;
   });
 
+  /** Panels open from the inspector's plugin tab and fill the right drawer. */
+  async function openPanel(plugin = "excalidraw", panel = "canvas"): Promise<void> {
+    await page.locator('[data-view="plugins"]').click();
+    await page
+      .locator(`[data-action="plugin-open"][data-plugin-panel="${plugin}/${panel}"]`)
+      .click();
+    await page.locator('[data-plugin-slot="workbench.panel"]').waitFor();
+  }
+
   afterAll(async () => {
     await page?.close();
     await ui?.close();
@@ -70,8 +79,7 @@ describe.runIf(enabled)("standard plugin UI in the unmodified host", () => {
 
   it("loads Excalidraw on demand, saves imported and manually drawn elements, exports all formats and survives reopening", async () => {
     expect(assets).toEqual([]);
-    await page.getByRole("button", { name: "Excalidraw", exact: true }).click();
-    await page.getByRole("button", { name: "放大", exact: true }).click();
+    await openPanel();
     const frame = page.frameLocator('iframe[data-plugin="excalidraw"]');
     await frame.locator(".excalidraw").waitFor();
     await expect
@@ -140,7 +148,6 @@ describe.runIf(enabled)("standard plugin UI in the unmodified host", () => {
       workspace: harness.workspace,
       title: "Second canvas",
     });
-    await page.getByRole("button", { name: "还原", exact: true }).click();
     await page.click(`[data-action="open-session"][data-session="${second.id}"]`);
     await expect
       .poll(() => frame.locator("[data-canvas-status]").textContent())
@@ -164,7 +171,6 @@ describe.runIf(enabled)("standard plugin UI in the unmodified host", () => {
     await expect
       .poll(() => frame.locator("[data-canvas-status]").textContent())
       .toContain("4 个元素");
-    await page.getByRole("button", { name: "放大", exact: true }).click();
     for (const format of [".excalidraw", "SVG", "PNG"]) {
       const download = page.waitForEvent("download", { timeout: 20_000 });
       await frame.getByRole("button", { name: format, exact: true }).click();
@@ -185,7 +191,7 @@ describe.runIf(enabled)("standard plugin UI in the unmodified host", () => {
     }
     await page.screenshot({ path: ".scratch/plugin-bundles/excalidraw.png" });
     await page.getByRole("button", { name: "关闭插件面板" }).click();
-    await page.getByRole("button", { name: "Excalidraw", exact: true }).click();
+    await openPanel();
     await expect
       .poll(() => frame.locator("[data-canvas-status]").textContent())
       .toContain("4 个元素");
@@ -288,7 +294,7 @@ describe.runIf(enabled)("standard plugin UI in the unmodified host", () => {
     const manager = harness.kernel.kernel.ctx.creator;
     await manager.manage({ action: "develop", directory });
     await manager.manage({ action: "enable", name: "independent-ui" });
-    await page.getByRole("button", { name: "Independent UI", exact: true }).click();
+    await openPanel("independent-ui", "view");
     const frame = page.frameLocator('iframe[data-plugin="independent-ui"]');
     await expect
       .poll(() => frame.locator("body").textContent())
@@ -342,7 +348,7 @@ describe.runIf(enabled)("standard plugin UI in the unmodified host", () => {
     const placements = {
       "workbench.header": "#topbar",
       "workbench.sidebar": "#sidebar",
-      "workbench.panel": "#chat",
+      "workbench.panel": "body",
       "workbench.status": "[data-kernel-status]",
       "session.header": "#chat-header",
       "session.toolbar": "#chat",
@@ -420,10 +426,7 @@ describe.runIf(enabled)("standard plugin UI in the unmodified host", () => {
             `[data-action="view"][data-view="${slot === "settings.panel" ? "settings" : "artifacts"}"]`,
           )
           .click();
-      if (slot === "workbench.panel") {
-        await page.getByRole("button", { name: `Slot ${slot}`, exact: true }).click();
-        await page.getByRole("button", { name: "放大", exact: true }).click();
-      }
+      if (slot === "workbench.panel") await openPanel("slot-tour", "workbench-panel");
       const selector = `${placements[slot]} [data-plugin-slot="${slot}"] iframe[data-plugin="slot-tour"]`;
       await page.locator(selector).waitFor({ state: "visible" });
       const frame = page.frameLocator(selector);

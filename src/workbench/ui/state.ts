@@ -9,7 +9,7 @@ import {
   type SessionGroup,
 } from "./derive.ts";
 
-export type UiView = "artifacts" | "settings";
+export type UiView = "artifacts" | "settings" | "plugins";
 
 /** An approval the user still has to answer. */
 export interface PendingApproval {

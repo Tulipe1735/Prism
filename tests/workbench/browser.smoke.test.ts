@@ -113,12 +113,29 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     await page.getByRole("button", { name: "移除 补充.txt" }).click();
     expect(await page.locator('ul[aria-label="待发送文件"] li').count()).toBe(1);
     const model = (await page.locator("#composer-model").boundingBox())!;
+    const thinking = (await page.locator("#composer-thinking").boundingBox())!;
     const send = (await page.locator("#send").boundingBox())!;
     const attach = (await page.locator("#attach-file").boundingBox())!;
     expect(attach.x).toBeLessThan(model.x);
-    expect(model.x + model.width).toBeLessThan(send.x);
+    expect(model.x + model.width).toBeLessThan(thinking.x);
+    expect(thinking.x + thinking.width).toBeLessThan(send.x);
+    // A pill, not a native box: the corners are rounded past half the height.
+    const pill = (await page.evaluate(`(() => {
+      const node = document.querySelector("#composer-thinking");
+      return {
+        radius: parseFloat(getComputedStyle(node).borderTopLeftRadius),
+        height: node.getBoundingClientRect().height,
+      };
+    })()`)) as { radius: number; height: number };
+    expect(pill.radius).toBeGreaterThanOrEqual(pill.height / 2);
+    await page.selectOption("#composer-thinking", "max");
+    await expect
+      .poll(async () => (await harness.kernel.kernel.settings()).model.thinking)
+      .toBe("max");
     await page.click("#send");
     await page.waitForSelector(".entry.assistant >> text=已经收到需求文件。");
+    // The choice is sent with the very next model request.
+    expect(harness.model.requests[0]?.reasoning_effort).toBe("max");
     expect(await page.locator("#chat-header strong").textContent()).toBe(
       "分析需求文件",
     );
@@ -716,8 +733,8 @@ export function apply(ctx) {
       '.tool[data-call="creator-verify"] .state[data-state="ok"]',
     );
     await page.waitForSelector("#cancel", { state: "detached" });
-    await page.click('[data-view="settings"]');
-    const section = page.locator('[data-section="creator"]');
+    await page.click('[data-view="plugins"]');
+    const section = page.locator('[data-section="plugins"]');
     await section.getByRole("button", { name: "刷新", exact: true }).click();
     const plugin = page.locator('[data-plugin="text-length"]');
     await plugin.waitFor();
@@ -731,9 +748,12 @@ export function apply(ctx) {
       .poll(() => plugin.locator('[data-action="plugin-reload"]').isEnabled())
       .toBe(true);
     await page.screenshot({ path: "/tmp/prism-creator-mode.png" });
+    await page.click('[data-view="settings"]');
     await toggle.click();
     await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("false");
     expect(harness.kernel.kernel.ctx.tools.get("wish_length")).toBeDefined();
+    // Removal lives in the plugin tab, so return to it after the Creator toggle.
+    await page.click('[data-view="plugins"]');
     await plugin.locator('[data-action="plugin-remove"]').click();
     await plugin.waitFor({ state: "detached" });
     expect(harness.kernel.kernel.ctx.tools.get("wish_length")).toBeUndefined();

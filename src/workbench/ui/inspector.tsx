@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { Button, SCOPE_LABELS, SectionLabel, workspaceName } from "./components.tsx";
 import { toArtifacts } from "./derive.ts";
 import { PluginSlot } from "./plugin-slots.tsx";
+import { Plugins } from "./plugins.tsx";
 import { Settings } from "./settings.tsx";
 import { Diff } from "./timeline.tsx";
 
@@ -30,6 +31,7 @@ export function Inspector({
             [
               ["artifacts", "产物"],
               ["settings", "设置"],
+              ["plugins", "插件"],
             ] as const
           ).map(([view, label]) => (
             <button
@@ -116,6 +118,9 @@ export function Inspector({
         <div id="settings" hidden={state.view !== "settings"}>
           <Settings workbench={workbench} />
           {state.view === "settings" ? <PluginSlot slot="settings.panel" /> : null}
+        </div>
+        <div id="plugins" hidden={state.view !== "plugins"}>
+          {state.view === "plugins" ? <Plugins /> : null}
         </div>
       </div>
       {state.approvals.length > 0 ? (

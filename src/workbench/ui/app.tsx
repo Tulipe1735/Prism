@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, PrismMark, SectionLabel, workspaceName } from "./components.tsx";
 import { Composer } from "./composer.tsx";
 import { Inspector } from "./inspector.tsx";
-import { PluginProvider, PluginSlot } from "./plugin-slots.tsx";
+import { PluginPanelDrawer, PluginProvider, PluginSlot } from "./plugin-slots.tsx";
 import { Sidebar } from "./sidebar.tsx";
 import { WorkspaceTerminal } from "./terminal.tsx";
 import { Timeline } from "./timeline.tsx";
@@ -240,7 +240,6 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
           </div>
           <PluginSlot slot="session.toolbar" />
           <Timeline state={state} />
-          <PluginSlot slot="workbench.panel" />
           <PluginSlot slot="session.footer" />
           <div
             id="approvals"
@@ -276,6 +275,7 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
         </aside>
       </main>
       <PluginSlot slot="workbench.status" />
+      <PluginPanelDrawer />
 
       {state.notice === null ? (
         <div id="notice" />

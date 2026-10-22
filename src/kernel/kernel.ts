@@ -11,7 +11,12 @@ import type { InstructionRoots } from "./instructions.ts";
 import type { SessionEntry, SessionSummary } from "./session.ts";
 import type { Tool } from "./tool.ts";
 import type { SkillToolRoots } from "./tools.ts";
-import type { BrowserEngine, ExecutionTarget, PermissionScope } from "./types.ts";
+import type {
+  BrowserEngine,
+  ExecutionTarget,
+  PermissionScope,
+  ThinkingEffort,
+} from "./types.ts";
 import type { WebFetchOverrides } from "./web-tools.ts";
 import { VERSION } from "../shared/version.ts";
 import { saveConfigPatch } from "./config.ts";
@@ -38,7 +43,12 @@ export interface KernelOptions {
 
 export interface KernelSettings {
   dataDir: string;
-  model: { baseUrl: string; model: string; hasApiKey: boolean };
+  model: {
+    baseUrl: string;
+    model: string;
+    hasApiKey: boolean;
+    thinking: ThinkingEffort;
+  };
   browser: { engine: BrowserEngine; actionsNeedApproval: boolean };
   search: { provider: string; baseUrl?: string };
   permissions: { scope: PermissionScope };
@@ -106,11 +116,16 @@ export class Kernel {
   }
 
   settings(): KernelSettings {
-    const { baseUrl, model, apiKey } = this.config.model;
+    const { baseUrl, model, apiKey, thinking } = this.config.model;
     const { provider, baseUrl: searchBaseUrl } = this.config.search;
     return {
       dataDir: this.config.dataDir,
-      model: { baseUrl, model, hasApiKey: apiKey !== undefined && apiKey !== "" },
+      model: {
+        baseUrl,
+        model,
+        hasApiKey: apiKey !== undefined && apiKey !== "",
+        thinking,
+      },
       browser: {
         engine: this.config.browser.engine,
         actionsNeedApproval: this.permissions.browserActionsNeedApproval,

@@ -183,13 +183,17 @@ export function apply(ctx) {
     assert(mcp && !mcp.isError);
     assert.match(mcp.content, /echo: native MCP/);
     assert(
-      model.requests[0]?.messages.some((message) =>
-        message.content?.includes("Native workspace instruction marker."),
+      model.requests[0]?.messages.some(
+        (message) =>
+          typeof message.content === "string" &&
+          message.content.includes("Native workspace instruction marker."),
       ),
     );
     assert(
-      model.requests[0]?.messages.some((message) =>
-        message.content?.includes("Native skill discovery marker."),
+      model.requests[0]?.messages.some(
+        (message) =>
+          typeof message.content === "string" &&
+          message.content.includes("Native skill discovery marker."),
       ),
     );
     const command = results.find((entry) => entry.callId === "command");

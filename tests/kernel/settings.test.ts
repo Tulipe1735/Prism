@@ -104,6 +104,35 @@ it("runs the next model request with the changed model", async () => {
   events.close();
 });
 
+it("changes the thinking effort and sends it on the next model request", async () => {
+  const { kernel, model, workspace, dataDir } = await start({
+    answers: [{ text: ["Done."] }],
+  });
+  const patched = await api<KernelSettings>(kernel.url, "/settings", {
+    method: "PUT",
+    body: { model: { thinking: "low" } },
+  });
+  expect(patched.status).toBe(200);
+  expect(patched.body.model.thinking).toBe("low");
+  // The other model settings are untouched by the narrow patch.
+  expect(patched.body.model.model).toBe("scripted-model");
+
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "hello" },
+  });
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 2,
+  );
+  expect(model.requests[0]?.reasoning_effort).toBe("low");
+  expect(
+    JSON.parse(await readFile(join(dataDir, "config.json"), "utf8")),
+  ).toMatchObject({ model: { thinking: "low" } });
+  events.close();
+});
+
 it("refuses settings it cannot apply instead of dropping them", async () => {
   const { kernel } = await start();
 
@@ -112,6 +141,7 @@ it("refuses settings it cannot apply instead of dropping them", async () => {
     { compaction: { keepTokens: 1000 } },
     { model: { provider: "other" } },
     { model: { baseUrl: "  " } },
+    { model: { thinking: "turbo" } },
     { browser: { engine: "netscape" } },
     { browser: { endpoints: "http://127.0.0.1:9222" } },
     { search: {} },

@@ -484,6 +484,7 @@ it("compacts a long session, loads nested instructions and keeps memory across s
 
   // The instructions reached the model outermost first, before anything was read.
   const first = model.requests[0]!.messages[0]!.content ?? "";
+  if (typeof first !== "string") throw new Error("Expected a text system prompt");
   expect(first).toContain("Global rule: answer in the user's language.");
   expect(first).toContain("Ancestor rule: keep each change small.");
   expect(first).toContain("Workspace rule: run pnpm test before reporting.");

@@ -25,6 +25,11 @@ export interface MessageEntry extends SessionEntryBase {
   role: MessageRole;
   content: string;
   attachments?: Attachment[];
+  /**
+   * Thinking that preceded an assistant message. Requests carrying tools must
+   * replay it verbatim, or the provider rejects the turn.
+   */
+  reasoning?: string;
 }
 
 export interface Attachment {
@@ -41,6 +46,11 @@ export interface ToolCallEntry extends SessionEntryBase {
   callId: string;
   name: string;
   arguments: string;
+  /**
+   * Thinking of a turn that answered with tool calls but no text; the entry
+   * starts that assistant turn, so the thinking is replayed from here.
+   */
+  reasoning?: string;
   /**
    * What the call declared it would touch (`Tool.effects`), decided before it
    * ran. Absent when the tool declares nothing (MCP tools, for example), which
@@ -72,6 +82,7 @@ export type SessionEntryInput =
       role: MessageRole;
       content: string;
       attachments?: Attachment[];
+      reasoning?: string;
       parentId?: string | null;
       /** Set by the task loop so streamed deltas carry the id of the persisted entry. */
       id?: string;
@@ -83,6 +94,7 @@ export type SessionEntryInput =
       arguments: string;
       /** Declared effects of this call; omitted when the tool declares none. */
       effects?: PermissionAction[];
+      reasoning?: string;
       parentId?: string | null;
       id?: string;
     }
@@ -133,6 +145,8 @@ export interface ContextMessage {
   toolCalls?: ToolCallRecord[];
   /** Set on a tool message: the call this result answers. */
   toolCallId?: string;
+  /** Thinking that preceded this assistant message, replayed with the tools. */
+  reasoning?: string;
 }
 
 export interface ToolCallRecord {
@@ -201,6 +215,7 @@ export function rebuildContext(
           ...(entry.attachments === undefined
             ? {}
             : { attachments: entry.attachments }),
+          ...(entry.reasoning === undefined ? {} : { reasoning: entry.reasoning }),
         };
         messages.push(message);
         openAssistant = entry.role === "assistant" ? message : null;
@@ -208,7 +223,12 @@ export function rebuildContext(
       }
       case "tool_call": {
         if (openAssistant === null) {
-          openAssistant = { role: "assistant", content: "", entryId: entry.id };
+          openAssistant = {
+            role: "assistant",
+            content: "",
+            entryId: entry.id,
+            ...(entry.reasoning === undefined ? {} : { reasoning: entry.reasoning }),
+          };
           messages.push(openAssistant);
         }
         openAssistant.toolCalls ??= [];

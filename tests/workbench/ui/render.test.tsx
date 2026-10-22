@@ -3,6 +3,7 @@ import type { Workbench } from "../../../src/workbench/ui/use-workbench.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { ApprovalCard } from "../../../src/workbench/ui/app.tsx";
+import { Composer } from "../../../src/workbench/ui/composer.tsx";
 import { Inspector } from "../../../src/workbench/ui/inspector.tsx";
 import { Settings } from "../../../src/workbench/ui/settings.tsx";
 import { Sidebar } from "../../../src/workbench/ui/sidebar.tsx";
@@ -266,6 +267,17 @@ it("renders touched files and their bounded diff in the inspector", () => {
   ).toContain("还没有文件改动");
 });
 
+it("offers a plugin tab beside artifacts and settings", () => {
+  const html = renderToStaticMarkup(
+    <Inspector
+      workbench={workbench({ ...emptyState(), view: "plugins" })}
+      onClose={() => {}}
+    />,
+  );
+  expect(html).toMatch(/data-view="plugins"[^>]*aria-pressed="true"/);
+  expect(html).toContain("插件服务尚未连接");
+});
+
 it("renders editable kernel settings, effective scope and browser approval state", () => {
   const state = reduce(emptyState(), {
     type: "settings",
@@ -275,6 +287,7 @@ it("renders editable kernel settings, effective scope and browser approval state
         baseUrl: "https://api.deepseek.com/v1",
         model: "deepseek-chat",
         hasApiKey: true,
+        thinking: "high",
       },
       browser: { engine: "chromium", actionsNeedApproval: false },
       search: { provider: "deepseek", baseUrl: "https://api.deepseek.com" },
@@ -303,4 +316,36 @@ it("renders editable kernel settings, effective scope and browser approval state
   expect(
     renderToStaticMarkup(<Settings workbench={workbench(emptyState())} />),
   ).toContain("尚未读取");
+});
+
+it("offers the thinking effort in a pill beside the model name in the composer", () => {
+  const settings: UiState["settings"] = {
+    dataDir: "/home/demo/.prism",
+    model: {
+      baseUrl: "https://api.deepseek.com/v1",
+      model: "deepseek-chat",
+      hasApiKey: true,
+      thinking: "low",
+    },
+    browser: { engine: "chromium", actionsNeedApproval: false },
+    search: { provider: "deepseek", baseUrl: "https://api.deepseek.com" },
+    permissions: { scope: "workspace-write" },
+    creator: { enabled: false },
+  };
+  const state = reduce(openSession(), { type: "settings", settings });
+  const html = renderToStaticMarkup(<Composer workbench={workbench(state)} />);
+
+  expect(html).toContain('id="composer-thinking"');
+  expect(html).toContain("思考强度");
+  expect(html).toContain("rounded-full");
+  expect(html).toContain('<option value="low" selected="">思考 低</option>');
+  expect(html).toContain('<option value="high">思考 高</option>');
+  expect(html).toContain('<option value="max">思考 最高</option>');
+  // The control sits between the model name and the send button.
+  expect(html.indexOf('id="composer-model"')).toBeLessThan(
+    html.indexOf('id="composer-thinking"'),
+  );
+  expect(html.indexOf('id="composer-thinking"')).toBeLessThan(
+    html.indexOf('id="send"'),
+  );
 });

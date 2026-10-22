@@ -11,6 +11,8 @@ import {
   type BrowserEngine,
   PERMISSION_SCOPES,
   type PermissionScope,
+  THINKING_EFFORTS,
+  type ThinkingEffort,
 } from "./types.ts";
 
 export interface ModelConfig {
@@ -18,6 +20,11 @@ export interface ModelConfig {
   baseUrl: string;
   model: string;
   apiKey?: string;
+  /**
+   * How much the model reasons before answering, sent as `reasoning_effort`.
+   * Thinking stays enabled for every level; `high` is the provider default.
+   */
+  thinking: ThinkingEffort;
 }
 
 export interface PermissionsConfig {
@@ -83,7 +90,11 @@ export interface ConfigPatch {
 }
 
 const DEFAULTS = {
-  model: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
+  model: {
+    baseUrl: "https://api.deepseek.com/v1",
+    model: "deepseek-chat",
+    thinking: "high",
+  },
   browser: { engine: "chromium", actionsNeedApproval: false },
   search: { provider: "deepseek" },
   compaction: { triggerTokens: 100_000, keepTokens: 15_000 },
@@ -99,6 +110,7 @@ const configFileSchema = z
         baseUrl: z.string().min(1),
         model: z.string().min(1),
         apiKey: z.string().min(1),
+        thinking: z.enum(THINKING_EFFORTS),
       })
       .partial()
       .strict()

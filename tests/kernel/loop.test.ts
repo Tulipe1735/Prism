@@ -152,6 +152,100 @@ it("runs the tools the model calls, feeds results back and keeps the log ordered
   events.close();
 });
 
+it("replays the thinking of a tool-only turn and never shows it as a result", async () => {
+  const { kernel, model, workspace, dataDir } = await start({
+    answers: [
+      {
+        reasoning: ["先确认回显", "再回答"],
+        toolCalls: [{ id: "call_1", name: "echo", arguments: '{"text":"pong"}' }],
+      },
+      { text: ["Done."] },
+    ],
+  });
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "ping" },
+  });
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 4,
+  );
+
+  // Thinking is requested at the configured effort but stays transport state.
+  expect(model.requests[0]?.reasoning_effort).toBe("high");
+  expect(
+    events.events
+      .filter((event) => event.type === "message.delta")
+      .map((event) => event.delta)
+      .join(""),
+  ).toBe("Done.");
+
+  // The turn answered with a tool call only, so its thinking rides on the call.
+  const log = await readLog(dataDir, session.id);
+  expect(log[1]).toMatchObject({
+    type: "tool_call",
+    callId: "call_1",
+    reasoning: "先确认回显再回答",
+  });
+  expect(log[3]).toMatchObject({
+    type: "message",
+    role: "assistant",
+    content: "Done.",
+  });
+  expect(log[3]).not.toHaveProperty("reasoning");
+
+  const replayed = model.requests[1]?.messages.at(-2);
+  expect(replayed).toMatchObject({
+    role: "assistant",
+    content: null,
+    reasoning_content: "先确认回显再回答",
+  });
+  expect(replayed?.tool_calls).toEqual([
+    {
+      id: "call_1",
+      type: "function",
+      function: { name: "echo", arguments: '{"text":"pong"}' },
+    },
+  ]);
+  events.close();
+});
+
+it("replays the thinking of an answer without tool calls on the next turn", async () => {
+  const { kernel, model, workspace } = await start({
+    answers: [{ reasoning: ["想一想"], text: ["好"] }, { text: ["ok"] }],
+  });
+  const events = await connectEvents(`${kernel.url}/events`);
+  const session = await createSession(kernel.url, workspace);
+
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "第一问" },
+  });
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 2,
+  );
+  await api(kernel.url, `/sessions/${session.id}/messages`, {
+    method: "POST",
+    body: { text: "第二问" },
+  });
+  await events.waitFor(
+    (event) => event.type === "session.updated" && event.session.entryCount === 4,
+  );
+
+  const messages = model.requests[1]?.messages ?? [];
+  const answer = messages.find(
+    (message) => message.role === "assistant" && message.content === "好",
+  );
+  expect(answer?.reasoning_content).toBe("想一想");
+  // The question that has no thinking behind it does not grow the field.
+  expect(messages.find((message) => message.role === "user")).not.toHaveProperty(
+    "reasoning_content",
+  );
+  events.close();
+});
+
 it("lists skills in the system prompt and reads one through the skill tool", async () => {
   const { kernel, model, workspace, dataDir, home } = await start({
     answers: [

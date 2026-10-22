@@ -141,7 +141,8 @@ MiB）。UI 请求经工作台同源代理转发。插件事件通过 `plugin.ev
   "model": {
     "baseUrl": "https://api.deepseek.com/v1",
     "model": "deepseek-chat",
-    "hasApiKey": true
+    "hasApiKey": true,
+    "thinking": "high"
   },
   "browser": { "engine": "chromium", "actionsNeedApproval": false },
   "search": { "provider": "deepseek" },
@@ -156,6 +157,8 @@ MiB）。UI 请求经工作台同源代理转发。插件事件通过 `plugin.ev
   切换，下一次 `browser_open` 使用新引擎。
 - `browser.actionsNeedApproval` 取布尔值，默认 `false`：为 `true`
   时每个浏览器动作都要一次审批。工作台入口由工作台消费本契约出卡片。
+- `model.thinking` 是思考强度，取 `low` | `high` | `max`，默认
+  `high`；随每次模型请求发送为 `reasoning_effort`，思考在每一档都保持开启。
 - `search` 报告当前来源；配置了 `search.baseUrl` 时一并报告（缺省时省略该键）。
 - `creator.enabled` 默认 `false`；开启后向模型提供 `creator_inspect` 和
   `plugin_manager`。关闭不会停用已安装插件。
@@ -182,6 +185,10 @@ MiB）。UI 请求经工作台同源代理转发。插件事件通过 `plugin.ev
 ```
 
 ```json
+{ "model": { "thinking": "max" } }
+```
+
+```json
 { "search": { "provider": "gateway", "baseUrl": "https://gateway.example.com" } }
 ```
 
@@ -192,15 +199,16 @@ MiB）。UI 请求经工作台同源代理转发。插件事件通过 `plugin.ev
 → 200，应答体与 `GET /settings` 相同，即修改后生效的全部设置。内核同时把修改合并进
 `<dataDir>/config.json`，下次启动沿用（未写过的字段保持原值）。
 
-| 段            | 可改的键                        | 生效时机                         |
-| ------------- | ------------------------------- | -------------------------------- |
-| `permissions` | `scope`                         | 下一次工具调用                   |
-| `browser`     | `engine`、`actionsNeedApproval` | 下一次 `browser_open` / 动作判定 |
-| `model`       | `baseUrl`、`model`、`apiKey`    | 下一次模型请求                   |
-| `search`      | `provider`、`baseUrl`           | 下一次 `web_search`              |
-| `creator`     | `enabled`                       | 当前工具列表与下一次模型请求     |
+| 段            | 可改的键                                 | 生效时机                         |
+| ------------- | ---------------------------------------- | -------------------------------- |
+| `permissions` | `scope`                                  | 下一次工具调用                   |
+| `browser`     | `engine`、`actionsNeedApproval`          | 下一次 `browser_open` / 动作判定 |
+| `model`       | `baseUrl`、`model`、`apiKey`、`thinking` | 下一次模型请求                   |
+| `search`      | `provider`、`baseUrl`                    | 下一次 `web_search`              |
+| `creator`     | `enabled`                                | 当前工具列表与下一次模型请求     |
 
 - `model.apiKey` 只写不回传：应答只带 `model.hasApiKey: true`。
+- `model.thinking` 只接受三个枚举值，其他取值返回 400。
 - 以上字段都必须是非空字符串（或枚举值）；`browser.endpoint` 与 `compaction`
   等启动期设置不在本端点内，`PUT` 它们返回 400。
 - 范围切换立即生效：正在运行的任务，其下一次工具调用就按新档位判定。
@@ -248,7 +256,10 @@ MiB）。UI 请求经工作台同源代理转发。插件事件通过 `plugin.ev
 `attachments`
 可省略。允许只发送附件；文本和附件不能同时为空。附件必须属于当前会话，每条消息最多 10 个。用户消息条目保留附件的
 `id`、`name`、`path`、`size` 与
-`mediaType`；重建模型上下文时附上本地路径和类型，供文件工具读取，文件字节不直接塞进文本上下文。
+`mediaType`。重建模型上下文时附上本地路径和类型；JPEG、PNG、GIF、WebP 图片在发送请求时读取文件，并作为 user 消息中的
+`image_url` 内容块以 base64 data
+URL 传给模型，其余文件供文件工具读取。图片按媒体类型识别，媒体类型不可用时按文件扩展名识别。会话日志不保存 base64；后续轮次和压缩摘要请求会从保留的附件引用重建图片输入。图片读取失败时任务明确报错，不降级为仅发送元数据。上下文估算按每张图片最多 1,024
+token 计入，不把 base64 当作文本计数。端点和模型必须支持图片输入；提供商拒绝图片或请求过大时按模型请求失败处理。
 
 内核把用户消息追加到会话日志后立即应答，任务在后台运行，进展经 SSE 推送。该会话已有任务运行时返回 409
 `TASK_RUNNING`。
@@ -473,4 +484,6 @@ Implementation Decisions）。
 测试经真实内核进程/实例的 HTTP/SSE 接口发起会话、消息与工具调用，配脚本化的假 OpenAI 兼容模型（PRD
 Testing
 Decisions）。测试断言事件序列、会话日志落盘与取消行为，不测内部模块结构。假模型服务只需实现
-`POST <baseUrl>/chat/completions`（`stream: true`，SSE 分块应答）。
+`POST <baseUrl>/chat/completions`（`stream: true`，SSE 分块应答）。请求携带
+`reasoning_effort`（取自 `model.thinking`）；应答的 `reasoning_content`
+分块被当作传输状态收集，随历史以同名 assistant 字段回传，不进入面向用户的输出。

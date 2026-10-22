@@ -168,12 +168,16 @@ it("changes the settings the kernel lets the workbench change", async () => {
 
     // Model, engine and search source are editable too; the key never comes back.
     const switched = await client.updateSettings({
-      model: { model: "deepseek-reasoner", apiKey: "sk-written" },
+      model: {
+        model: "deepseek-reasoner",
+        apiKey: "sk-written",
+        thinking: "max",
+      },
       browser: { engine: "firefox" },
       search: { provider: "deepseek", baseUrl: "https://gateway.example.com" },
     });
     expect(switched).toMatchObject({
-      model: { model: "deepseek-reasoner", hasApiKey: true },
+      model: { model: "deepseek-reasoner", hasApiKey: true, thinking: "max" },
       browser: { engine: "firefox", actionsNeedApproval: true },
       search: { provider: "deepseek", baseUrl: "https://gateway.example.com" },
     });

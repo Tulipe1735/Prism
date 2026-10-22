@@ -61,6 +61,7 @@ it("reads the settings in effect without handing back the model key", async () =
       baseUrl: expect.stringContaining("http://127.0.0.1:"),
       model: "scripted-model",
       hasApiKey: true,
+      thinking: "high",
     },
     browser: { engine: "chromium", actionsNeedApproval: false },
     search: { provider: "deepseek" },

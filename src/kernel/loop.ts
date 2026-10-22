@@ -114,6 +114,8 @@ export async function runTask(run: TaskRun): Promise<void> {
       }
       const entryId = randomUUID();
       let text = "";
+      /** Thinking of this turn: replayed on the next request, never shown. */
+      let reasoning = "";
       const calls: { id: string; name: string; arguments: string }[] = [];
       try {
         for await (const event of ctx.model.stream({
@@ -129,6 +131,8 @@ export async function runTask(run: TaskRun): Promise<void> {
               entryId,
               delta: event.text,
             });
+          } else if (event.type === "reasoning") {
+            reasoning += event.text;
           } else {
             calls.push({ id: event.id, name: event.name, arguments: event.arguments });
           }
@@ -140,6 +144,7 @@ export async function runTask(run: TaskRun): Promise<void> {
             type: "message",
             role: "assistant",
             content: text,
+            ...(reasoning === "" ? {} : { reasoning }),
             id: entryId,
           });
         await finish(run, "The user cancelled the task.");
@@ -155,18 +160,25 @@ export async function runTask(run: TaskRun): Promise<void> {
           type: "message",
           role: "assistant",
           content: text,
+          ...(reasoning === "" ? {} : { reasoning }),
           id: entryId,
         });
       // The effects are decided before the log records the call, so the
       // workbench can tell a file change from a read without guessing names.
       const prepared = calls.map((call) => prepareCall(run, call));
-      for (const item of prepared)
+      // A turn that only called tools has no message entry; its thinking is
+      // kept on the call that starts the turn so the next request can replay it.
+      const turnReasoning = text === "" && reasoning !== "" ? reasoning : undefined;
+      for (const [index, item] of prepared.entries())
         await ctx.sessions.append(sessionId, {
           type: "tool_call",
           callId: item.call.id,
           name: item.call.name,
           arguments: item.call.arguments,
           ...(item.effects.length === 0 ? {} : { effects: item.effects }),
+          ...(index === 0 && turnReasoning !== undefined
+            ? { reasoning: turnReasoning }
+            : {}),
         });
 
       if (calls.length === 0) {

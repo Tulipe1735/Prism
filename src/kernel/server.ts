@@ -20,7 +20,9 @@ import {
   BROWSER_ENGINES,
   isBrowserEngine,
   isPermissionScope,
+  isThinkingEffort,
   PERMISSION_SCOPES,
+  THINKING_EFFORTS,
 } from "./types.ts";
 
 /** Cap on request bodies; the workbench sends small JSON documents. */
@@ -586,16 +588,25 @@ function parseSettingsPatch(body: unknown): SettingsPatch {
 
   const model = field(body, "model");
   if (model !== undefined) {
-    requireKnownKeys(model, ["baseUrl", "model", "apiKey"]);
+    requireKnownKeys(model, ["baseUrl", "model", "apiKey", "thinking"]);
     patch.model = {};
     for (const key of ["baseUrl", "model", "apiKey"] as const) {
       const value = optionalText(model, key);
       if (value !== undefined) patch.model[key] = value;
     }
+    const thinking = field(model, "thinking");
+    if (thinking !== undefined) {
+      if (!isThinkingEffort(thinking))
+        throw new KernelError(
+          "INVALID_REQUEST",
+          `"model.thinking" must be one of ${THINKING_EFFORTS.join(", ")}`,
+        );
+      patch.model.thinking = thinking;
+    }
     if (Object.keys(patch.model).length === 0)
       throw new KernelError(
         "INVALID_REQUEST",
-        'A "model" patch must set "baseUrl", "model" or "apiKey"',
+        'A "model" patch must set "baseUrl", "model", "apiKey" or "thinking"',
       );
   }
 

@@ -63,6 +63,7 @@ it("loads AGENTS.md from the global root, the ancestors and the workspace", asyn
   );
 
   const prompt = model.requests[0]?.messages[0]?.content ?? "";
+  if (typeof prompt !== "string") throw new Error("Expected a text system prompt");
   expect(prompt).toContain("GLOBAL-RULE");
   expect(prompt).toContain("ANCESTOR-RULE");
   expect(prompt).toContain("WORKSPACE-RULE");

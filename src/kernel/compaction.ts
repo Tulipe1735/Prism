@@ -27,6 +27,8 @@ export interface CompactSessionOptions {
 
 /** Assistant or tool messages carry tool bookkeeping on top of their text. */
 const MESSAGE_OVERHEAD_TOKENS = 8;
+/** DeepSeek's documented upper bound per image; base64 is not prose tokens. */
+const IMAGE_TOKENS = 1_024;
 
 /** Rough token count: about four characters per token for prose, code and JSON. */
 export function estimateTokens(text: string): number {
@@ -37,7 +39,11 @@ export function estimateTokens(text: string): number {
 export function estimateContextTokens(messages: ChatMessage[]): number {
   let tokens = 0;
   for (const message of messages) {
-    tokens += estimateTokens(message.content) + MESSAGE_OVERHEAD_TOKENS;
+    tokens +=
+      estimateTokens(message.content) +
+      estimateTokens(message.reasoning ?? "") +
+      (message.images?.length ?? 0) * IMAGE_TOKENS +
+      MESSAGE_OVERHEAD_TOKENS;
     for (const call of message.toolCalls ?? [])
       tokens +=
         estimateTokens(call.name) +

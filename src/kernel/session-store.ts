@@ -76,6 +76,7 @@ const entrySchema = z.discriminatedUnion("type", [
         }),
       )
       .optional(),
+    reasoning: z.string().optional(),
   }),
   z.object({
     type: z.literal("tool_call"),
@@ -86,6 +87,7 @@ const entrySchema = z.discriminatedUnion("type", [
     name: z.string().min(1),
     arguments: z.string(),
     effects: z.array(permissionActionSchema).optional(),
+    reasoning: z.string().optional(),
   }),
   z.object({
     type: z.literal("tool_result"),
@@ -171,6 +173,7 @@ export class SessionStore {
             ...(input.attachments === undefined
               ? {}
               : { attachments: input.attachments }),
+            ...(input.reasoning === undefined ? {} : { reasoning: input.reasoning }),
           };
         case "tool_call":
           return {
@@ -180,6 +183,7 @@ export class SessionStore {
             name: input.name,
             arguments: input.arguments,
             ...(input.effects === undefined ? {} : { effects: input.effects }),
+            ...(input.reasoning === undefined ? {} : { reasoning: input.reasoning }),
           };
         case "tool_result":
           return {
