@@ -7,6 +7,7 @@ import { setTimeout } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { launchKernel } from "../../src/workbench/kernel-process.ts";
 import { startFakeModel } from "../kernel/harness.ts";
+import { pluginBundle } from "./plugin.ts";
 
 async function main(): Promise<void> {
   assert.equal(process.platform, "win32");
@@ -69,9 +70,8 @@ setInterval(() => {}, 1000);
           name: "plugin_manager",
           arguments: JSON.stringify({
             action: "install",
-            name: "native-check",
-            description: "原生插件验证",
-            source: `import { platform } from 'node:os';
+            bundle: pluginBundle(
+              `import { platform } from 'node:os';
 export const inject = ['tools'];
 export function apply(ctx) {
   ctx.effect(() => ctx.tools.register({
@@ -80,7 +80,19 @@ export function apply(ctx) {
     async execute() { return { content: platform() + ':中文插件' }; }
   }));
 }`,
+              "native-check",
+              "原生插件验证",
+            ),
           }),
+        },
+      ],
+    },
+    {
+      toolCalls: [
+        {
+          id: "plugin-enable",
+          name: "plugin_manager",
+          arguments: JSON.stringify({ action: "enable", name: "native-check" }),
         },
       ],
     },
@@ -233,7 +245,7 @@ export function apply(ctx) {
     await request(`/sessions/${session.id}/messages`, {
       text: "Keep streaming until cancelled",
     });
-    await until(async () => model.requests.length === 6);
+    await until(async () => model.requests.length === 7);
     await request(`/sessions/${session.id}/cancel`, {});
     await until(async () =>
       (await entries()).some(

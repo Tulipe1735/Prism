@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, PrismMark, SectionLabel, workspaceName } from "./components.tsx";
 import { Composer } from "./composer.tsx";
 import { Inspector } from "./inspector.tsx";
+import { PluginProvider, PluginSlot } from "./plugin-slots.tsx";
 import { Sidebar } from "./sidebar.tsx";
 import { WorkspaceTerminal } from "./terminal.tsx";
 import { Timeline } from "./timeline.tsx";
@@ -24,6 +25,17 @@ import { useWorkbench } from "./use-workbench.ts";
 
 export function App(): JSX.Element {
   const workbench = useWorkbench();
+  return (
+    <PluginProvider
+      connected={workbench.state.connected}
+      sessionId={workbench.state.activeId}
+    >
+      <WorkbenchView workbench={workbench} />
+    </PluginProvider>
+  );
+}
+
+function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
   const { state } = workbench;
   const inlineNavigation = useMediaQuery("(min-width: 768px)");
   const inlineInspector = useMediaQuery("(min-width: 1280px)");
@@ -73,7 +85,7 @@ export function App(): JSX.Element {
   return (
     <div
       data-kernel-status={state.connected ? state.kernel?.status : "offline"}
-      className="grid h-dvh grid-rows-[56px_minmax(0,1fr)] overflow-hidden"
+      className="grid h-dvh grid-rows-[56px_minmax(0,1fr)_auto] overflow-hidden"
     >
       <a
         href="#message"
@@ -128,6 +140,7 @@ export function App(): JSX.Element {
               {state.workspace === "" ? "开始" : workspaceName(state.workspace)}
             </span>
           </div>
+          <PluginSlot slot="workbench.header" />
           <button
             ref={inspectorButton}
             type="button"
@@ -193,7 +206,7 @@ export function App(): JSX.Element {
             id="chat-header"
             className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-5 md:px-8 lg:px-12"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               {state.session === null ? (
                 <SectionLabel>任务对话</SectionLabel>
               ) : (
@@ -210,6 +223,7 @@ export function App(): JSX.Element {
                 </>
               )}
             </div>
+            <PluginSlot slot="session.header" />
             {state.session === null ? null : (
               <Button
                 variant="ghost"
@@ -224,7 +238,10 @@ export function App(): JSX.Element {
               </Button>
             )}
           </div>
+          <PluginSlot slot="session.toolbar" />
           <Timeline state={state} />
+          <PluginSlot slot="workbench.panel" />
+          <PluginSlot slot="session.footer" />
           <div
             id="approvals"
             aria-label="待审批动作"
@@ -258,6 +275,7 @@ export function App(): JSX.Element {
           />
         </aside>
       </main>
+      <PluginSlot slot="workbench.status" />
 
       {state.notice === null ? (
         <div id="notice" />

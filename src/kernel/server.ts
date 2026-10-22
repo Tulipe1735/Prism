@@ -38,6 +38,7 @@ export interface KernelServerOptions {
   instructionRoots?: InstructionRoots;
   /** Test seam: a controlled HTTP service instead of the public network. */
   webFetch?: WebFetchOverrides;
+  bundledPlugins?: string | false;
 }
 
 export interface RunningKernel {
@@ -101,6 +102,84 @@ export async function startKernel(
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     const segments = url.pathname.split("/").filter((segment) => segment !== "");
     const method = request.method ?? "GET";
+
+    if (
+      segments[0] === "plugins" &&
+      segments[1] === "ui" &&
+      segments.length === 2 &&
+      method === "GET"
+    ) {
+      sendJson(response, 200, { entries: kernel.ctx.creator.ui() });
+      return;
+    }
+    if (
+      segments[0] === "plugins" &&
+      segments[2] === "assets" &&
+      segments.length >= 6 &&
+      method === "GET"
+    ) {
+      const asset = await kernel.ctx.creator.asset(
+        segments[1]!,
+        segments[3]!,
+        segments[4]!,
+        segments.slice(5).map(decodeURIComponent).join("/"),
+      );
+      response.writeHead(200, {
+        "content-type": asset.contentType,
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "content-security-policy": asset.contentType.startsWith("text/html")
+          ? "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'"
+          : "default-src 'none'; script-src 'self' 'unsafe-eval'; connect-src 'self' data: blob:",
+      });
+      response.end(asset.content);
+      return;
+    }
+    if (
+      segments[0] === "plugins" &&
+      segments[2] === "rpc" &&
+      segments.length === 4 &&
+      method === "POST"
+    ) {
+      if (!request.headers["content-type"]?.startsWith("application/json"))
+        throw new KernelError(
+          "INVALID_REQUEST",
+          "Plugin requests require application/json.",
+        );
+      const body = await readJson(request, 21 * 1024 * 1024);
+      const controller = new AbortController();
+      const abort = (): void => controller.abort();
+      response.on("close", abort);
+      try {
+        sendJson(response, 200, {
+          result: await kernel.ctx.creator.request(
+            segments[1]!,
+            segments[3]!,
+            field(body, "input"),
+            requireText(body, "sessionId"),
+            controller.signal,
+          ),
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.name === "PluginError" &&
+          "code" in error &&
+          "status" in error &&
+          typeof error.code === "string" &&
+          typeof error.status === "number" &&
+          error.status >= 400 &&
+          error.status <= 599
+        )
+          sendJson(response, error.status, {
+            error: { code: error.code, message: error.message },
+          });
+        else throw error;
+      } finally {
+        response.off("close", abort);
+      }
+      return;
+    }
 
     if (segments[0] === "status" && segments.length === 1 && method === "GET") {
       sendJson(response, 200, kernel.statusReport() satisfies KernelStatusReport);
@@ -394,11 +473,14 @@ function classify(error: unknown): { status: number; code: string } {
   return { status: 500, code: "INTERNAL_ERROR" };
 }
 
-async function readJson(request: IncomingMessage): Promise<unknown> {
+async function readJson(
+  request: IncomingMessage,
+  limit = MAX_BODY_BYTES,
+): Promise<unknown> {
   let raw = "";
   for await (const chunk of request) {
     raw += chunk.toString();
-    if (Buffer.byteLength(raw) > MAX_BODY_BYTES)
+    if (Buffer.byteLength(raw) > limit)
       throw new KernelError("INVALID_REQUEST", "Request body is too large");
   }
   if (raw.trim() === "") return {};

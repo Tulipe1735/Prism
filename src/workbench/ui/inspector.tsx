@@ -5,6 +5,7 @@ import { ChevronRight, FileCode2, Files, X } from "lucide-react";
 import { useMemo } from "react";
 import { Button, SCOPE_LABELS, SectionLabel, workspaceName } from "./components.tsx";
 import { toArtifacts } from "./derive.ts";
+import { PluginSlot } from "./plugin-slots.tsx";
 import { Settings } from "./settings.tsx";
 import { Diff } from "./timeline.tsx";
 
@@ -86,6 +87,7 @@ export function Inspector({
               ))}
             </div>
           )}
+          {state.view === "artifacts" ? <PluginSlot slot="inspector.panel" /> : null}
           <div className="mx-5 mt-8 border-t pt-5 pb-6">
             <dl className="space-y-3 text-[13px]">
               <div className="flex justify-between gap-3">
@@ -113,6 +115,7 @@ export function Inspector({
         </div>
         <div id="settings" hidden={state.view !== "settings"}>
           <Settings workbench={workbench} />
+          {state.view === "settings" ? <PluginSlot slot="settings.panel" /> : null}
         </div>
       </div>
       {state.approvals.length > 0 ? (

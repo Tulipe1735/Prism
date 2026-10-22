@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "name": "excalidraw",
+  "version": "1.0.0",
+  "description": "会话独立的 Excalidraw 协作画布，支持 Agent 编辑、自动保存、冲突保护和导入导出。",
+  "backend": "src/canvas.ts",
+  "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "lucide-react": "1.59.0",
+    "zod": "4.6.5"
+  },
+  "ui": [
+    {
+      "id": "canvas",
+      "slot": "workbench.panel",
+      "title": "Excalidraw",
+      "entry": "src/client.tsx"
+    }
+  ],
+  "assets": [
+    { "from": "node_modules/@excalidraw/excalidraw/dist/prod/fonts", "to": "fonts" },
+    {
+      "from": "node_modules/@excalidraw/excalidraw/dist/prod/index.css",
+      "to": "excalidraw.css"
+    }
+  ]
+}

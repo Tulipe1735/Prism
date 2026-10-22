@@ -11,6 +11,7 @@ export default antfu(
     yaml: false,
     ignores: [
       "coverage/**",
+      ".release-worktree/**",
       "dist/**",
       "release/**",
       ".packaging/**",

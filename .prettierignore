@@ -1,4 +1,5 @@
 node_modules/
+.release-worktree/
 dist/
 release/
 .packaging/

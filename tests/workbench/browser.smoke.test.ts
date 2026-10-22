@@ -7,6 +7,7 @@ import process from "node:process";
 import { type Browser, chromium, type Page } from "playwright";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type RunningUiServer, startUiServer } from "../../src/workbench/ui-server.ts";
+import { pluginBundle } from "../fixtures/plugin.ts";
 import { type KernelHarness, startTestKernel } from "../kernel/harness.ts";
 
 const UI_ROOT = resolve("dist/workbench-ui");
@@ -667,10 +668,17 @@ export function apply(ctx) {
               name: "plugin_manager",
               arguments: JSON.stringify({
                 action: "install",
-                name: "text-length",
-                description: "统计文本长度",
-                source,
+                bundle: pluginBundle(source, "text-length", "统计文本长度"),
               }),
+            },
+          ],
+        },
+        {
+          toolCalls: [
+            {
+              id: "creator-enable",
+              name: "plugin_manager",
+              arguments: JSON.stringify({ action: "enable", name: "text-length" }),
             },
           ],
         },

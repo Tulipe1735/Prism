@@ -52,7 +52,9 @@ const plugin = {
 
 新增内置插件时，在对应的 `plugins/` 模块导出插件，并加入装配入口。用户插件通过
 [Creator Mode](../guide/creator-mode.md) 管理，源码与启用状态保存在数据目录的 `plugins/`
-中。当前不提供插件市场、DSH 配置加载器或文件监听式自动热更新；显式安装、更新和重载立即生效。用户插件的具体契约见[插件开发](../develop/plugins.md)。
+中。多文件 Bundle 经独立 pnpm 依赖检查和 esbuild 构建后暂存，显式启用时才求值后端。开发目录启用后支持文件监听重载；UI 通过十个通用 Slot 注册。职责位于
+`packages/plugin-sdk`、`packages/plugin-manager` 和 `packages/runtime`，Excalidraw 位于
+`plugins/excalidraw`。用户插件具体契约见[插件开发](../develop/plugins.md)。
 
 ## 验证
 

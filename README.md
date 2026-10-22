@@ -42,11 +42,11 @@ Windows 原生模式无需 WSL，也无需另外安装 Node。WSL 模式使用�
 
 > 给我做一个统计文本字数的插件，安装后用一段中文和英文验证它。
 
-Agent 可以检查当前能力，生成 JavaScript 插件，调用 `plugin_manager`
-安装，再在下一轮直接调用新工具。插件保存在内核数据目录，重启后恢复。设置中可以查看、启用、停用、重载和移除插件；更新失败时恢复旧版本。
+Agent 可以检查能力并准备多文件 Bundle，单独启用后在下一轮调用新工具。插件支持受控 npm 依赖、十个 UI
+Slot 和开发热重载；Excalidraw 已使用同一契约。设置中可查看、启用、停用、重载和移除；更新失败恢复旧版本。
 
 Creator
-Mode 默认关闭。关闭后，已启用的插件继续工作。当前支持内核工具和事件插件；DSH 插件需要核对宿主接口，不能直接保证兼容。完整用法见[Creator Mode](docs/guide/creator-mode.md)，代码契约见[插件开发](docs/develop/plugins.md)。
+Mode 默认关闭。关闭后，已启用的插件继续工作。Bundle 支持后端工具、事件和 UI；DSH 插件需要核对宿主接口。完整用法见[Creator Mode](docs/guide/creator-mode.md)，代码契约见[插件开发](docs/develop/plugins.md)。
 
 ## 给其他 Agent 使用的浏览器 CLI
 

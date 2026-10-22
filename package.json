@@ -1,6 +1,6 @@
 {
   "name": "@tulipe1735/prism",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Extensible personal agent workbench for Windows and WSL, powered by Cordis. Creator Mode builds and hot-loads plugins from natural-language requests; browser automation is also available as a standalone CLI.",
   "license": "MIT",
   "repository": {
@@ -19,7 +19,7 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup --config tsup.config.ts --sourcemap --no-splitting && pnpm build:ui:css && node -e \"const fs=require('node:fs');for(const file of ['index.html','startup.html'])fs.copyFileSync('src/workbench/ui/'+file,'dist/workbench-ui/'+file);fs.cpSync('src/workbench/ui/assets','dist/workbench-ui/assets',{recursive:true});fs.copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup --config tsup.config.ts --sourcemap --no-splitting && pnpm build:plugins && pnpm build:ui:css && node -e \"const fs=require('node:fs');for(const file of ['index.html','startup.html'])fs.copyFileSync('src/workbench/ui/'+file,'dist/workbench-ui/'+file);fs.cpSync('src/workbench/ui/assets','dist/workbench-ui/assets',{recursive:true});fs.mkdirSync('dist/plugin-sdk',{recursive:true});fs.copyFileSync('packages/plugin-sdk/src/client.ts','dist/plugin-sdk/client.ts');fs.copyFileSync('src/browser/snapshot.js','dist/snapshot.js')\"",
     "build:ui:css": "tailwindcss -i src/workbench/ui/app.css -o dist/workbench-ui/app.css --minify",
     "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/interfaces/cli.ts",
     "format": "prettier --write .",
@@ -28,10 +28,11 @@
     "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test",
     "start": "node dist/cli.js",
     "test": "vitest run --exclude '.scratch/**'",
-    "typecheck": "tsc --noEmit && tsc -p src/workbench/ui/tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p src/workbench/ui/tsconfig.json --noEmit && tsc -p plugins/excalidraw/tsconfig.json --noEmit",
     "workbench": "node dist/workbench-ui/server.js",
     "workbench:electron": "electron dist/workbench/electron/main.cjs",
-    "package:win": "pnpm build && node --use-env-proxy --experimental-strip-types --disable-warning=ExperimentalWarning scripts/package-windows.ts"
+    "package:win": "pnpm build && node --use-env-proxy --experimental-strip-types --disable-warning=ExperimentalWarning scripts/package-windows.ts",
+    "build:plugins": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/build-plugins.ts"
   },
   "engines": {
     "node": ">=22.23.2"
@@ -57,7 +58,9 @@
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.7.0",
     "yaml": "^2.9.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "esbuild": "^0.28.2",
+    "pnpm": "9.15.9"
   },
   "devDependencies": {
     "@antfu/eslint-config": "4.0.1",
@@ -69,7 +72,6 @@
     "@types/react-dom": "^19.3.0",
     "electron": "^44.9.0",
     "electron-builder": "^26.15.3",
-    "esbuild": "^0.28.2",
     "eslint": "9.39.5",
     "prettier": "3.9.6",
     "tailwindcss": "^4.3.3",

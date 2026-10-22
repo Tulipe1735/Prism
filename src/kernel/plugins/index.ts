@@ -60,7 +60,7 @@ export async function createContext(options: KernelOptions): Promise<Context> {
       ctx.plugin(capabilities.extraTools, options),
     ]);
     await ctx.plugin(tasks, options);
-    await ctx.plugin(creator);
+    await ctx.plugin(creator, options);
     return ctx;
   } catch (error) {
     await ctx.fiber.dispose();

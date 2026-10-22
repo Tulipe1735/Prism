@@ -1,0 +1,14 @@
+{
+  "name": "@prism/plugin-excalidraw",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@prism/plugin-sdk": "workspace:*",
+    "@excalidraw/excalidraw": "0.18.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "lucide-react": "1.59.0",
+    "zod": "4.6.5"
+  }
+}

@@ -53,7 +53,7 @@ async function skillRoots(options: SkillScanOptions): Promise<SkillRoot[]> {
 }
 
 /** The `skills` directory next to this module's own package, when it ships one. */
-async function bundledSkillsDirectory(): Promise<string | undefined> {
+export async function bundledSkillsDirectory(): Promise<string | undefined> {
   let directory = fileURLToPath(new URL(".", import.meta.url));
   for (;;) {
     if (await exists(join(directory, "package.json"))) {
@@ -170,7 +170,9 @@ export async function scanSkills(options: SkillScanOptions): Promise<SkillScan> 
 }
 
 /** Read one skill's body on demand. */
-export async function loadSkill(skill: SkillSummary): Promise<string> {
+export async function loadSkill(
+  skill: Pick<SkillSummary, "name" | "path">,
+): Promise<string> {
   const parsed = await readSkillFile(skill.path);
   if ("reason" in parsed)
     throw new Error(`Skill "${skill.name}" is unreadable: ${parsed.reason}`);

@@ -1,3 +1,4 @@
+import type { PluginEvent } from "../../packages/plugin-sdk/src/index.ts";
 import type { CompactionReason } from "./compaction.ts";
 import type { SessionSummary } from "./session.ts";
 import type { JsonValue } from "./types.ts";
@@ -11,6 +12,8 @@ export type KernelStatus = (typeof KERNEL_STATUSES)[number];
  * never polls.
  */
 export type KernelEvent =
+  | { type: "plugins.updated" }
+  | PluginEvent
   | { type: "message.delta"; sessionId: string; entryId: string; delta: string }
   | {
       type: "tool.started";

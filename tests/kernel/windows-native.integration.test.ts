@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -7,6 +7,7 @@ import process from "node:process";
 import { promisify } from "node:util";
 import { build } from "esbuild";
 import { expect, it } from "vitest";
+import { copyPluginRuntime } from "../../scripts/plugin-runtime.ts";
 
 const execute = promisify(execFile);
 const enabled =
@@ -29,13 +30,16 @@ it.runIf(enabled)(
         platform: "node",
         format: "cjs",
         target: "node22",
-        external: ["playwright"],
+        external: ["playwright", "esbuild"],
         define: { "import.meta.url": "__prismModuleUrl" },
         banner: {
           js: 'const __prismModuleUrl = require("node:url").pathToFileURL(__filename).href;',
         },
       });
       await cp(resolve("src/browser/snapshot.js"), join(root, "snapshot.js"));
+      await cp(resolve("skills"), join(root, "skills"), { recursive: true });
+      await writeFile(join(root, "package.json"), '{"type":"module"}\n');
+      await copyPluginRuntime(root, ["win32-x64"]);
       const require = createRequire(import.meta.url);
       const playwright = require.resolve("playwright/package.json");
       const playwrightRequire = createRequire(playwright);

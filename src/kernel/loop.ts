@@ -9,6 +9,7 @@ import type { ExecutionTarget, JsonValue, PermissionScope } from "./types.ts";
 import { randomUUID } from "node:crypto";
 import { estimateContextTokens } from "./compaction.ts";
 import { notifySession } from "./context.ts";
+import { loadCreatorGuide } from "./creator.ts";
 import { instructionNote, instructionPrompt } from "./instructions.ts";
 import { toModelMessages } from "./model.ts";
 import { describeScope } from "./permissions.ts";
@@ -17,7 +18,7 @@ import { rebuildContext } from "./session.ts";
 /** Tool output longer than this is cut before it reaches the model and the log. */
 export const TOOL_RESULT_LIMIT = 8_000;
 /** Model rounds one task may take before the kernel stops it. */
-export const MAX_MODEL_ROUNDS = 25;
+export const MAX_MODEL_ROUNDS = 100;
 
 export const TRUNCATION_NOTICE = `\n[result truncated after ${TOOL_RESULT_LIMIT} characters]`;
 export const CANCELLED_RESULT = "Task cancelled before this tool ran.";
@@ -66,7 +67,7 @@ export async function runTask(run: TaskRun): Promise<void> {
       return [
         {
           role: "system",
-          content: buildSystemPrompt({
+          content: await buildSystemPrompt({
             workspace,
             scope: run.scope,
             skills,
@@ -341,13 +342,13 @@ function truncate(content: string): string {
 }
 
 /** Workspace, permission scope, instructions and skills, stated once per task. */
-export function buildSystemPrompt(input: {
+export async function buildSystemPrompt(input: {
   workspace: string;
   scope: PermissionScope;
   skills: SkillSummary[];
   instructions?: InstructionFile[];
   creator?: boolean;
-}): string {
+}): Promise<string> {
   const lines = [
     "You are Prism, a personal agent that operates software and works with files in the user's chosen workspace.",
     `Workspace: ${input.workspace}. Keep every file operation inside it.`,
@@ -355,11 +356,8 @@ export function buildSystemPrompt(input: {
     "Use the tools to inspect and change the workspace; answer in the user's language and keep tool output out of your prose unless asked.",
   ];
   const instructions = instructionPrompt(input.instructions ?? []);
-  if (input.creator)
-    lines.push(
-      "Creator Mode is enabled. When the user asks for a new reusable capability or plugin, call creator_inspect, then author and install a persistent plugin with plugin_manager. Verify it by calling its tools on the next request. Installed plugins survive restart. Never claim a plugin works merely because it installed.",
-    );
   if (instructions !== undefined) lines.push(instructions);
+  if (input.creator) lines.push(await loadCreatorGuide());
   if (input.skills.length > 0) {
     lines.push(
       'Skills available for this workspace; call the "skill" tool with a name to read its instructions before following them:',

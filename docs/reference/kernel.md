@@ -100,21 +100,36 @@ node --experimental-strip-types --disable-warning=ExperimentalWarning \
 
 ### GET /plugins 与 POST /plugins
 
-`GET /plugins` 返回 `{ "plugins": [...] }`。每项包括
-`name`、`description`、`enabled`、`state`、`tools`，加载失败时附带 `error`。 `state` 为
-`active`、`disabled` 或 `failed`。这里不返回源码。
+`GET /plugins` 返回 `{ "plugins": [...] }`，包含名称、版本、描述、启停状态、工具、UI
+ID、是否有待启用版本、开发目录和错误。准备不会执行插件代码，启用才求值后端。更新失败会清理新实例并恢复旧版；恢复成功时仍显示原失败原因。
 
-`POST /plugins` 要求 `Content-Type: application/json`，接受与模型工具 `plugin_manager`
-相同的动作：
+`POST /plugins` 要求 `Content-Type: application/json`：
 
-- `list`：返回摘要列表。
-- `inspect` + `name`：返回完整持久记录，包括 `source`。
-- `install` + `name`、`description`、`source`：创建或更新并立即启用；要求 Creator
-  Mode 已开启。
-- `enable`、`disable`、`reload`、`remove` + `name`：管理已有插件。
+- `list`：返回摘要。
+- `inspect` + `name`：返回完整待启用 Bundle；没有待启用版本则返回当前 Bundle。
+- `install` +
+  `bundle: {manifest,files}`：校验依赖、构建并保存，保持新插件停用或将更新暂存。要求 Creator
+  Mode。
+- `develop` + `directory`：从绝对源目录准备开发快照。要求 Creator Mode；启用后开始监听。
+- `enable`、`disable`、`reload`、`remove` +
+  `name`：显式启用、停用、重载当前实例或移除记录。停用的插件不能通过 reload 隐式启用。
 
-响应为 `{ "result": ... }`：`inspect`
-返回记录，其余动作返回当前摘要列表。管理操作依次执行。失败更新恢复旧版本；启动时单个插件失败不会阻止内核服务。具体源码契约见[插件开发](../develop/plugins.md)。
+响应为
+`{ "result": ... }`。inspect 返回 Bundle，其余返回摘要列表。旧 source 参数已移除；旧磁盘记录在启动时迁移。详见[Bundle 开发契约](../develop/plugins.md)。
+
+### 通用插件 UI 与 RPC
+
+- `GET /plugins/ui` →
+  `{ "entries": [...] }`：仅包含活动插件的 UI 声明和带 revision 的资源 URL。
+- `GET /plugins/:name/assets/:revision/:id/*`：只服务当前活动版本的编译后 UI 资源。停用或版本过期返回 404，拒绝路径越界。设置独立 CSP 和资源类型。
+- `POST /plugins/:name/rpc/:method`，JSON `{ "sessionId": "真实会话", "input": ... }` →
+  `{ "result": ... }`。宿主验证会话存在，提供取消信号；插件负责输入校验。插件的
+  `PluginError` 保留 code、message、HTTP status。
+
+源 Bundle 最多 1 MB，插件 RPC 请求上限为 21 MiB（画布场景自身限制 20
+MiB）。UI 请求经工作台同源代理转发。插件事件通过 `plugin.event`
+携带 plugin、name、data 和可选 sessionId；`plugins.updated`
+通知客户端重新获取目录，无轮询。
 
 ### GET /settings
 

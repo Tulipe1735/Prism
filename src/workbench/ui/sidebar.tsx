@@ -14,6 +14,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { AccountMenu } from "./account-menu.tsx";
 import { Button, SectionLabel, workspaceName } from "./components.tsx";
+import { PluginSlot } from "./plugin-slots.tsx";
 import { selectKnownWorkspaces, selectVisibleSessions } from "./state.ts";
 
 export function Sidebar({
@@ -82,6 +83,7 @@ export function Sidebar({
             workbench={workbench}
           />
         </div>
+        {collapsed ? null : <PluginSlot slot="workbench.sidebar" />}
         <div className="flex min-h-0 flex-1 flex-col px-3 py-5">
           <h2 className="px-2 text-xs font-semibold tracking-[0.01em] text-muted">
             会话

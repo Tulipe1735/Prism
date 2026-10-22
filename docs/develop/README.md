@@ -19,7 +19,9 @@ pnpm workbench
 | 路径                    | 职责                                           |
 | ----------------------- | ---------------------------------------------- |
 | `src/kernel/plugins/`   | Cordis 内置插件装配                            |
-| `src/kernel/creator.ts` | Creator Mode、持久插件与模型侧开发契约         |
+| `src/kernel/creator.ts` | Creator Mode 开发工具与指引                    |
+| `packages/`             | Bundle SDK、构建运行时、依赖与生命周期管理     |
+| `plugins/excalidraw/`   | 使用标准契约的协作画布                         |
 | `src/kernel/loop.ts`    | 模型请求、工具调用、执行记录                   |
 | `src/kernel/server.ts`  | HTTP/SSE                                       |
 | `src/workbench/`        | Electron、运行时准备、UI 服务器与 React 工作台 |
@@ -63,5 +65,9 @@ WSL 内核载荷。缓存位于 `.packaging/cache/`，均不纳入 Git。
 `src/shared/version.ts`。验证后，把对应源码提交推送到 GitHub，再发布指向该提交的版本标签。Release 必须包含
 `Prism-<版本>-Setup-x64.exe`、同名 `.exe.blockmap`、`latest.yml` 和 `SHA256SUMS.txt`。
 `latest.yml` 与 blockmap 来自同一次构建；应用内更新使用它们。
+
+GitHub 上的 `Release Windows desktop`
+工作流可从已推送的版本标签构建并发布。工作流运行仓库检查、打包 Windows 安装程序并核对更新摘要后，上传四个发布文件并公开 Release；已公开的版本保留原有文件。使用仓库中的
+`release-windows.yml` 手动工作流，指定已推送的版本标签即可。草稿中的发布说明会保留。
 
 本地更新通过正常安装程序完成，保留会话、配置和插件。安装前完成或取消现有任务，再退出旧版本；完成后核对安装版本、启动工作台并验证现有数据可读取。

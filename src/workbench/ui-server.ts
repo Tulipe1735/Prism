@@ -128,7 +128,8 @@ export async function startUiServer(
             : { "content-type": request.headers["content-type"] },
         body: await readBody(
           request,
-          /\/sessions\/[^/]+\/attachments$/.test(url.pathname)
+          /\/sessions\/[^/]+\/attachments$/.test(url.pathname) ||
+            /\/plugins\/[^/]+\/rpc\//.test(url.pathname)
             ? MAX_ATTACHMENT_BYTES
             : MAX_BODY_BYTES,
         ),
@@ -150,6 +151,18 @@ export async function startUiServer(
     response.writeHead(upstream.status, {
       "content-type": upstream.headers.get("content-type") ?? "application/json",
       "cache-control": "no-store",
+      ...(upstream.headers.has("content-security-policy")
+        ? {
+            "content-security-policy": upstream.headers.get("content-security-policy")!,
+          }
+        : {}),
+      ...(upstream.headers.has("access-control-allow-origin")
+        ? {
+            "access-control-allow-origin": upstream.headers.get(
+              "access-control-allow-origin",
+            )!,
+          }
+        : {}),
     });
     if (upstream.body === null) {
       response.end();

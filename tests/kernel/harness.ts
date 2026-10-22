@@ -360,6 +360,7 @@ export async function startTestKernel(
     bundledSkills?: "empty" | "package";
     /** Test seam: transport overrides for a controlled HTTP service. */
     webFetch?: WebFetchOverrides;
+    bundledPlugins?: string | false;
   } = {},
 ): Promise<KernelHarness> {
   const base = await mkdtemp(join(tmpdir(), "prism-kernel-"));
@@ -396,6 +397,7 @@ export async function startTestKernel(
   });
   const kernel = await startKernel({
     config,
+    bundledPlugins: options.bundledPlugins ?? false,
     ...(options.scope === undefined ? {} : { scope: options.scope }),
     ...(options.browserActionsNeedApproval === undefined
       ? {}

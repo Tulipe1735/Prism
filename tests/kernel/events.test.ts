@@ -20,6 +20,9 @@ function category(event: KernelEvent): string {
       return "compaction";
     case "kernel.status":
       return "kernel";
+    case "plugins.updated":
+    case "plugin.event":
+      return "plugin";
     default: {
       const unhandled: never = event;
       throw new Error(`Unhandled kernel event ${JSON.stringify(unhandled)}`);

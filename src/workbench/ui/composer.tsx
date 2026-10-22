@@ -4,6 +4,7 @@ import { ArrowUp, FileText, Paperclip, ShieldCheck, Square, X } from "lucide-rea
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS } from "../../shared/attachments.ts";
 import { Button, SCOPE_LABELS, workspaceName } from "./components.tsx";
+import { PluginSlot } from "./plugin-slots.tsx";
 
 export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
   const { state } = workbench;
@@ -201,6 +202,7 @@ export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
             }
           }}
         />
+        <PluginSlot slot="composer.toolbar" />
         <div className="flex min-h-11 items-center justify-between gap-2 px-3 pb-3 md:px-4">
           <div className="flex min-w-0 items-center gap-2 text-[13px] text-muted">
             <Button

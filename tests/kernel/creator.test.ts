@@ -5,8 +5,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { loadConfig } from "../../src/kernel/config.ts";
-import { CREATOR_GUIDE } from "../../src/kernel/creator.ts";
+import { loadCreatorGuide } from "../../src/kernel/creator.ts";
 import { Kernel } from "../../src/kernel/kernel.ts";
+import { echoPlugin, pluginBundle } from "../fixtures/plugin.ts";
 import { api, type KernelHarness, readSessionLog, startTestKernel } from "./harness.ts";
 
 let harness: KernelHarness | undefined;
@@ -18,30 +19,22 @@ afterEach(async () => {
   harness = undefined;
 });
 
-function source(result = "Hello from a plugin", toolName = "wish_echo"): string {
-  return `export const inject = ['tools'];
-export function apply(ctx) {
-  ctx.effect(() => ctx.tools.register({
-    name: ${JSON.stringify(toolName)}, description: 'A test wish.',
-    parameters: { type: 'object', properties: {}, additionalProperties: false },
-    async execute() { return { content: ${JSON.stringify(result)} }; }
-  }));
-}`;
-}
-
 async function start(enabled = true): Promise<KernelHarness> {
   harness = await startTestKernel({ configFile: { creator: { enabled } } });
   return harness;
 }
 
-it("enables authoring through settings, persists it and refuses installation while disabled", async () => {
+it("gates preparation on Creator Mode and keeps authoring tools out of Standard", async () => {
   const { kernel, dataDir } = await start(false);
   expect(kernel.kernel.ctx.tools.get("plugin_manager")).toBeUndefined();
-  const refused = await api(kernel.url, "/plugins", {
-    method: "POST",
-    body: { action: "install", name: "wish", description: "A wish", source: source() },
-  });
-  expect(refused.status).toBe(403);
+  expect(
+    (
+      await api(kernel.url, "/plugins", {
+        method: "POST",
+        body: { action: "install", bundle: pluginBundle(echoPlugin()) },
+      })
+    ).status,
+  ).toBe(403);
   expect(
     (
       await api(kernel.url, "/settings", {
@@ -63,82 +56,281 @@ it("enables authoring through settings, persists it and refuses installation whi
     ).status,
   ).toBe(400);
 });
+it("adds the shipped Creator guide only while enabled and retains AGENTS.md instructions", async () => {
+  harness = await startTestKernel({
+    bundledSkills: "package",
+    answers: [{ text: ["standard"] }, { text: ["creator"] }, { text: ["standard"] }],
+  });
+  const { kernel, model, workspace } = harness;
+  const baseline = "Use the project's existing conventions.";
+  await writeFile(join(workspace, "AGENTS.md"), baseline);
+  const guide = await loadCreatorGuide();
+  const session = (
+    await api<{ session: SessionSummary }>(kernel.url, "/sessions", {
+      method: "POST",
+      body: { workspace },
+    })
+  ).body.session;
+  const request = async () => {
+    const response = await api(kernel.url, `/sessions/${session.id}/messages`, {
+      method: "POST",
+      body: { text: "Inspect the workspace." },
+    });
+    expect(response.status).toBe(202);
+    await expect.poll(() => kernel.kernel.isRunning(session.id)).toBe(false);
+    return model.requests.at(-1)!;
+  };
 
-it("installs, hot-replaces, disables, reloads and removes a persistent plugin", async () => {
+  const standard = await request();
+  expect(standard.messages[0]?.content).toContain(baseline);
+  expect(standard.messages[0]?.content).not.toContain(guide);
+  expect(standard.messages[0]?.content).not.toContain("- creator:");
+  expect(standard.tools?.map((tool) => tool.function.name)).not.toContain(
+    "creator_inspect",
+  );
+  expect(standard.tools?.map((tool) => tool.function.name)).not.toContain(
+    "plugin_manager",
+  );
+
+  await kernel.kernel.updateSettings({ creator: { enabled: true } });
+  const creator = await request();
+  expect(creator.messages[0]?.content).toContain(baseline);
+  expect(creator.messages[0]?.content).toContain(guide);
+  expect(creator.tools?.map((tool) => tool.function.name)).toEqual(
+    expect.arrayContaining(["creator_inspect", "plugin_manager"]),
+  );
+
+  await kernel.kernel.updateSettings({ creator: { enabled: false } });
+  const restored = await request();
+  expect(restored.messages[0]?.content).toContain(baseline);
+  expect(restored.messages[0]?.content).not.toContain(guide);
+  expect(restored.tools?.map((tool) => tool.function.name)).not.toContain(
+    "plugin_manager",
+  );
+});
+
+it("prepares without evaluation, stages updates, explicitly activates and persists disable/remove", async () => {
   const { kernel, dataDir } = await start();
-  const creator = kernel.kernel.ctx.creator;
-  await creator.manage({
-    action: "install",
-    name: "wish",
-    description: "A wish",
-    source: source(),
-  });
-  expect(kernel.kernel.ctx.tools.get("wish_echo")).toBeDefined();
-  await creator.manage({
-    action: "install",
-    name: "wish",
-    description: "Updated wish",
-    source: source("version two"),
-  });
-  expect(
-    kernel.kernel.ctx.tools.list().filter((tool) => tool.name === "wish_echo"),
-  ).toHaveLength(1);
-  await expect(
+  const manager = kernel.kernel.ctx.creator;
+  const bundle = pluginBundle(echoPlugin());
+  bundle.files["index.ts"] =
+    `import { message } from './nested/message.ts';\n${echoPlugin().replace('"Hello from a plugin"', "message")}`;
+  bundle.files["nested/message.ts"] = "export const message: string = 'one';";
+  await manager.manage({ action: "install", bundle });
+  expect(kernel.kernel.ctx.tools.get("wish_echo")).toBeUndefined();
+  expect(manager.list()[0]).toMatchObject({ state: "disabled", enabled: false });
+  await manager.manage({ action: "enable", name: "wish" });
+  const execute = () =>
     kernel.kernel.ctx.tools
       .get("wish_echo")!
-      .execute({}, context(kernel.kernel, dataDir)),
-  ).resolves.toEqual({ content: "version two" });
-  await creator.manage({ action: "disable", name: "wish" });
-  expect(kernel.kernel.ctx.tools.get("wish_echo")).toBeUndefined();
-  expect(creator.list()[0]?.state).toBe("disabled");
-  await creator.manage({ action: "enable", name: "wish" });
-  await creator.manage({ action: "reload", name: "wish" });
+      .execute({}, context(kernel.kernel, dataDir));
+  expect(await execute()).toEqual({ content: "one" });
+  bundle.files["nested/message.ts"] = "export const message: string = 'two';";
+  await manager.manage({ action: "install", bundle });
+  expect(await execute()).toEqual({ content: "one" });
+  expect(manager.list()[0]?.staged).toBe(true);
+  await manager.manage({ action: "enable", name: "wish" });
+  expect(await execute()).toEqual({ content: "two" });
+  await manager.manage({ action: "reload", name: "wish" });
   expect(
     kernel.kernel.ctx.tools.list().filter((tool) => tool.name === "wish_echo"),
   ).toHaveLength(1);
-  expect(await creator.manage({ action: "inspect", name: "wish" })).toMatchObject({
-    source: source("version two"),
-  });
-  await creator.manage({ action: "remove", name: "wish" });
+  expect(await manager.manage({ action: "inspect", name: "wish" })).toEqual(bundle);
+  await manager.manage({ action: "disable", name: "wish" });
   expect(kernel.kernel.ctx.tools.get("wish_echo")).toBeUndefined();
+  await expect(manager.manage({ action: "reload", name: "wish" })).rejects.toThrow(
+    "Enable",
+  );
+  await manager.manage({ action: "remove", name: "wish" });
   await expect(readFile(join(dataDir, "plugins/wish.json"))).rejects.toMatchObject({
     code: "ENOENT",
   });
 });
 
-it("refuses browser-simple POST requests before evaluating plugin code", async () => {
+it("never evaluates top-level code during preparation", async () => {
   const { kernel } = await start();
-  const response = await fetch(`${kernel.url}/plugins`, {
-    method: "POST",
-    headers: { "content-type": "text/plain" },
-    body: JSON.stringify({
-      action: "install",
-      name: "wish",
-      description: "Blocked",
-      source: source(),
-    }),
+  const manager = kernel.kernel.ctx.creator;
+  await manager.manage({
+    action: "install",
+    bundle: pluginBundle(
+      "throw new Error('evaluated only on enable'); export function apply() {}",
+    ),
   });
-  expect(response.status).toBe(400);
-  expect(kernel.kernel.ctx.tools.get("wish_echo")).toBeUndefined();
+  await expect(manager.manage({ action: "enable", name: "wish" })).rejects.toThrow(
+    "evaluated only on enable",
+  );
+  expect(manager.list()[0]?.state).toBe("failed");
 });
 
-it("runs the authoring example advertised by runtime inspection", async () => {
+it("restores the previous tools after failed activation and removes partial registrations", async () => {
   const { kernel, dataDir } = await start();
-  const example = CREATOR_GUIDE.split("Example source:\n")[1]!;
+  const manager = kernel.kernel.ctx.creator;
+  await manager.manage({ action: "install", bundle: pluginBundle(echoPlugin()) });
+  await manager.manage({ action: "enable", name: "wish" });
+  const broken = echoPlugin("partial", "partial_tool").replace(
+    /\n\}$/,
+    "\nthrow new Error('broken update');\n}",
+  );
+  await manager.manage({ action: "install", bundle: pluginBundle(broken) });
+  await expect(manager.manage({ action: "enable", name: "wish" })).rejects.toThrow(
+    "broken update",
+  );
+  expect(kernel.kernel.ctx.tools.get("partial_tool")).toBeUndefined();
+  expect(manager.list()[0]).toMatchObject({
+    state: "active",
+    staged: true,
+    error: expect.stringContaining("broken update"),
+  });
+  expect(
+    await kernel.kernel.ctx.tools
+      .get("wish_echo")!
+      .execute({}, context(kernel.kernel, dataDir)),
+  ).toEqual({ content: "Hello from a plugin" });
+  await kernel.close();
+  restarted = await Kernel.create({
+    config: await loadConfig({ dataDir }),
+    bundledPlugins: false,
+  });
+  expect(restarted.ctx.tools.get("wish_echo")).toBeDefined();
+  expect(restarted.ctx.tools.get("partial_tool")).toBeUndefined();
+});
+
+it("restores enabled bundles while Creator Mode is off and migrates old on-disk records", async () => {
+  const { kernel, dataDir } = await start();
+  await kernel.kernel.updateSettings({ creator: { enabled: false } });
+  await kernel.close();
+  await mkdir(join(dataDir, "plugins"), { recursive: true });
+  await writeFile(
+    join(dataDir, "plugins/wish.json"),
+    JSON.stringify({
+      name: "wish",
+      description: "Migrated",
+      source: echoPlugin(),
+      enabled: true,
+    }),
+  );
+  await writeFile(
+    join(dataDir, "plugins/broken.json"),
+    JSON.stringify({
+      name: "broken",
+      description: "Broken",
+      source: "export function apply( {",
+      enabled: true,
+    }),
+  );
+  restarted = await Kernel.create({
+    config: await loadConfig({ dataDir }),
+    bundledPlugins: false,
+  });
+  expect(restarted.ctx.tools.get("wish_echo")).toBeDefined();
+  expect(restarted.ctx.tools.get("plugin_manager")).toBeUndefined();
+  expect(restarted.ctx.creator.list()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ name: "broken", state: "failed" }),
+      expect.objectContaining({ name: "wish", state: "active" }),
+    ]),
+  );
+  expect(
+    JSON.parse(await readFile(join(dataDir, "plugins/wish.json"), "utf8")),
+  ).not.toHaveProperty("source");
+});
+
+it("rejects browser-simple management requests, invalid manifests, undeclared dependencies and escaping imports", async () => {
+  const { kernel } = await start();
+  const manager = kernel.kernel.ctx.creator;
+  expect(
+    (
+      await fetch(`${kernel.url}/plugins`, {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: JSON.stringify({ action: "install", bundle: pluginBundle(echoPlugin()) }),
+      })
+    ).status,
+  ).toBe(400);
+  const invalid = pluginBundle(echoPlugin(), "../escape");
+  await expect(
+    manager.manage({ action: "install", bundle: invalid }),
+  ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+  for (const path of [
+    "../escape.ts",
+    "/absolute.ts",
+    "a\\escape.ts",
+    "node_modules/escape.ts",
+  ]) {
+    const bundle = pluginBundle(echoPlugin());
+    bundle.files[path] = "export {};";
+    await expect(manager.manage({ action: "install", bundle })).rejects.toMatchObject({
+      code: "INVALID_REQUEST",
+    });
+  }
+  await expect(
+    manager.manage({
+      action: "install",
+      bundle: pluginBundle("import 'zod'; export function apply() {}"),
+    }),
+  ).rejects.toThrow("Undeclared dependency");
+  await expect(
+    manager.manage({
+      action: "install",
+      bundle: pluginBundle("import '../../outside.ts'; export function apply() {}"),
+    }),
+  ).rejects.toThrow();
+  const unapproved = pluginBundle(echoPlugin());
+  unapproved.manifest.dependencies = { zod: "4.6.5" };
+  await expect(
+    manager.manage({ action: "install", bundle: unapproved }),
+  ).rejects.toThrow("not approved");
+  unapproved.manifest.dependencies.zod = "^4.6.5";
+  await expect(
+    manager.manage({ action: "install", bundle: unapproved }),
+  ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+  expect(manager.list()).toEqual([]);
+});
+
+it("rejects unavailable services and invalid plugin contracts before exposing capabilities", async () => {
+  const { kernel } = await start();
+  const manager = kernel.kernel.ctx.creator;
+  for (const source of [
+    "export const inject = ['agents']; export function apply() {}",
+    "export const inject = ['creator']; export function apply() {}",
+    "export const nothing = 1;",
+    echoPlugin("bad", "plugin_manager"),
+  ]) {
+    await manager.manage({ action: "install", bundle: pluginBundle(source) });
+    await expect(manager.manage({ action: "enable", name: "wish" })).rejects.toThrow();
+    expect(kernel.kernel.ctx.tools.get("wish_echo")).toBeUndefined();
+  }
+});
+
+it("executes the authoring example from the shipped guide", async () => {
+  const { kernel, dataDir } = await start();
+  const inspection = await kernel.kernel.ctx.tools
+    .get("creator_inspect")!
+    .execute({}, context(kernel.kernel, dataDir));
+  const example = /```js\n([\s\S]*?)\n```/u.exec(inspection.content)?.[1];
+  expect(example).toBeDefined();
   await kernel.kernel.ctx.creator.manage({
     action: "install",
-    name: "example",
-    description: "Live SDK example",
-    source: example,
+    bundle: pluginBundle(example!, "example"),
   });
-  await expect(
-    kernel.kernel.ctx.tools
-      .get("word_count")!
-      .execute({ text: "hello world" }, context(kernel.kernel, dataDir)),
-  ).resolves.toEqual({ content: "2" });
+  await kernel.kernel.ctx.creator.manage({ action: "enable", name: "example" });
+  const tool = kernel.kernel.ctx.tools.get("word_count")!;
+  for (const [text, expected] of [
+    ["hello world", "2"],
+    ["", "0"],
+    [" \t\n ", "0"],
+    ["one\n two\tthree", "3"],
+  ] as const)
+    expect(await tool.execute({ text }, context(kernel.kernel, dataDir))).toEqual({
+      content: expected,
+    });
+  expect(await tool.execute({}, context(kernel.kernel, dataDir))).toEqual({
+    content: "text must be a string",
+    isError: true,
+  });
 });
 
-it("keeps model-driven plugin changes inside the command permission policy", async () => {
+it("keeps model-driven bundle preparation inside the command permission policy", async () => {
   harness = await startTestKernel({
     scope: "read-only",
     configFile: { creator: { enabled: true } },
@@ -150,9 +342,7 @@ it("keeps model-driven plugin changes inside the command permission policy", asy
             name: "plugin_manager",
             arguments: JSON.stringify({
               action: "install",
-              name: "wish",
-              description: "Blocked",
-              source: source(),
+              bundle: pluginBundle(echoPlugin()),
             }),
           },
         ],
@@ -181,117 +371,16 @@ it("keeps model-driven plugin changes inside the command permission policy", asy
   expect(kernel.kernel.ctx.tools.get("wish_echo")).toBeUndefined();
 });
 
-it("restores the working version and cleans partial registrations after a failed update", async () => {
+it("cancels in-flight tool calls when a bundle is disabled", async () => {
   const { kernel, dataDir } = await start();
-  const creator = kernel.kernel.ctx.creator;
-  await creator.manage({
+  const manager = kernel.kernel.ctx.creator;
+  await manager.manage({
     action: "install",
-    name: "wish",
-    description: "Working",
-    source: source(),
+    bundle: pluginBundle(
+      `export const inject=['tools']; export function apply(ctx) { ctx.effect(() => ctx.tools.register({name:'wait_for_abort', description:'Wait', parameters:{type:'object',properties:{}}, async execute(args, context) { await new Promise(resolve => context.signal.addEventListener('abort',resolve,{once:true})); return {content:'cancelled',isError:true}; }})); }`,
+    ),
   });
-  const broken = `${source("partial", "partial_tool").replace(/\n\}$/, "\nthrow new Error('broken update');\n}")}`;
-  await expect(
-    creator.manage({
-      action: "install",
-      name: "wish",
-      description: "Broken",
-      source: broken,
-    }),
-  ).rejects.toThrow("broken update");
-  expect(kernel.kernel.ctx.tools.get("partial_tool")).toBeUndefined();
-  expect(creator.list()).toMatchObject([
-    { name: "wish", state: "active", description: "Working" },
-  ]);
-  expect(
-    JSON.parse(await readFile(join(dataDir, "plugins/wish.json"), "utf8")).description,
-  ).toBe("Working");
-  await expect(
-    kernel.kernel.ctx.tools
-      .get("wish_echo")!
-      .execute({}, context(kernel.kernel, dataDir)),
-  ).resolves.toEqual({ content: "Hello from a plugin" });
-});
-
-it("restores enabled plugins after restart even when authoring is switched off", async () => {
-  const { kernel, dataDir } = await start();
-  await kernel.kernel.ctx.creator.manage({
-    action: "install",
-    name: "wish",
-    description: "Persistent",
-    source: source(),
-  });
-  await kernel.kernel.updateSettings({ creator: { enabled: false } });
-  expect(kernel.kernel.ctx.tools.get("wish_echo")).toBeDefined();
-  expect(kernel.kernel.ctx.tools.get("plugin_manager")).toBeUndefined();
-  await kernel.close();
-  restarted = await Kernel.create({ config: await loadConfig({ dataDir }) });
-  expect(restarted.ctx.tools.get("wish_echo")).toBeDefined();
-  expect(restarted.ctx.tools.get("plugin_manager")).toBeUndefined();
-});
-
-it("reports broken plugins without preventing startup and rejects invalid names and unavailable services", async () => {
-  const { kernel, dataDir } = await start();
-  const creator = kernel.kernel.ctx.creator;
-  await expect(
-    creator.manage({
-      action: "install",
-      name: "../escape",
-      description: "Bad",
-      source: source(),
-    }),
-  ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
-  await expect(
-    creator.manage({
-      action: "install",
-      name: "dsh",
-      description: "DSH",
-      source: "export const inject = ['agents']; export function apply() {}",
-    }),
-  ).rejects.toThrow('Required service "agents"');
-  await expect(
-    creator.manage({
-      action: "install",
-      name: "recursive",
-      description: "No self dependency",
-      source: "export const inject = ['creator']; export function apply() {}",
-    }),
-  ).rejects.toThrow('Required service "creator"');
-  await kernel.close();
-  await mkdir(join(dataDir, "plugins"), { recursive: true });
-  await writeFile(
-    join(dataDir, "plugins/broken.json"),
-    JSON.stringify({
-      name: "broken",
-      description: "Broken source",
-      source: "export function apply( {",
-      enabled: true,
-    }),
-  );
-  restarted = await Kernel.create({ config: await loadConfig({ dataDir }) });
-  expect(restarted.ctx.creator.list()).toMatchObject([
-    { name: "broken", state: "failed" },
-  ]);
-  expect(restarted.ctx.tools.get("read_file")).toBeDefined();
-  expect(restarted.ctx.tools.get("plugin_manager")).toBeDefined();
-});
-
-it("cancels an active tool call when its plugin is disabled", async () => {
-  const { kernel, dataDir } = await start();
-  await kernel.kernel.ctx.creator.manage({
-    action: "install",
-    name: "wait",
-    description: "Wait for cancellation",
-    source: `export const inject = ['tools'];
-export function apply(ctx) {
-  ctx.effect(() => ctx.tools.register({ name: 'wait_for_abort', description: 'Wait', parameters: { type: 'object', properties: {} },
-    async execute(args, context) {
-      await new Promise(resolve => context.signal.addEventListener('abort', resolve, { once: true }));
-      return { content: 'cancelled', isError: true };
-    }
-  }));
-}`,
-  });
+  await manager.manage({ action: "enable", name: "wish" });
   const tools = kernel.kernel.ctx.tools;
   const running = tools.execute(
     tools.get("wait_for_abort")!,
@@ -299,12 +388,12 @@ export function apply(ctx) {
     context(kernel.kernel, dataDir),
   );
   await new Promise((resolve) => setTimeout(resolve, 5));
-  await kernel.kernel.ctx.creator.manage({ action: "disable", name: "wait" });
-  await expect(running).resolves.toEqual({ content: "cancelled", isError: true });
+  await manager.manage({ action: "disable", name: "wish" });
+  expect(await running).toEqual({ content: "cancelled", isError: true });
   expect(tools.get("wait_for_abort")).toBeUndefined();
 });
 
-it("fulfils a wish through HTTP: inspect, create, discover and execute the new tool in the same conversation", async () => {
+it("fulfils a request over HTTP through inspect, prepare, enable and next-round discovery", async () => {
   harness = await startTestKernel({
     configFile: { creator: { enabled: true } },
     answers: [
@@ -316,10 +405,17 @@ it("fulfils a wish through HTTP: inspect, create, discover and execute the new t
             name: "plugin_manager",
             arguments: JSON.stringify({
               action: "install",
-              name: "wish",
-              description: "Created from a wish",
-              source: source("Wish fulfilled"),
+              bundle: pluginBundle(echoPlugin("Wish fulfilled")),
             }),
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            id: "enable",
+            name: "plugin_manager",
+            arguments: JSON.stringify({ action: "enable", name: "wish" }),
           },
         ],
       },
@@ -336,11 +432,10 @@ it("fulfils a wish through HTTP: inspect, create, discover and execute the new t
   ).body.session;
   await api(kernel.url, `/sessions/${session.id}/messages`, {
     method: "POST",
-    body: { text: "给我做一个问候插件，并运行它。" },
+    body: { text: "给我做一个问候插件，启用并运行它。" },
   });
   await expect.poll(() => kernel.kernel.isRunning(session.id)).toBe(false);
-  const entries = await readSessionLog(dataDir, session.id);
-  expect(entries).toContainEqual(
+  expect(await readSessionLog(dataDir, session.id)).toContainEqual(
     expect.objectContaining({
       type: "tool_result",
       callId: "verify",
@@ -348,17 +443,15 @@ it("fulfils a wish through HTTP: inspect, create, discover and execute the new t
       isError: false,
     }),
   );
-  expect(model.requests[0]?.messages[0]?.content).toContain("Creator Mode is enabled");
-  expect(
-    model.requests[0]?.tools?.some((tool) => tool.function.name === "wish_echo"),
-  ).toBe(false);
   expect(
     model.requests[2]?.tools?.some((tool) => tool.function.name === "wish_echo"),
+  ).toBe(false);
+  expect(
+    model.requests[3]?.tools?.some((tool) => tool.function.name === "wish_echo"),
   ).toBe(true);
-  const listed = await api<{ plugins: PluginSummary[] }>(kernel.url, "/plugins");
-  expect(listed.body.plugins).toMatchObject([
-    { name: "wish", state: "active", tools: ["wish_echo"] },
-  ]);
+  expect(
+    (await api<{ plugins: PluginSummary[] }>(kernel.url, "/plugins")).body.plugins,
+  ).toMatchObject([{ name: "wish", state: "active", tools: ["wish_echo"] }]);
 });
 
 function context(kernel: Kernel, workspace: string): ToolContext {

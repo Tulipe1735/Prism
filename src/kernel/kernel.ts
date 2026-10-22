@@ -32,6 +32,8 @@ export interface KernelOptions {
   browserActionsNeedApproval?: boolean;
   target?: ExecutionTarget;
   webFetch?: WebFetchOverrides;
+  /** Override discovery of prebuilt shipped bundles; false keeps an embedded host minimal. */
+  bundledPlugins?: string | false;
 }
 
 export interface KernelSettings {
@@ -186,6 +188,7 @@ export class Kernel {
     if (!(await this.ctx.sessions.delete(sessionId)))
       throw new KernelError("SESSION_NOT_FOUND", `Session ${sessionId} does not exist`);
     await this.ctx.attachments.removeSession(sessionId);
+    await this.ctx.creator.sessionRemoved(sessionId);
   }
 
   async renameSession(sessionId: string, title: string): Promise<SessionSummary> {

@@ -1,0 +1,74 @@
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+body {
+  color: #24282d;
+  background: #fff;
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+.canvas-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.canvas-toolbar,
+.canvas-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e3e4e6;
+}
+.canvas-error {
+  color: #b12727;
+}
+.canvas-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.canvas-button:hover {
+  background: #f1f1f1;
+}
+.canvas-button:focus-visible {
+  outline: 2px solid #2563eb;
+}
+.canvas-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.canvas-content {
+  flex: 1;
+  min-height: 0;
+}
+.canvas-loading {
+  padding: 24px;
+  color: #667;
+}
+.canvas-status {
+  flex-shrink: 0;
+  border-top: 1px solid #e3e4e6;
+  padding: 8px 16px;
+  margin: 0;
+  color: #667;
+  font-size: 12px;
+}

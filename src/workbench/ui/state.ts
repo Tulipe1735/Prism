@@ -164,6 +164,9 @@ export function reduce(state: UiState, action: UiAction): UiState {
 
 function reduceEvent(state: UiState, event: KernelEvent): UiState {
   switch (event.type) {
+    case "plugins.updated":
+    case "plugin.event":
+      return state;
     case "kernel.status":
       return {
         ...state,

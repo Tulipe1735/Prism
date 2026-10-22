@@ -19,6 +19,7 @@ export function CreatorSettings({
   const [plugins, setPlugins] = useState<PluginSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [directory, setDirectory] = useState("");
 
   useEffect(() => {
     if (!connected) return;
@@ -34,8 +35,22 @@ export function CreatorSettings({
       .catch((reason: unknown) => {
         if (!disposed) setError(describe(reason));
       });
+    const close = client.openEvents({
+      onEvent: (event) => {
+        if (event.type === "plugins.updated")
+          void client
+            .plugins()
+            .then((value) => {
+              if (!disposed) setPlugins(value);
+            })
+            .catch((reason: unknown) => {
+              if (!disposed) setError(describe(reason));
+            });
+      },
+    });
     return () => {
       disposed = true;
+      close();
     };
   }, [client, connected, enabled]);
 
@@ -85,13 +100,53 @@ export function CreatorSettings({
         </span>
       </button>
       <p className="mt-3 text-xs leading-6 text-muted">
-        开启后，在对话中描述需要的能力。Agent 可以创建插件并立即使用，重启后仍保留。
+        开启后，在对话中描述需要的能力。Agent
+        可以准备多文件插件，确认启用后即可使用，重启后仍保留。
         插件以内核权限运行，请只启用可信代码。关闭此模式后，已启用的插件继续工作。
       </p>
       <fieldset
         disabled={busy || !connected}
         className="mt-4 min-w-0 space-y-3 disabled:opacity-60"
       >
+        {enabled ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              setBusy(true);
+              void client
+                .developPlugin(directory)
+                .then((value) => {
+                  setPlugins(value);
+                  setError(null);
+                })
+                .catch((reason: unknown) => setError(describe(reason)))
+                .finally(() => setBusy(false));
+            }}
+            className="space-y-2"
+          >
+            <label className="block text-xs">
+              开发插件目录
+              <input
+                aria-label="开发插件目录"
+                value={directory}
+                onChange={(event) => setDirectory(event.target.value)}
+                placeholder="包含 prism.plugin.json 的绝对路径"
+                className="mt-2 w-full rounded border bg-paper px-2 py-2 text-xs"
+              />
+            </label>
+            <Button
+              type="submit"
+              variant="outline"
+              className="text-xs"
+              disabled={directory.trim() === ""}
+            >
+              准备 Bundle
+            </Button>
+            <p className="text-xs leading-5 text-muted">
+              准备完成后点击启用，源文件变更会自动重载。npm 依赖需先加入宿主批准清单。
+            </p>
+          </form>
+        ) : null}
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs text-muted">已安装插件 · {plugins.length}</span>
           <Button variant="ghost" className="text-xs" onClick={() => void refresh()}>
@@ -119,12 +174,22 @@ export function CreatorSettings({
               <span className="shrink-0 text-xs text-muted">
                 {plugin.state === "active"
                   ? "已启用"
-                  : plugin.state === "disabled"
+                  : plugin.state === "disabled" || plugin.state === "installed"
                     ? "已停用"
                     : "加载失败"}
               </span>
             </div>
             <p className="mt-2 text-xs leading-6 text-muted">{plugin.description}</p>
+            {plugin.staged ? (
+              <p className="mt-2 text-xs text-muted">
+                新版本已准备，点击启用更新后生效。
+              </p>
+            ) : null}
+            {plugin.development === undefined ? null : (
+              <p className="mt-2 break-all text-xs text-muted">
+                开发热重载 · {plugin.development}
+              </p>
+            )}
             {plugin.error === undefined ? null : (
               <p className="mt-2 text-xs leading-6 break-all text-accent">
                 {plugin.error}
@@ -136,6 +201,15 @@ export function CreatorSettings({
               </p>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
+              {plugin.staged ? (
+                <Button
+                  variant="outline"
+                  className="text-xs"
+                  onClick={() => void manage("enable", plugin.name)}
+                >
+                  启用更新
+                </Button>
+              ) : null}
               <Button
                 variant="outline"
                 className="text-xs"

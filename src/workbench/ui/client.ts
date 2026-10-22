@@ -1,3 +1,4 @@
+import type { PluginUiEntry } from "../../../packages/plugin-sdk/src/index.ts";
 import type { PluginSummary } from "../../kernel/creator.ts";
 import type { KernelEvent } from "../../kernel/events.ts";
 import type {
@@ -74,6 +75,32 @@ export class KernelClient {
   async plugins(): Promise<PluginSummary[]> {
     const { plugins } = await this.request<{ plugins: PluginSummary[] }>("/plugins");
     return plugins;
+  }
+
+  async pluginUi(): Promise<PluginUiEntry[]> {
+    const { entries } = await this.request<{ entries: PluginUiEntry[] }>("/plugins/ui");
+    return entries.map((entry) => ({ ...entry, url: `${this.baseUrl}${entry.url}` }));
+  }
+
+  async pluginRequest(
+    plugin: string,
+    method: string,
+    sessionId: string,
+    input: unknown,
+  ): Promise<unknown> {
+    const { result } = await this.request<{ result: unknown }>(
+      `/plugins/${encodeURIComponent(plugin)}/rpc/${encodeURIComponent(method)}`,
+      { method: "POST", body: { sessionId, input } },
+    );
+    return result;
+  }
+
+  async developPlugin(directory: string): Promise<PluginSummary[]> {
+    const { result } = await this.request<{ result: PluginSummary[] }>("/plugins", {
+      method: "POST",
+      body: { action: "develop", directory },
+    });
+    return result;
   }
 
   async managePlugin(

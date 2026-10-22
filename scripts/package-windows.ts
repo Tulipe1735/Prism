@@ -8,6 +8,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { Arch, build as packageApp, Platform } from "electron-builder";
 import { build as bundle } from "esbuild";
+import { copyPluginRuntime } from "./plugin-runtime.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const staging = join(root, ".packaging");
@@ -40,7 +41,7 @@ await bundle({
   platform: "node",
   format: "cjs",
   target: "node22",
-  external: ["playwright", "node-pty"],
+  external: ["playwright", "node-pty", "esbuild"],
   legalComments: "linked",
   define: { "import.meta.url": "__prismModuleUrl" },
   banner: {
@@ -49,6 +50,8 @@ await bundle({
 });
 await cp(join(root, "src/browser/snapshot.js"), join(runtime, "snapshot.js"));
 await cp(join(root, "skills"), join(runtime, "skills"), { recursive: true });
+await cp(join(root, "dist/plugins"), join(runtime, "plugins"), { recursive: true });
+await copyPluginRuntime(runtime, ["linux-x64", "win32-x64"]);
 await cp(join(root, "LICENSE"), join(runtime, "LICENSE"));
 await cp(join(root, "THIRD_PARTY_NOTICES.md"), join(runtime, "THIRD_PARTY_NOTICES.md"));
 await writeFile(

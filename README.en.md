@@ -58,15 +58,14 @@ Open **Settings → Creator Mode**, enable plugin authoring, and ask:
 > Create a text word-count plugin, install it, and verify it with Chinese and English
 > text.
 
-The agent can inspect the runtime, generate a JavaScript plugin, install it with
-`plugin_manager`, then discover and call its tools on the next model request. Plugins
-persist in the kernel's data directory and reload after restart. Settings provides
-enable, disable, reload and remove actions. A failed update restores the previous
-version.
+The agent prepares a multi-file Bundle with controlled npm dependencies, optional UI
+slots and development hot reload, then explicitly enables it. Tools appear on the next
+model request. Excalidraw uses this same contract. Settings provides enable, disable,
+reload and remove actions; failed activation restores the previous version.
 
 Creator Mode is off by default. Turning it off leaves enabled plugins running. This
-version supports kernel tools and events; DSH plugin compatibility depends on the
-required host interfaces. See [usage](docs/guide/creator-mode.md) and the
+version supports backend tools, events and ten UI slots; DSH compatibility depends on
+the required host interfaces. See [usage](docs/guide/creator-mode.md) and the
 [authoring contract](docs/develop/plugins.md).
 
 ## Browser CLI for other agents

@@ -37,21 +37,22 @@ export function registerRenderer(getUiUrl: () => string | undefined): void {
       signal: request.signal,
     });
     const responseHeaders = new Headers(upstream.headers);
-    responseHeaders.set(
-      "Content-Security-Policy",
-      [
-        "default-src 'self'",
-        `script-src 'self' 'unsafe-inline' https://${CLERK_FRONTEND_HOST} https://challenges.cloudflare.com https://*.protect.clerk.com`,
-        `connect-src 'self' https://${CLERK_FRONTEND_HOST} https://*.protect.clerk.com:* https://clerk-telemetry.com https://*.clerk-telemetry.com`,
-        "img-src 'self' https://img.clerk.com data:",
-        "style-src 'self' 'unsafe-inline'",
-        "worker-src 'self' blob:",
-        "frame-src 'self' https://challenges.cloudflare.com https://*.protect.clerk.com",
-        "form-action 'self'",
-        "object-src 'none'",
-        "base-uri 'self'",
-      ].join("; "),
-    );
+    if (!url.pathname.startsWith("/kernel/plugins/"))
+      responseHeaders.set(
+        "Content-Security-Policy",
+        [
+          "default-src 'self'",
+          `script-src 'self' 'unsafe-inline' https://${CLERK_FRONTEND_HOST} https://challenges.cloudflare.com https://*.protect.clerk.com`,
+          `connect-src 'self' https://${CLERK_FRONTEND_HOST} https://*.protect.clerk.com:* https://clerk-telemetry.com https://*.clerk-telemetry.com`,
+          "img-src 'self' https://img.clerk.com data:",
+          "style-src 'self' 'unsafe-inline'",
+          "worker-src 'self' blob:",
+          "frame-src 'self' https://challenges.cloudflare.com https://*.protect.clerk.com",
+          "form-action 'self'",
+          "object-src 'none'",
+          "base-uri 'self'",
+        ].join("; "),
+      );
     return new Response(upstream.body, {
       status: upstream.status,
       headers: responseHeaders,

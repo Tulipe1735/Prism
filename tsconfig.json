@@ -17,6 +17,19 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src", "tests", "vitest.config.ts", "tsup.config.ts", "scripts"],
-  "exclude": ["src/workbench/ui", "tests/workbench/ui"]
+  "include": [
+    "src",
+    "tests",
+    "vitest.config.ts",
+    "tsup.config.ts",
+    "scripts",
+    "packages/**/*.ts",
+    "plugins/excalidraw/src/canvas.ts",
+    "plugins/excalidraw/src/scene.ts"
+  ],
+  "exclude": [
+    "src/workbench/ui",
+    "tests/workbench/ui",
+    "packages/plugin-sdk/src/client.ts"
+  ]
 }
