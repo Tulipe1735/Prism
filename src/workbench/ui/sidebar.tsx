@@ -1,9 +1,12 @@
 import type { JSX, RefObject } from "react";
 import type { SessionSummary } from "../../kernel/session.ts";
+import type { SessionGroup } from "./derive.ts";
 import type { UiState } from "./state.ts";
 import type { Workbench } from "./use-workbench.ts";
 import {
   ArrowUpRight,
+  ChevronRight,
+  Folder,
   FolderOpen,
   MessageSquare,
   Pencil,
@@ -11,11 +14,28 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AccountMenu } from "./account-menu.tsx";
-import { Button, SectionLabel, workspaceName } from "./components.tsx";
+import { Button, workspaceName } from "./components.tsx";
 import { PluginSlot } from "./plugin-slots.tsx";
 import { selectKnownWorkspaces, selectVisibleSessions } from "./state.ts";
+
+const COLLAPSED_WORKSPACES_KEY = "prism.workbench.collapsed-workspaces";
+
+function readCollapsedWorkspaces(): Set<string> {
+  try {
+    const saved: unknown = JSON.parse(
+      localStorage.getItem(COLLAPSED_WORKSPACES_KEY) ?? "[]",
+    );
+    return new Set(
+      Array.isArray(saved)
+        ? saved.filter((path): path is string => typeof path === "string")
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
 
 export function Sidebar({
   workbench,
@@ -32,9 +52,35 @@ export function Sidebar({
 }): JSX.Element {
   const { state } = workbench;
   const [creating, setCreating] = useState(false);
+  const [collapsedWorkspaces, setCollapsedWorkspaces] = useState(
+    readCollapsedWorkspaces,
+  );
+  const [searchCollapsed, setSearchCollapsed] = useState(() => new Set<string>());
   const workspaceInput = useRef<HTMLInputElement>(null);
   const focusWorkspace = useRef(false);
   const groups = selectVisibleSessions(state);
+  const searching = state.search.trim() !== "";
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        COLLAPSED_WORKSPACES_KEY,
+        JSON.stringify([...collapsedWorkspaces]),
+      );
+    } catch {
+      // Folder disclosure still works when browser storage is unavailable.
+    }
+  }, [collapsedWorkspaces]);
+
+  function toggleWorkspace(workspace: string): void {
+    const update = searching ? setSearchCollapsed : setCollapsedWorkspaces;
+    update((current) => {
+      const next = new Set(current);
+      if (next.has(workspace)) next.delete(workspace);
+      else next.add(workspace);
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!collapsed && focusWorkspace.current) {
@@ -52,7 +98,15 @@ export function Sidebar({
     }
     setCreating(true);
     try {
-      if (await workbench.newSession(workspace)) onNavigate();
+      if (await workbench.newSession(workspace)) {
+        for (const update of [setCollapsedWorkspaces, setSearchCollapsed])
+          update((current) => {
+            const next = new Set(current);
+            next.delete(workspace);
+            return next;
+          });
+        onNavigate();
+      }
     } finally {
       setCreating(false);
     }
@@ -74,20 +128,28 @@ export function Sidebar({
         <Plus size={18} aria-hidden="true" />
       </Button>
       <div hidden={collapsed} className="flex min-h-0 flex-1 flex-col">
-        <div className="px-5 pt-6 pb-4">
-          <SectionLabel>工作区</SectionLabel>
+        <div className="workspace-picker px-5 pt-6 pb-5">
           <WorkspacePicker
             key={state.workspace}
             inputRef={workspaceInput}
             state={state}
             workbench={workbench}
           />
+          <Button
+            variant="primary"
+            className="new-session mt-4 w-full justify-start gap-2.5 rounded-lg px-3.5"
+            data-action="new-session-primary"
+            onClick={() => void create()}
+            disabled={creating || !state.connected || state.workspace === ""}
+            aria-busy={creating}
+          >
+            <Plus size={16} aria-hidden="true" />
+            新建会话
+          </Button>
         </div>
         {collapsed ? null : <PluginSlot slot="workbench.sidebar" />}
-        <div className="flex min-h-0 flex-1 flex-col px-3 py-5">
-          <h2 className="px-2 text-xs font-semibold tracking-[0.01em] text-muted">
-            会话
-          </h2>
+        <div className="flex min-h-0 flex-1 flex-col px-3 pt-3 pb-5">
+          <h2 className="px-2 text-xs font-medium text-muted">会话</h2>
           <div className="relative mx-2 mt-3 mb-3">
             <Search
               size={14}
@@ -99,9 +161,10 @@ export function Sidebar({
               aria-label="搜索会话"
               placeholder="搜索会话"
               value={state.search}
-              onChange={(event) =>
-                workbench.dispatch({ type: "search", query: event.target.value })
-              }
+              onChange={(event) => {
+                setSearchCollapsed(new Set());
+                workbench.dispatch({ type: "search", query: event.target.value });
+              }}
               className="field border-transparent bg-ink/[0.035] py-2 pl-8 focus:bg-paper"
               autoComplete="off"
             />
@@ -125,43 +188,20 @@ export function Sidebar({
               </div>
             ) : (
               groups.map((group) => (
-                <div key={group.workspace} className="group mb-4">
-                  <div className="workspace-heading mb-1.5 flex items-center gap-1 px-2 text-xs text-muted">
-                    <h3 className="min-w-0 flex-1">
-                      <button
-                        type="button"
-                        title={group.workspace}
-                        onClick={() => workbench.openWorkspace(group.workspace)}
-                        className="flex w-full min-w-0 items-center gap-2 py-1.5 text-left hover:text-ink"
-                      >
-                        <FolderOpen size={13} aria-hidden="true" className="shrink-0" />
-                        <span className="truncate">
-                          {workspaceName(group.workspace)}
-                        </span>
-                      </button>
-                    </h3>
-                    <Button
-                      variant="ghost"
-                      className="workspace-create size-7 min-h-7 px-0"
-                      data-action="new-session"
-                      data-workspace={group.workspace}
-                      aria-label={`在 ${workspaceName(group.workspace)} 中新建会话`}
-                      title="新建会话"
-                      disabled={creating || !state.connected}
-                      onClick={() => void create(group.workspace)}
-                    >
-                      <Plus size={15} aria-hidden="true" />
-                    </Button>
-                  </div>
-                  {group.sessions.map((session) => (
-                    <SessionRow
-                      key={session.id}
-                      session={session}
-                      workbench={workbench}
-                      onNavigate={onNavigate}
-                    />
-                  ))}
-                </div>
+                <WorkspaceGroup
+                  key={group.workspace}
+                  group={group}
+                  expanded={
+                    !(searching ? searchCollapsed : collapsedWorkspaces).has(
+                      group.workspace,
+                    )
+                  }
+                  onToggle={() => toggleWorkspace(group.workspace)}
+                  onCreate={() => void create(group.workspace)}
+                  creating={creating}
+                  workbench={workbench}
+                  onNavigate={onNavigate}
+                />
               ))
             )}
           </nav>
@@ -176,6 +216,90 @@ export function Sidebar({
         />
       </div>
     </>
+  );
+}
+
+function WorkspaceGroup({
+  group,
+  expanded,
+  onToggle,
+  onCreate,
+  creating,
+  workbench,
+  onNavigate,
+}: {
+  group: SessionGroup;
+  expanded: boolean;
+  onToggle: () => void;
+  onCreate: () => void;
+  creating: boolean;
+  workbench: Workbench;
+  onNavigate: () => void;
+}): JSX.Element {
+  const contentId = useId();
+  const FolderIcon = expanded ? FolderOpen : Folder;
+  return (
+    <div className="workspace-group mb-3" data-expanded={expanded}>
+      <div className="workspace-heading flex items-center gap-1 rounded-lg pr-1 text-xs text-muted">
+        <h3 className="min-w-0 flex-1">
+          <button
+            type="button"
+            data-action="toggle-workspace"
+            data-workspace={group.workspace}
+            aria-expanded={expanded}
+            aria-controls={contentId}
+            aria-label={workspaceName(group.workspace)}
+            title={`${expanded ? "收起" : "展开"} ${group.workspace}`}
+            onClick={onToggle}
+            className="workspace-disclosure flex w-full min-w-0 items-center gap-2 py-2.5 pl-2 text-left"
+          >
+            <ChevronRight
+              size={12}
+              aria-hidden="true"
+              className="workspace-chevron shrink-0"
+            />
+            <FolderIcon size={15} aria-hidden="true" className="shrink-0" />
+            <span className="truncate font-medium">
+              {workspaceName(group.workspace)}
+            </span>
+            <span className="workspace-count ml-auto text-[11px] tabular-nums">
+              {group.sessions.length}
+            </span>
+          </button>
+        </h3>
+        <Button
+          variant="ghost"
+          className="workspace-create size-7 min-h-7 px-0"
+          data-action="new-session"
+          data-workspace={group.workspace}
+          aria-label={`在 ${workspaceName(group.workspace)} 中新建会话`}
+          title="新建会话"
+          disabled={creating || !workbench.state.connected}
+          onClick={onCreate}
+        >
+          <Plus size={14} aria-hidden="true" />
+        </Button>
+      </div>
+      <div
+        id={contentId}
+        className="workspace-sessions"
+        aria-hidden={!expanded}
+        inert={!expanded}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="workspace-session-list mt-1 ml-[17px] border-l pl-2">
+            {group.sessions.map((session) => (
+              <SessionRow
+                key={session.id}
+                session={session}
+                workbench={workbench}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -213,13 +337,22 @@ function WorkspacePicker({
 
   return (
     <form
-      className="mt-3"
+      className="min-w-0"
       onSubmit={(event) => {
         event.preventDefault();
         workbench.openWorkspace(path);
       }}
     >
-      <label htmlFor="workspace-input" className="mb-2 block text-sm font-semibold">
+      <label
+        htmlFor="workspace-input"
+        className="mb-3 flex items-center gap-2.5 text-sm font-semibold"
+      >
+        <FolderOpen
+          size={17}
+          strokeWidth={1.5}
+          className="shrink-0 text-accent"
+          aria-hidden="true"
+        />
         {state.workspace === "" ? "选择你的工作区" : workspaceName(state.workspace)}
       </label>
       {desktop === undefined ? null : (
@@ -243,7 +376,7 @@ function WorkspacePicker({
           value={path}
           onChange={(event) => setPath(event.target.value)}
           placeholder="/home/you/project"
-          className="field font-mono text-xs"
+          className="field workspace-path font-mono text-xs"
           autoComplete="off"
         />
         <Button
@@ -322,7 +455,7 @@ function SessionRow({
           void workbench.openSession(session.id);
           onNavigate();
         }}
-        className="flex w-full min-w-0 items-center gap-2 py-2.5 pr-16 pl-3 text-left"
+        className="flex w-full min-w-0 items-center gap-2 py-2.5 pr-5 pl-2.5 text-left"
       >
         <MessageSquare size={15} aria-hidden="true" className="shrink-0 text-muted" />
         <span

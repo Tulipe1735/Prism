@@ -525,6 +525,67 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     expect(errors).toEqual([]);
   });
 
+  it("folds workspace folders independently, preserves preferences, and reveals search matches", async () => {
+    harness = await startTestKernel();
+    const first = await harness.kernel.kernel.createSession({
+      workspace: harness.workspace,
+      title: "文件夹中的任务",
+    });
+    const other = await harness.kernel.kernel.createSession({
+      workspace: join(harness.workspace, "another-project"),
+      title: "另一个工作区的任务",
+    });
+    ui = await startUiServer({ kernelUrl: harness.kernel.url, uiRoot: UI_ROOT });
+    page = await browser.newPage({ viewport: { width: 1440, height: 920 } });
+    await page.goto(ui.url);
+    await page.waitForSelector('[data-kernel-status="ready"]');
+    const folder = page.locator('[data-action="toggle-workspace"]').filter({
+      has: page.locator("span", { hasText: /^workspace$/ }),
+    });
+    const row = page.locator(
+      `[data-action="open-session"][data-session="${first.id}"]`,
+    );
+    const otherRow = page.locator(
+      `[data-action="open-session"][data-session="${other.id}"]`,
+    );
+    await row.click();
+    await page.locator("#message").fill("保留这条草稿");
+    await folder.focus();
+    await page.keyboard.press("Enter");
+    const folderContent = page
+      .locator(".workspace-group")
+      .filter({ has: row })
+      .locator(".workspace-sessions");
+    await expect.poll(async () => (await folderContent.boundingBox())?.height).toBe(0);
+    expect(await folder.getAttribute("aria-expanded")).toBe("false");
+    expect(await row.getAttribute("aria-current")).toBe("page");
+    expect(await otherRow.isVisible()).toBe(true);
+    expect(await page.locator("#message").inputValue()).toBe("保留这条草稿");
+
+    await page.locator("#search").fill("文件夹中的任务");
+    expect(await folder.getAttribute("aria-expanded")).toBe("true");
+    expect(await row.isVisible()).toBe(true);
+    await page.locator("#search").fill("");
+    expect(await folder.getAttribute("aria-expanded")).toBe("false");
+    await page.reload();
+    await page.waitForSelector('[data-kernel-status="ready"]');
+    expect(await folder.getAttribute("aria-expanded")).toBe("false");
+    expect(await otherRow.isVisible()).toBe(true);
+
+    // Creating in a closed folder reveals the newly selected session.
+    const heading = folder.locator("xpath=../..");
+    await heading.hover();
+    await heading.locator('[data-action="new-session"]').click();
+    await page.waitForSelector("#chat-header strong");
+    expect(await folder.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      await page
+        .locator('[data-action="open-session"][aria-current="page"]')
+        .isVisible(),
+    ).toBe(true);
+    expect(await page.locator("#message").isDisabled()).toBe(false);
+  });
+
   it("creates a session in the hovered workspace and renders Markdown without widening the chat", async () => {
     const markdown = [
       "## 修改结果",
@@ -573,15 +634,15 @@ describe.runIf(enabled)("workbench in a real browser", () => {
     expect(await opacity()).toBe("0");
     await heading.hover();
     await page.waitForFunction(
-      `getComputedStyle(document.querySelector('[data-workspace="${other}"]')).opacity === '1'`,
+      `getComputedStyle(document.querySelector('[data-action="new-session"][data-workspace="${other}"]')).opacity === '1'`,
     );
     await page.mouse.move(700, 500);
     await page.waitForFunction(
-      `getComputedStyle(document.querySelector('[data-workspace="${other}"]')).opacity === '0'`,
+      `getComputedStyle(document.querySelector('[data-action="new-session"][data-workspace="${other}"]')).opacity === '0'`,
     );
     await heading.getByRole("button", { name: "another-project", exact: true }).focus();
     await page.waitForFunction(
-      `getComputedStyle(document.querySelector('[data-workspace="${other}"]')).opacity === '1'`,
+      `getComputedStyle(document.querySelector('[data-action="new-session"][data-workspace="${other}"]')).opacity === '1'`,
     );
     await page.keyboard.press("Tab");
     await page.keyboard.press("Enter");

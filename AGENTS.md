@@ -171,6 +171,7 @@ verified API behavior and the gaps in the current transport.
 
 ## Workbench Integration
 
+- Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
 - The UI selects presets and displays session state; it does not implement agent
   capabilities.
 - The Host is responsible for resolving and constructing session compositions.

@@ -130,7 +130,7 @@ export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
     }
   }
   return (
-    <div className="shrink-0 px-5 pt-3 pb-4 md:px-8 md:pb-6 lg:px-12">
+    <div className="composer-dock shrink-0 px-5 pt-3 pb-4 md:px-8 md:pb-6 lg:px-12">
       <form
         id="composer"
         className={`relative mx-auto max-w-[45rem] rounded-lg border bg-paper transition-[border-color,box-shadow] duration-200 focus-within:border-ink/25 focus-within:shadow-[0_2px_8px_rgba(55,53,47,0.06)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/30 ${dragging ? "border-accent ring-2 ring-accent/20" : "border-line"}`}
@@ -294,6 +294,14 @@ export function Composer({ workbench }: { workbench: Workbench }): JSX.Element {
           </div>
         </div>
       </form>
+      <div className="composer-hint mx-auto mt-3 flex max-w-[45rem] justify-end gap-3 text-[11px] text-muted">
+        <span>
+          <kbd>Enter</kbd> 发送
+        </span>
+        <span>
+          <kbd>Shift Enter</kbd> 换行
+        </span>
+      </div>
     </div>
   );
 }

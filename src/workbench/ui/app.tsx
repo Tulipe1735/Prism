@@ -92,7 +92,7 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
   return (
     <div
       data-kernel-status={state.connected ? state.kernel?.status : "offline"}
-      className="grid h-dvh grid-rows-[56px_minmax(0,1fr)_auto] overflow-hidden"
+      className="prism-workbench grid h-dvh grid-rows-[56px_minmax(0,1fr)_auto] overflow-hidden"
     >
       <a
         href="#message"
@@ -225,6 +225,9 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
         </aside>
         <section
           id="chat"
+          data-empty={
+            state.entries.length === 0 && Object.keys(state.deltas).length === 0
+          }
           aria-label="任务对话"
           className="col-start-2 row-start-1 flex min-h-0 min-w-0 flex-col"
         >
@@ -234,7 +237,7 @@ function WorkbenchView({ workbench }: { workbench: Workbench }): JSX.Element {
           >
             <div className="min-w-0 flex-1">
               {state.session === null ? (
-                <SectionLabel>任务对话</SectionLabel>
+                <SectionLabel>新任务</SectionLabel>
               ) : (
                 <>
                   <strong className="block truncate text-sm font-semibold">

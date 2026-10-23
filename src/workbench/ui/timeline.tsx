@@ -58,12 +58,12 @@ export function Timeline({ state }: { state: UiState }): JSX.Element {
 
 function Welcome(): JSX.Element {
   return (
-    <div className="mx-auto flex min-h-full max-w-[45rem] flex-col justify-center py-12 md:py-16">
-      <PrismMark className="mb-8 size-9" />
-      <h1 className="max-w-lg text-[clamp(30px,3.4vw,46px)] leading-[1.15] font-semibold tracking-[-0.035em]">
-        让想法，
+    <div className="welcome mx-auto flex min-h-full max-w-[45rem] flex-col justify-center py-12 md:py-16">
+      <PrismMark className="welcome-mark mb-7 size-10" />
+      <h1 className="welcome-title max-w-lg text-[clamp(34px,3.6vw,52px)] leading-[1.4] font-medium tracking-[-0.045em]">
+        万物皆虚
         <br />
-        <span className="text-muted">成为下一步。</span>
+        <span className="text-muted">万事皆允</span>
       </h1>
     </div>
   );
